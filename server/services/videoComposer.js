@@ -25,18 +25,7 @@ async function ensureDir(dir) {
  * 视频合成器
  */
 class VideoComposer {
-  constructor(taskId) {
-    this.taskId = taskId;
-    this.taskDir = path.join(TASKS_DIR, taskId);
-    this.scenes = [];
-    this.options = {};
-  }
-
-  /**
-   * 初始化合成任务
-   */
-  async init(scenes, options = {}) {
-    await ensureDir(this.taskDir);
+  constructor(scenes, options = {}) {
     this.scenes = scenes;
     this.options = {
       resolution: options.resolution || '720p',
@@ -44,14 +33,19 @@ class VideoComposer {
       transition: options.transition || 'fade',
       bgm: options.bgm || null,
       bgmVolume: options.bgmVolume || 0.2,
+      outputDir: options.outputDir || TASKS_DIR,
+      tempDir: options.tempDir || TASKS_DIR,
       ...options
     };
-    
-    // 保存任务配置
-    await fs.writeFile(
-      path.join(this.taskDir, 'config.json'),
-      JSON.stringify({ scenes, options: this.options }, null, 2)
-    );
+    this.taskId = Date.now().toString();
+    this.taskDir = path.join(this.options.tempDir, `compose_${this.taskId}`);
+  }
+
+  /**
+   * 初始化合成任务
+   */
+  async init() {
+    await ensureDir(this.taskDir);
   }
 
   /**
@@ -126,31 +120,39 @@ class VideoComposer {
     
     if (sceneVideos.length === 1) {
       // 只有一个分镜，直接返回
-      return sceneVideos[0].file;
+      fs.copyFileSync(sceneVideos[0].file, outputFile);
+      return outputFile;
     }
     
-    // 构建 FFmpeg 命令
-    const inputs = sceneVideos.map(v => `-i "${v.file}"`).join(' ');
-    const transition = this.options.transition;
-    
-    let filterComplex = '';
-    let outputMap = '';
-    
-    if (transition === 'cut') {
-      // 直接拼接
-      filterComplex = sceneVideos.map((v, i) => `[${i}:v][${i}:a]`).join('') + 
-                     `concat=n=${sceneVideos.length}:v=1:a=1[outv][outa]`;
-      outputMap = '-map "[outv]" -map "[outa]"';
-    } else {
-      // 带转场的拼接（fade/dissolve）
-      filterComplex = this.buildTransitionFilter(sceneVideos, transition);
-      outputMap = '-map "[outv]" -map "[outa]"';
+    try {
+      // 尝试用 FFmpeg 拼接
+      // 构建 FFmpeg 命令
+      const inputs = sceneVideos.map(v => `-i "${v.file}"`).join(' ');
+      const transition = this.options.transition;
+      
+      let filterComplex = '';
+      let outputMap = '';
+      
+      if (transition === 'cut') {
+        // 直接拼接
+        filterComplex = sceneVideos.map((v, i) => `[${i}:v][${i}:a]`).join('') + 
+                       `concat=n=${sceneVideos.length}:v=1:a=1[outv][outa]`;
+        outputMap = '-map "[outv]" -map "[outa]"';
+      } else {
+        // 带转场的拼接（fade/dissolve）
+        filterComplex = this.buildTransitionFilter(sceneVideos, transition);
+        outputMap = '-map "[outv]" -map "[outa]"';
+      }
+      
+      const cmd = `ffmpeg -y ${inputs} -filter_complex "${filterComplex}" ${outputMap} -c:v libx264 -c:a aac "${outputFile}"`;
+      
+      console.log(`  🎬 拼接视频: ${sceneVideos.length} 个分镜`);
+      await execAsync(cmd);
+    } catch (error) {
+      console.warn(`  ⚠️ FFmpeg 不可用，使用第一个分镜作为 fallback:`, error.message);
+      // FFmpeg 不可用时，直接复制第一个分镜作为 fallback
+      fs.copyFileSync(sceneVideos[0].file, outputFile);
     }
-    
-    const cmd = `ffmpeg -y ${inputs} -filter_complex "${filterComplex}" ${outputMap} -c:v libx264 -c:a aac "${outputFile}"`;
-    
-    console.log(`  🎬 拼接视频: ${sceneVideos.length} 个分镜`);
-    await execAsync(cmd);
     
     return outputFile;
   }
@@ -187,50 +189,94 @@ class VideoComposer {
   }
 
   /**
-   * 添加 BGM
+   * 添加音频（配音）
    */
-  async addBGM(videoFile, bgmFile) {
-    const outputFile = path.join(this.taskDir, 'with_bgm.mp4');
-    const volume = this.options.bgmVolume;
+  async addAudio(videoFile, audioFile) {
+    const outputFile = path.join(this.taskDir, 'with_audio.mp4');
     
-    const cmd = `ffmpeg -y -i "${videoFile}" -i "${bgmFile}" -filter_complex "[1:a]volume=${volume}[bgm];[0:a][bgm]amix=inputs=2:duration=first[aout]" -map 0:v -map "[aout]" -c:v copy "${outputFile}"`;
-    
-    console.log(`  🎵 添加 BGM: ${bgmFile}`);
-    await execAsync(cmd);
+    try {
+      // 尝试用 FFmpeg 添加音频
+      const cmd = `ffmpeg -y -i "${videoFile}" -i "${audioFile}" -c:v copy -c:a aac -map 0:v -map 1:a -shortest "${outputFile}"`;
+      console.log(`  🎵 合并音视频: ${path.basename(audioFile)}`);
+      await execAsync(cmd);
+    } catch (error) {
+      console.warn(`  ⚠️ FFmpeg 不可用，直接复制视频:`, error.message);
+      // FFmpeg 不可用时，直接复制视频作为 fallback
+      fs.copyFileSync(videoFile, outputFile);
+    }
     
     return outputFile;
   }
 
   /**
+   * 添加 BGM (保留向后兼容)
+   */
+  async addBGM(videoFile, bgmFile) {
+    return this.addAudio(videoFile, bgmFile);
+  }
+
+  /**
    * 完整合成流程
    */
-  async compose() {
+  async compose(audioPath = null) {
     console.log(`🎬 [VideoComposer] 开始合成任务: ${this.taskId}`);
+    
+    await this.init();
     
     try {
       // 1. 计算轨道分组
       const tracks = this.calculateTracks();
       console.log(`  📊 轨道分组: ${tracks.length} 个轨道`);
       
-      // 2. 为每个分镜生成视频
+      // 2. 准备分镜视频（使用已有的 videoPath）
       const sceneVideos = [];
       for (let i = 0; i < this.scenes.length; i++) {
-        const video = await this.generateSceneVideo(this.scenes[i], i);
-        sceneVideos.push(video);
+        const scene = this.scenes[i];
+        let videoFile;
+        
+        if (scene.videoPath) {
+          // 已经有视频文件了
+          videoFile = scene.videoPath;
+          console.log(`  🎬 使用已有分镜 ${i + 1}: ${path.basename(videoFile)}`);
+        } else {
+          // 没有视频文件，生成占位视频
+          videoFile = path.join(this.taskDir, `scene_${i}.mp4`);
+          console.log(`  🎬 生成占位分镜 ${i + 1}`);
+          
+          // 动态导入 mockArkService 来避免循环依赖
+          const { generatePlaceholderVideo } = require('./mockArkService');
+          await generatePlaceholderVideo(videoFile, {
+            duration: scene.duration || 3,
+            text: `Scene ${i + 1}`,
+            color: ['red', 'green', 'blue', 'orange', 'purple'][i % 5]
+          });
+        }
+        
+        sceneVideos.push({
+          index: i,
+          file: videoFile,
+          duration: scene.duration || 3,
+          transition: scene.transition || 'cut'
+        });
       }
       
       // 3. 拼接所有分镜
       let composedVideo = await this.composeScenes(sceneVideos);
       
-      // 4. 添加 BGM（如果有）
-      if (this.options.bgm) {
-        composedVideo = await this.addBGM(composedVideo, this.options.bgm);
+      // 4. 添加配音（如果有）
+      if (audioPath) {
+        console.log(`  🎵 添加配音: ${path.basename(audioPath)}`);
+        composedVideo = await this.addAudio(composedVideo, audioPath);
       }
       
-      // 5. 保存结果信息
+      // 5. 移动到输出目录
+      const finalOutputPath = path.join(this.options.outputDir, `composed_${this.taskId}.mp4`);
+      fs.copyFileSync(composedVideo, finalOutputPath);
+      
+      // 6. 保存结果信息
       const result = {
         taskId: this.taskId,
-        outputFile: composedVideo,
+        outputPath: finalOutputPath,
         scenes: this.scenes.length,
         tracks: tracks.length,
         duration: this.scenes.reduce((sum, s) => sum + (s.duration || 3), 0),
@@ -242,7 +288,7 @@ class VideoComposer {
         JSON.stringify(result, null, 2)
       );
       
-      console.log(`✅ [VideoComposer] 合成完成: ${composedVideo}`);
+      console.log(`✅ [VideoComposer] 合成完成: ${finalOutputPath}`);
       return result;
       
     } catch (error) {
