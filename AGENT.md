@@ -34,8 +34,17 @@ aigc-video-mvp/
 │   ├── .env                     # 环境变量（API Key，不提交）
 │   ├── .env.example             # 环境变量模板
 │   ├── package.json             # 后端依赖
-│   ├── agents/
-│   │   └── scriptAgent.js       # 三层 Agent 架构实现
+│   ├── agents/                  # Agent 模块
+│   │   ├── index.js             # Agent 统一导出
+│   │   ├── orchestrator.js      # 编排器（核心）
+│   │   ├── scriptAgent.js       # 剧本生成 Agent
+│   │   ├── videoAgent.js        # 视频生成 Agent
+│   │   ├── clipAgent.js         # 智能剪辑 Agent
+│   │   └── tools/               # 工具集
+│   │       ├── index.js         # 工具统一导出
+│   │       ├── llm.js           # LLM 调用工具
+│   │       ├── videoAPI.js      # 视频 API 工具
+│   │       └── ttsAPI.js        # TTS 调用工具
 │   ├── services/
 │   │   ├── videoComposer.js     # 视频拼接 + TTS 服务
 │   │   └── traceService.js      # 生成过程追踪服务
@@ -44,11 +53,13 @@ aigc-video-mvp/
 │   ├── skills/
 │   │   ├── script_execution_skeleton.md  # 故事骨架生成 Skill
 │   │   └── script_execution_script.md    # 剧本写作 Skill
+│   ├── routes/
+│   │   └── agent.js             # Agent 路由
 │   ├── uploads/                 # 上传文件存储
 │   ├── outputs/                 # 生成的视频输出
 │   └── temp/                    # 临时文件
 │
-├── my-app/                      # 前端 (React + TypeScript + Vite)
+├── frontend/                    # 前端 (React + TypeScript + Vite)
 │   ├── src/
 │   │   ├── App.tsx              # 主组件
 │   │   ├── Dashboard.tsx        # 数据看板页面
@@ -59,6 +70,13 @@ aigc-video-mvp/
 │   ├── tsconfig.json            # TypeScript 配置
 │   └── vite.config.ts           # Vite 配置
 │
+├── docs/                        # 文档目录
+│   └── references/              # 学习参考文档
+│       ├── 01-arcreel-analysis.md
+│       ├── 02-toonflow-analysis.md
+│       ├── 03-learning-summary.md
+│       ├── 04-agent-architecture.md
+│       └── README.md
 ├── TODO.md                      # 待办事项清单
 ├── AGENT.md                     # 本文件
 ├── .gitignore                   # Git 忽略配置
@@ -87,6 +105,7 @@ aigc-video-mvp/
 | dotenv | 16.x | 环境变量 |
 | FFmpeg | - | 视频处理（需系统安装） |
 | Edge TTS | - | TTS 配音（需 pip 安装） |
+| Vercel AI SDK | - | Agent 框架 |
 
 ### 3.3 AI 能力
 | 模型 | Endpoint | 用途 |
@@ -98,31 +117,57 @@ aigc-video-mvp/
 
 ## 四、核心架构
 
-### 4.1 三层 Agent 架构（借鉴 Toonflow）
+### 4.1 多 Agent 协作架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Decision Layer (决策层)                   │
-│  • 接收用户输入，orchestrate 整个流程                          │
-│  • 协调 Execution 和 Supervision 层                           │
-│  • 根据评分结果决定是否重试                                    │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────┴──────────────┐
-        ▼                              ▼
-┌──────────────────────┐    ┌──────────────────────┐
-│  Execution Layer     │    │  Supervision Layer   │
-│  (执行层)             │    │  (监督层)             │
-│                      │    │                      │
-│  • 生成故事骨架        │    │  • 质量评估 (A/B/C)   │
-│  • 编写分镜剧本        │    │  • 问题检测           │
-│  • 修订剧本           │    │  • 改进建议           │
-└──────────────────────┘    └──────────────────────┘
+│                    VideoOrchestrator                         │
+│                      (编排层)                                │
+│  - 任务规划                                                  │
+│  - 流程编排                                                  │
+│  - 状态管理                                                  │
+│  - 错误处理与重试                                            │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        ▼             ▼             ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│  ScriptAgent  │ │  VideoAgent  │ │  ClipAgent    │
+│  (剧本生成)   │ │  (视频生成)   │ │  (智能剪辑)   │
+└───────────────┘ └───────────────┘ └───────────────┘
+        │             │             │
+        ▼             ▼             ▼
+┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+│  LLM Tools   │ │ VideoAPI Tools│ │ TTS Tools     │
+│  (火山方舟)   │ │ (火山方舟)    │ │ (Edge TTS)   │
+└───────────────┘ └───────────────┘ └───────────────┘
 ```
 
-**实现文件**：`server/agents/scriptAgent.js`
+**实现文件**：`server/agents/`
 
-### 4.2 API 端点
+### 4.2 Agent 职责说明
+
+#### ScriptAgent（剧本生成 Agent）
+- **职责**：根据商品信息生成结构化剧本
+- **输入**：商品标题、卖点描述、目标人群、价格（可选）
+- **输出**：结构化剧本 JSON（含分镜、旁白、时长等）
+- **特性**：支持结构化 JSON 输出、自动 fallback 机制、剧本优化
+
+#### VideoAgent（视频生成 Agent）
+- **职责**：根据分镜描述生成视频片段
+- **功能**：单分镜视频生成、批量视频生成、自动重试机制、Mock 模式支持
+- **特性**：RPM 限流处理、进度追踪、失败重试（最多 2 次）
+
+#### ClipAgent（智能剪辑 Agent）
+- **职责**：制定剪辑方案并合成最终视频
+- **功能**：智能剪辑方案生成、素材匹配、转场效果选择、TTS 配音合成、BGM 背景音乐
+
+#### Orchestrator（编排器）
+- **职责**：编排多个 Agent 协作完成任务
+- **工作流**：IDLE → PLANNING → GENERATING_SCRIPT → GENERATING_VIDEOS → COMPOSING → COMPLETED
+- **特性**：状态管理、进度回调、错误处理、历史记录
+
+### 4.3 API 端点
 
 #### 核心功能 API
 | 端点 | 方法 | 功能 |
@@ -137,6 +182,13 @@ aigc-video-mvp/
 | `/api/video/batch-generate` | POST | 批量生成完整视频 |
 | `/api/video/batch-status/:id` | GET | 查询批量任务状态 |
 
+#### Agent API
+| 端点 | 方法 | 功能 | 状态 |
+|------|------|------|------|
+| `/api/agent/generate` | POST | 端到端视频生成 | ✅ |
+| `/api/agent/status/:taskId` | GET | 查询 Agent 任务状态 | ✅ |
+| `/api/agent/steps` | GET | 获取可用步骤 | ✅ |
+
 #### 新增功能 API
 | 端点 | 方法 | 功能 | 状态 |
 |------|------|------|------|
@@ -147,7 +199,7 @@ aigc-video-mvp/
 | `/api/tasks` | GET | 任务历史列表 | ✅ |
 | `/api/health` | GET | 健康检查 | ✅ |
 
-### 4.3 数据结构
+### 4.4 数据结构
 
 #### 剧本结构
 ```typescript
@@ -176,6 +228,19 @@ interface Track {
   totalDuration: number;
 }
 ```
+
+#### Agent 任务状态
+| 状态 | 说明 |
+|------|------|
+| `idle` | 空闲 |
+| `planning` | 规划中 |
+| `generating_script` | 生成剧本 |
+| `generating_videos` | 生成视频 |
+| `composing` | 合成中 |
+| `adding_audio` | 添加音频 |
+| `reviewing` | 审查中 |
+| `completed` | 完成 |
+| `failed` | 失败 |
 
 ---
 
@@ -262,7 +327,7 @@ eventSource.onmessage = (event) => {
 
 ### 5.4 Mock 数据看板
 
-**文件**：`my-app/src/Dashboard.tsx`
+**文件**：`frontend/src/Dashboard.tsx`
 
 **功能**：
 - 总览统计（视频数、播放量、完播率）
@@ -272,6 +337,40 @@ eventSource.onmessage = (event) => {
 - 系统状态监控
 
 **API**：`GET /api/dashboard/stats`
+
+### 5.5 Agent 端到端生成
+
+**端点**：`POST /api/agent/generate`
+
+**请求**：
+```json
+{
+  "productInfo": {
+    "title": "商品名称",
+    "sellingPoints": "卖点描述",
+    "targetAudience": "目标人群"
+  },
+  "options": {
+    "resolution": "720p",
+    "ratio": "9:16",
+    "transition": "cut",
+    "enableTTS": true
+  }
+}
+```
+
+**响应**：
+```json
+{
+  "success": true,
+  "taskId": "task_xxx",
+  "script": { ... },
+  "videoUrl": "http://...",
+  "steps": [...],
+  "duration": 15000,
+  "state": "completed"
+}
+```
 
 ---
 
@@ -292,7 +391,7 @@ PORT=3001
 cd server && npm install
 
 # 前端
-cd my-app && npm install
+cd frontend && npm install
 
 # Edge TTS（系统级）
 pip install edge-tts
@@ -308,7 +407,7 @@ pip install edge-tts
 cd server && node index.js
 
 # 启动前端
-cd my-app && npm run dev
+cd frontend && npm run dev
 ```
 
 ---
@@ -323,7 +422,7 @@ cd my-app && npm run dev
 - [x] 任务进度
 - [x] 预览导出（多分辨率/画幅）
 
-### P1 进阶（78% 完成）
+### P1 进阶（90% 完成）
 - [x] 分镜级编辑（轨道系统）
 - [x] TTS 配音（Edge TTS）
 - [x] 字幕生成（SRT）
@@ -333,12 +432,13 @@ cd my-app && npm run dev
 - [x] **Mock 数据看板** ✅ 2026-05-21
 - [x] **失败重试机制** ✅ 2026-05-21
 - [x] **SSE 实时推送** ✅ 2026-05-21
+- [x] **智能剪辑 Agent** ✅ 2026-05-21（ClipAgent）
 - [ ] 素材标签/Embedding 检索
-- [ ] 智能剪辑 Agent
 
-### P2 加分（29% 完成）
+### P2 加分（36% 完成）
 - [x] Agent 编排
 - [x] **长任务体验优化** ✅ 2026-05-21（SSE 实时推送）
+- [x] **智能剪辑 Agent** ✅ 2026-05-21（ClipAgent 实现）
 - [ ] 多因子归因
 - [ ] A/B 对比
 - [ ] CI/CD
@@ -388,7 +488,7 @@ cd my-app && npm run dev
 
 ### 11.2 API 调用
 - 火山引擎 API 需要正确配置 Endpoint
-- 视频生成是异步任务，需要轮询状态
+- 视频生成是异步任务，需要轮询状态或使用 SSE
 - 注意 API 调用频率限制
 
 ### 11.3 视频处理
@@ -426,6 +526,11 @@ cd my-app && npm run dev
 - 检查网络连接
 - 系统会自动回退到轮询
 
+### Q5: Agent 编排失败
+- 检查 Agent 模块是否正确导出
+- 检查 orchestrator 状态管理
+- 查看错误日志和 Trace 记录
+
 ---
 
 ## 十三、下一步开发建议
@@ -442,4 +547,4 @@ cd my-app && npm run dev
 
 *文档创建时间: 2026-05-21*  
 *文档更新时间: 2026-05-21*  
-*文档版本: 1.1*
+*文档版本: 1.2*

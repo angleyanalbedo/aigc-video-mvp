@@ -7,8 +7,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// 引入 Agent 架构
-const { DecisionAgent } = require('./agents/scriptAgent');
+// 引入 Agent 架构 (新版)
+const { scriptAgent, videoAgent, clipAgent, orchestrator } = require('./agents');
 
 // 引入视频合成和 TTS 服务
 const { VideoComposer, TTSService } = require('./services/videoComposer');
@@ -85,17 +85,15 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   res.json({ success: true, url: fileUrl, filename: req.file.filename });
 });
 
-// 2. 生成剧本（使用三层 Agent 架构）
+// 2. 生成剧本（使用 Agent 架构）
 app.post('/api/script/generate', async (req, res) => {
   const { productInfo, materials } = req.body;
 
   try {
-    console.log('🎬 启动三层 Agent 剧本生成流程...');
-    
-    // 使用决策层 Agent  orchestrate 整个流程
-    const decisionAgent = new DecisionAgent(productInfo, materials || []);
-    const script = await decisionAgent.run();
-    
+    console.log('📝 使用 ScriptAgent 生成剧本...');
+
+    const script = await scriptAgent.generate(productInfo, materials || []);
+
     console.log('✅ 剧本生成完成');
     res.json({ success: true, script });
   } catch (error) {
@@ -843,6 +841,12 @@ async function downloadFile(url, destPath) {
   }
 }
 
+// 引入 Agent 路由
+const agentRoutes = require('./routes/agent');
+
+// 使用 Agent 路由
+app.use('/api/agent', agentRoutes);
+
 // 启动服务器
 app.listen(PORT, () => {
   console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
@@ -851,4 +855,5 @@ app.listen(PORT, () => {
   console.log(`🤖 LLM Endpoint: ${LLM_EP}`);
   console.log(`🎥 Video Endpoint: ${VIDEO_EP}`);
   console.log('✅ P1/P2 功能已启用：Agent编排、TTS、视频拼接、批量生成');
+  console.log('✅ 新增 /api/agent 端到端生成接口');
 });
