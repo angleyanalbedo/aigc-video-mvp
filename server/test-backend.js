@@ -75,11 +75,10 @@ async function runTests() {
     // 3. 剧本生成（使用三层 Agent）
     await tester.test('剧本生成（Agent架构）', async () => {
       const productInfo = {
-        name: '智能手表 Pro',
+        title: '智能手表 Pro',
         price: '299元',
-        features: ['心率监测', '睡眠追踪', 'GPS定位', '防水50米'],
-        targetAudience: '年轻白领',
-        sellingPoint: '性价比高'
+        sellingPoints: '心率监测、睡眠追踪、GPS定位、防水50米',
+        targetAudience: '年轻白领'
       };
 
       const response = await axios.post(`${BASE_URL}/api/script/generate`, {

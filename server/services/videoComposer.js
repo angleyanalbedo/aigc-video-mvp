@@ -282,42 +282,86 @@ class VideoComposer {
 }
 
 /**
- * TTS 服务 - 使用 Edge TTS
+ * TTS 服务 - Mock 版本（临时方案）
+ * 真实TTS需要外部服务，但我们先实现一个简单版本，让系统运行起来
  */
+
 class TTSService {
   constructor() {
-    this.edgeTTS = null;
+    // 这里可以后续添加真实的TTS实现
   }
 
   /**
    * 生成语音和字幕
    */
   async generate(text, options = {}) {
-    const voice = options.voice || 'zh-CN-XiaoxiaoNeural';
-    const rate = options.rate || '+0%';
+    console.log('  🎵 [TTS] 生成语音（Mock版本）');
     
-    // 使用 edge-tts 命令行工具
+    // 输出文件
     const outputFile = path.join(options.outputDir || TASKS_DIR, `tts_${Date.now()}.mp3`);
     const subtitleFile = outputFile.replace('.mp3', '.srt');
     
-    const cmd = `edge-tts --voice "${voice}" --rate "${rate}" --text "${text}" --write-media "${outputFile}" --write-subtitles "${subtitleFile}"`;
+    // 生成简单字幕（基于文本分段）
+    await this.generateSimpleSubtitle(text, subtitleFile);
     
-    await execAsync(cmd);
+    // 创建一个空文件（实际TTS会写入真实音频）
+    await fs.writeFile(outputFile, Buffer.from([]));
+    
+    // 估算音频时长
+    const estimatedDuration = Math.max(3, Math.ceil(text.length / 8)); // 简单估算
     
     return {
       audioFile: outputFile,
       subtitleFile: subtitleFile,
-      duration: await this.getAudioDuration(outputFile)
+      duration: estimatedDuration
     };
   }
 
   /**
-   * 获取音频时长
+   * 生成简单字幕
+   */
+  async generateSimpleSubtitle(text, subtitleFile) {
+    // 简单分段（按句子）
+    const sentences = text.split(/[。！？!?\n]+/).filter(s => s.trim());
+    const durationPerSentence = 3; // 每个句子约3秒
+    
+    let srtContent = '';
+    let currentTime = 0;
+    
+    sentences.forEach((sentence, index) => {
+      if (!sentence.trim()) return;
+      
+      const startTime = this.formatSRTTime(currentTime);
+      const endTime = this.formatSRTTime(currentTime + durationPerSentence);
+      
+      srtContent += `${index + 1}\n`;
+      srtContent += `${startTime} --> ${endTime}\n`;
+      srtContent += `${sentence.trim()}\n\n`;
+      
+      currentTime += durationPerSentence;
+    });
+    
+    await fs.writeFile(subtitleFile, srtContent, 'utf-8');
+  }
+
+  /**
+   * 格式化 SRT 时间
+   */
+  formatSRTTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds % 1) * 1000);
+    
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+  }
+
+  /**
+   * 获取音频时长（Mock版本）
    */
   async getAudioDuration(file) {
-    const cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${file}"`;
-    const { stdout } = await execAsync(cmd);
-    return parseFloat(stdout.trim());
+    // 估算时长
+    return 10; // 默认10秒
   }
 }
 
