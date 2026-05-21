@@ -13,6 +13,12 @@ const { DecisionAgent } = require('./agents/scriptAgent');
 // 引入视频合成和 TTS 服务
 const { VideoComposer, TTSService } = require('./services/videoComposer');
 
+// 引入 Trace 服务
+const traceService = require('./services/traceService');
+
+// 引入重试工具
+const { withRetry, sleep, videoRetryOptions, ttsRetryOptions } = require('./utils/retry');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -280,12 +286,23 @@ app.post('/api/video/batch-generate', async (req, res) => {
   }
 
   const batchId = Date.now().toString();
+  
+  // 初始化任务状态
   taskStore.set(batchId, {
     status: 'processing',
     progress: 0,
     scenes: [],
     createdAt: Date.now()
   });
+
+  // 开始 Trace 追踪
+  traceService.startTrace(batchId, {
+    type: 'batch_generate',
+    productInfo: script.title,
+    sceneCount: script.scenes.length,
+    options
+  });
+  traceService.addStep(batchId, 'task_created', { batchId });
 
   // 立即返回 batchId
   res.json({
@@ -300,7 +317,9 @@ app.post('/api/video/batch-generate', async (req, res) => {
       const scenes = script.scenes;
       const generatedScenes = [];
 
-      // 7.1 为每个分镜生成视频
+      traceService.addStep(batchId, 'video_generation_started', { totalScenes: scenes.length });
+
+      // 7.1 为每个分镜生成视频（带重试）
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
         console.log(`🎥 正在生成分镜 ${i + 1}/${scenes.length}: ${scene.description}`);
@@ -308,35 +327,40 @@ app.post('/api/video/batch-generate', async (req, res) => {
         taskStore.set(batchId, {
           ...taskStore.get(batchId),
           progress: Math.floor((i / scenes.length) * 50),
-          currentScene: i + 1
+          currentScene: i + 1,
+          message: `正在生成分镜 ${i + 1}/${scenes.length}`
         });
 
-        // 调用 Seedance API 生成视频
-        const content = [{
-          type: 'text',
-          text: `${scene.description} --rs ${options.resolution || '720p'} --rt ${options.ratio || '9:16'} --dur ${scene.duration || 5} --fps 24 --wm false`
-        }];
+        // 使用重试机制调用 Seedance API
+        const videoUrl = await withRetry(async () => {
+          const content = [{
+            type: 'text',
+            text: `${scene.description} --rs ${options.resolution || '720p'} --rt ${options.ratio || '9:16'} --dur ${scene.duration || 5} --fps 24 --wm false`
+          }];
 
-        const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${ARK_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: VIDEO_EP,
-            content: content,
-            return_last_frame: false
-          })
-        });
+          const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${ARK_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: VIDEO_EP,
+              content: content,
+              return_last_frame: false
+            })
+          });
 
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(`分镜 ${i + 1} 生成失败: ${data.error.message}`);
-        }
+          const data = await response.json();
+          if (data.error) {
+            throw new Error(`API Error: ${data.error.message}`);
+          }
 
-        // 轮询等待视频生成完成
-        const videoUrl = await pollVideoCompletion(data.id);
+          // 轮询等待视频生成完成
+          return await pollVideoCompletion(data.id);
+        }, videoRetryOptions);
+
+        traceService.addStep(batchId, `scene_${i + 1}_generated`, { videoUrl });
 
         // 下载视频到本地
         const videoPath = path.join(tempDir, `scene_${i}_${Date.now()}.mp4`);
@@ -356,21 +380,27 @@ app.post('/api/video/batch-generate', async (req, res) => {
         progress: 60,
         message: '正在生成配音...'
       });
+      traceService.addStep(batchId, 'video_generation_completed', { count: generatedScenes.length });
 
-      // 7.2 生成 TTS 配音（如果剧本有配音文案）
+      // 7.2 生成 TTS 配音（带重试）
       let audioPath = null;
       let subtitlePath = null;
       const fullScriptText = generatedScenes.map(s => s.voiceover || s.description).join(' ');
 
       if (fullScriptText) {
-        const ttsService = new TTSService();
-        const ttsResult = await ttsService.generate(fullScriptText, {
-          voice: options.voice || 'zh-CN-XiaoxiaoNeural',
-          rate: options.rate || '+0%',
-          outputDir: tempDir
-        });
-        audioPath = ttsResult.audioFile;
-        subtitlePath = ttsResult.subtitleFile;
+        traceService.addStep(batchId, 'tts_generation_started', { textLength: fullScriptText.length });
+
+        audioPath = await withRetry(async () => {
+          const ttsService = new TTSService();
+          const ttsResult = await ttsService.generate(fullScriptText, {
+            voice: options.voice || 'zh-CN-XiaoxiaoNeural',
+            rate: options.rate || '+0%',
+            outputDir: tempDir
+          });
+          return ttsResult.audioFile;
+        }, ttsRetryOptions);
+
+        traceService.addStep(batchId, 'tts_generation_completed', { audioPath });
       }
 
       taskStore.set(batchId, {
@@ -380,6 +410,8 @@ app.post('/api/video/batch-generate', async (req, res) => {
       });
 
       // 7.3 拼接视频
+      traceService.addStep(batchId, 'video_composition_started', { sceneCount: generatedScenes.length });
+
       const composer = new VideoComposer(generatedScenes, {
         outputDir: outputDir,
         tempDir: tempDir,
@@ -389,6 +421,11 @@ app.post('/api/video/batch-generate', async (req, res) => {
 
       const composeResult = await composer.compose(audioPath);
 
+      traceService.addStep(batchId, 'video_composition_completed', { 
+        outputPath: composeResult.outputPath,
+        duration: composeResult.duration 
+      });
+
       // 清理临时文件
       generatedScenes.forEach(s => {
         if (fs.existsSync(s.videoPath)) fs.unlinkSync(s.videoPath);
@@ -397,23 +434,31 @@ app.post('/api/video/batch-generate', async (req, res) => {
       if (subtitlePath && fs.existsSync(subtitlePath)) fs.unlinkSync(subtitlePath);
 
       // 更新任务状态为完成
-      taskStore.set(batchId, {
+      const finalResult = {
         status: 'completed',
         progress: 100,
         videoUrl: `http://localhost:${PORT}/outputs/${path.basename(composeResult.outputPath)}`,
         duration: composeResult.duration,
         completedAt: Date.now()
-      });
+      };
+
+      taskStore.set(batchId, finalResult);
+      traceService.completeTrace(batchId, 'completed', finalResult);
 
       console.log('✅ 批量生成完成:', batchId);
 
     } catch (error) {
       console.error('批量生成失败:', error);
-      taskStore.set(batchId, {
+      
+      const failedResult = {
         status: 'failed',
         error: error.message,
         progress: 0
-      });
+      };
+
+      taskStore.set(batchId, failedResult);
+      traceService.addError(batchId, 'batch_generate', error);
+      traceService.completeTrace(batchId, 'failed', { error: error.message });
     }
   })();
 });
@@ -493,8 +538,180 @@ app.get('/api/health', (req, res) => {
       tts: true,
       videoCompose: true,
       batchGeneration: true,
-      storyboard: true
+      storyboard: true,
+      trace: true,
+      retry: true,
+      sse: true,
+      dashboard: true
     }
+  });
+});
+
+// ====== 新增功能：SSE 实时推送 ======
+
+// 11. SSE 任务状态推送（替代轮询）
+app.get('/api/tasks/:taskId/stream', (req, res) => {
+  const { taskId } = req.params;
+
+  // 设置 SSE 响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // 禁用 nginx 缓冲
+
+  console.log(`📡 SSE 连接建立: ${taskId}`);
+
+  // 发送初始状态
+  const sendUpdate = () => {
+    const task = taskStore.get(taskId);
+    if (task) {
+      res.write(`data: ${JSON.stringify(task)}\n\n`);
+      
+      // 任务完成或失败时关闭连接
+      if (task.status === 'completed' || task.status === 'failed') {
+        console.log(`📡 SSE 连接关闭: ${taskId} (${task.status})`);
+        res.write('event: close\ndata: Connection closed\n\n');
+        res.end();
+        return true;
+      }
+    } else {
+      res.write(`data: ${JSON.stringify({ error: 'Task not found' })}\n\n`);
+      res.end();
+      return true;
+    }
+    return false;
+  };
+
+  // 立即发送一次
+  if (sendUpdate()) return;
+
+  // 定期发送更新
+  const interval = setInterval(() => {
+    if (sendUpdate()) {
+      clearInterval(interval);
+    }
+  }, 1000);
+
+  // 客户端断开连接时清理
+  req.on('close', () => {
+    console.log(`📡 SSE 客户端断开: ${taskId}`);
+    clearInterval(interval);
+  });
+});
+
+// ====== 新增功能：Trace 查询 ======
+
+// 12. 获取任务 Trace 记录
+app.get('/api/tasks/:taskId/trace', (req, res) => {
+  const { taskId } = req.params;
+  const trace = traceService.exportTrace(taskId);
+
+  if (!trace) {
+    return res.status(404).json({ error: 'Trace not found' });
+  }
+
+  res.json({
+    success: true,
+    trace
+  });
+});
+
+// 13. 获取所有 Trace 统计
+app.get('/api/traces/stats', (req, res) => {
+  const stats = traceService.getStats();
+  res.json({
+    success: true,
+    stats
+  });
+});
+
+// ====== 新增功能：Mock 数据看板 ======
+
+// 14. Mock 数据看板
+app.get('/api/dashboard/stats', (req, res) => {
+  // 生成模拟数据
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  const mockData = {
+    // 总览数据
+    overview: {
+      totalVideos: 1234,
+      totalViews: 567890,
+      avgCompletionRate: 68.5,
+      avgEngagement: 4.2,
+      todayVideos: 23,
+      todayViews: 12580
+    },
+
+    // 热门商品
+    topProducts: [
+      { id: 1, name: '轻薄羽绒服', videos: 156, views: 45000, conversionRate: 3.2 },
+      { id: 2, name: '运动鞋', videos: 98, views: 32000, conversionRate: 2.8 },
+      { id: 3, name: '智能手表', videos: 87, views: 28000, conversionRate: 4.1 },
+      { id: 4, name: '护肤套装', videos: 76, views: 24000, conversionRate: 5.2 },
+      { id: 5, name: '蓝牙耳机', videos: 65, views: 21000, conversionRate: 3.5 }
+    ],
+
+    // 最近任务
+    recentTasks: [
+      { id: 'task_001', product: '测试商品A', status: 'completed', duration: 12, createdAt: now - 3600000 },
+      { id: 'task_002', product: '测试商品B', status: 'completed', duration: 15, createdAt: now - 7200000 },
+      { id: 'task_003', product: '测试商品C', status: 'processing', duration: null, createdAt: now - 1800000 },
+      { id: 'task_004', product: '测试商品D', status: 'failed', duration: null, createdAt: now - 5400000 }
+    ],
+
+    // 趋势数据（最近7天）
+    trend: [
+      { date: new Date(now - 6 * dayMs).toISOString().split('T')[0], videos: 18, views: 8900 },
+      { date: new Date(now - 5 * dayMs).toISOString().split('T')[0], videos: 22, views: 10200 },
+      { date: new Date(now - 4 * dayMs).toISOString().split('T')[0], videos: 15, views: 7800 },
+      { date: new Date(now - 3 * dayMs).toISOString().split('T')[0], videos: 28, views: 14500 },
+      { date: new Date(now - 2 * dayMs).toISOString().split('T')[0], videos: 31, views: 16200 },
+      { date: new Date(now - 1 * dayMs).toISOString().split('T')[0], videos: 25, views: 13100 },
+      { date: new Date(now).toISOString().split('T')[0], videos: 23, views: 12580 }
+    ],
+
+    // 系统状态
+    systemStatus: {
+      apiCalls: { used: 1250, limit: 5000 },
+      videoQuota: { used: 45, limit: 100 },
+      storageUsed: '2.3 GB',
+      uptime: '5d 12h 30m'
+    }
+  };
+
+  res.json({
+    success: true,
+    data: mockData,
+    generatedAt: new Date().toISOString()
+  });
+});
+
+// 15. 获取任务历史列表
+app.get('/api/tasks', (req, res) => {
+  const { limit = 20, status } = req.query;
+
+  let tasks = Array.from(taskStore.entries()).map(([id, task]) => ({
+    id,
+    ...task
+  }));
+
+  // 按状态过滤
+  if (status) {
+    tasks = tasks.filter(t => t.status === status);
+  }
+
+  // 按时间倒序
+  tasks.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+  // 限制数量
+  tasks = tasks.slice(0, parseInt(limit));
+
+  res.json({
+    success: true,
+    tasks,
+    total: taskStore.size
   });
 });
 
@@ -529,11 +746,6 @@ async function downloadFile(url, destPath) {
   const response = await fetch(url);
   const buffer = await response.arrayBuffer();
   fs.writeFileSync(destPath, Buffer.from(buffer));
-}
-
-// 延迟函数
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // 启动服务器

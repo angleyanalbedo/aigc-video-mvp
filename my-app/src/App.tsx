@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Layout, Card, Steps, Button, Upload, Input, Form, message, Progress, Spin, Alert, Radio, Collapse, Timeline, Badge, Tag, Tooltip, Switch } from 'antd'
-import { UploadOutlined, FileTextOutlined, VideoCameraOutlined, DownloadOutlined, ReloadOutlined, SoundOutlined, PlayCircleOutlined, PauseCircleOutlined, EditOutlined, AppstoreOutlined, MergeCellsOutlined } from '@ant-design/icons'
+import { Layout, Card, Steps, Button, Upload, Input, Form, message, Progress, Spin, Alert, Radio, Collapse, Timeline, Badge, Tag, Tooltip, Switch, Menu } from 'antd'
+import { UploadOutlined, FileTextOutlined, VideoCameraOutlined, DownloadOutlined, ReloadOutlined, SoundOutlined, PlayCircleOutlined, PauseCircleOutlined, EditOutlined, AppstoreOutlined, MergeCellsOutlined, DashboardOutlined, VideoCameraAddOutlined } from '@ant-design/icons'
 import axios from 'axios'
 import './App.css'
+import Dashboard from './Dashboard'
 
 // API 基础地址 - 在 Trae 预览环境中使用绝对路径
 const API_BASE = window.location.hostname.includes('trae.cn') 
@@ -178,7 +179,7 @@ function App() {
     }
   }
 
-  // 批量生成视频（P1/P2 核心功能）
+  // 批量生成视频（P1/P2 核心功能）- 使用 SSE 实时推送
   const batchGenerateVideo = async () => {
     if (!generatedScript) return
 
@@ -203,34 +204,42 @@ function App() {
       setBatchTask({ batchId, status: 'processing', progress: 0 })
       setStatusText('🎬 正在批量生成视频分镜...')
 
-      // 轮询批量任务状态
-      batchPollRef.current = setInterval(async () => {
+      // 使用 SSE 实时推送替代轮询
+      const eventSource = new EventSource(`${API_BASE}/api/tasks/${batchId}/stream`)
+      
+      eventSource.onmessage = (event) => {
         try {
-          const statusRes = await axios.get(`${API_BASE}/api/video/batch-status/${batchId}`)
-          const { status, progress: taskProgress, videoUrl: taskVideoUrl, error: taskError, message } = statusRes.data
+          const data = JSON.parse(event.data)
+          
+          setProgress(data.progress || 0)
+          setBatchTask(prev => prev ? { ...prev, ...data } : null)
+          if (data.message) setStatusText(data.message)
 
-          setProgress(taskProgress)
-          setBatchTask(prev => prev ? { ...prev, status, progress: taskProgress, message } : null)
-          if (message) setStatusText(message)
-
-          if (status === 'completed' && taskVideoUrl) {
-            clearPoll()
-            setVideoUrl(taskVideoUrl)
+          if (data.status === 'completed' && data.videoUrl) {
+            eventSource.close()
+            setVideoUrl(data.videoUrl)
             setProgress(100)
             setStatusText('')
             setTaskStatus('completed')
             message.success('🎉 视频生成成功！')
             setCurrentStep(3)
-          } else if (status === 'failed') {
-            clearPoll()
-            setErrorMsg(taskError || '批量生成失败')
+          } else if (data.status === 'failed') {
+            eventSource.close()
+            setErrorMsg(data.error || '批量生成失败')
             setTaskStatus('error')
             setStatusText('')
           }
-        } catch (pollError) {
-          console.error('轮询错误:', pollError)
+        } catch (e) {
+          console.error('SSE 解析错误:', e)
         }
-      }, 3000)
+      }
+
+      eventSource.onerror = (error) => {
+        console.error('SSE 连接错误:', error)
+        eventSource.close()
+        // SSE 失败时回退到轮询
+        fallbackToPolling(batchId)
+      }
 
     } catch (error: any) {
       const msg = error.response?.data?.error || '批量生成启动失败'
@@ -238,6 +247,37 @@ function App() {
       setTaskStatus('error')
       setStatusText('')
     }
+  }
+
+  // 轮询回退方案
+  const fallbackToPolling = (batchId: string) => {
+    batchPollRef.current = setInterval(async () => {
+      try {
+        const statusRes = await axios.get(`${API_BASE}/api/video/batch-status/${batchId}`)
+        const { status, progress: taskProgress, videoUrl: taskVideoUrl, error: taskError, message } = statusRes.data
+
+        setProgress(taskProgress)
+        setBatchTask(prev => prev ? { ...prev, status, progress: taskProgress, message } : null)
+        if (message) setStatusText(message)
+
+        if (status === 'completed' && taskVideoUrl) {
+          clearPoll()
+          setVideoUrl(taskVideoUrl)
+          setProgress(100)
+          setStatusText('')
+          setTaskStatus('completed')
+          message.success('🎉 视频生成成功！')
+          setCurrentStep(3)
+        } else if (status === 'failed') {
+          clearPoll()
+          setErrorMsg(taskError || '批量生成失败')
+          setTaskStatus('error')
+          setStatusText('')
+        }
+      } catch (pollError) {
+        console.error('轮询错误:', pollError)
+      }
+    }, 3000)
   }
 
   // 单分镜生成（原有功能）
@@ -652,25 +692,46 @@ function App() {
     }
   ]
 
+  // 页面切换状态
+  const [activePage, setActivePage] = useState<'create' | 'dashboard'>('create')
+
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <Header style={{ background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, fontSize: 20 }}>🎬 AIGC 带货视频生成系统</h1>
-          <div>
-            <Tag color="blue">P0 基础功能</Tag>
-            <Tag color="green">P1 高级功能</Tag>
-            <Tag color="purple">P2 Agent编排</Tag>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Menu
+              mode="horizontal"
+              selectedKeys={[activePage]}
+              onClick={(e) => setActivePage(e.key as 'create' | 'dashboard')}
+              items={[
+                { key: 'create', icon: <VideoCameraAddOutlined />, label: '视频创作' },
+                { key: 'dashboard', icon: <DashboardOutlined />, label: '数据看板' }
+              ]}
+              style={{ border: 'none', minWidth: 200 }}
+            />
+            <div>
+              <Tag color="blue">P0 基础</Tag>
+              <Tag color="green">P1 高级</Tag>
+              <Tag color="purple">P2 Agent</Tag>
+            </div>
           </div>
         </div>
       </Header>
-      <Content style={{ padding: 24, maxWidth: 900, margin: '0 auto', width: '100%' }}>
-        <Steps
-          current={currentStep}
-          items={steps.map(step => ({ title: step.title, icon: step.icon }))}
-          style={{ marginBottom: 32 }}
-        />
-        {steps[currentStep].content}
+      <Content style={{ padding: 24, maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {activePage === 'dashboard' ? (
+          <Dashboard />
+        ) : (
+          <>
+            <Steps
+              current={currentStep}
+              items={steps.map(step => ({ title: step.title, icon: step.icon }))}
+              style={{ marginBottom: 32 }}
+            />
+            {steps[currentStep].content}
+          </>
+        )}
       </Content>
     </Layout>
   )
