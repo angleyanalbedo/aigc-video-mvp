@@ -5,6 +5,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const { mockChatCompletion } = require('../services/mockArkService');
 
 // 技能文件目录
 const SKILLS_DIR = path.join(__dirname, '../skills');
@@ -123,28 +124,99 @@ class ExecutionAgent {
    * 调用 LLM
    */
   async callLLM(prompt, taskName) {
-    const ARK_API_KEY = 'ark-2af51d30-ed70-4061-a2cd-74f454ccc4e8-2282e';
-    const LLM_EP = 'ep-20260514115629-vhldw';
+    try {
+      // 优先尝试使用真实 API (如果环境变量配置了)
+      const ARK_API_KEY = process.env.ARK_API_KEY;
+      const LLM_EP = process.env.LLM_EP;
+      
+      if (ARK_API_KEY && LLM_EP) {
+        console.log('  🔗 [LLM] 尝试使用真实 API');
+        const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${ARK_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: LLM_EP,
+            messages: [
+              { role: 'system', content: prompt },
+              { role: 'user', content: `请完成：${taskName}` }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        });
+        
+        const data = await response.json();
+        
+        // 检查是否有错误
+        if (!data.error && data.choices && data.choices[0]) {
+          console.log('  ✅ [LLM] 真实 API 调用成功');
+          return data.choices[0].message.content;
+        } else {
+          console.warn('  ⚠️ [LLM] 真实 API 调用失败，使用 Mock 服务');
+        }
+      } else {
+        console.log('  🤖 [LLM] 使用 Mock 服务 (未配置 API 密钥)');
+      }
+      
+      // 使用 Mock 服务
+      const mockResponse = await mockChatCompletion([
+        { role: 'system', content: prompt },
+        { role: 'user', content: `请完成：${taskName}` }
+      ], { model: LLM_EP });
+      
+      console.log('  ✅ [LLM] Mock 服务调用成功');
+      return mockResponse.choices[0].message.content;
+      
+    } catch (error) {
+      console.error('  ❌ [LLM] 错误:', error);
+      console.log('  🤖 [LLM] 使用 Fallback 响应');
+      return this.getFallbackResponse(taskName);
+    }
+  }
+
+  /**
+   * 获取默认响应（LLM调用失败时使用）
+   */
+  getFallbackResponse(taskName) {
+    console.log('  ⚠️ [LLM] 使用默认响应');
     
-    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ARK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: LLM_EP,
-        messages: [
-          { role: 'system', content: prompt },
-          { role: 'user', content: `请完成：${taskName}` }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
-    });
+    if (taskName === '生成故事骨架') {
+      return `
+<script>
+  <title>${this.productInfo.title || '商品'} - 带货短视频</title>
+  <scene id="1">
+    <description>Product showcase, professional lighting</description>
+    <duration>3</duration>
+    <voiceover>大家好，今天给大家推荐一款超棒的${this.productInfo.title || '商品'}</voiceover>
+  </scene>
+</script>
+      `;
+    }
     
-    const data = await response.json();
-    return data.choices[0].message.content;
+    // 默认剧本
+    return `
+<script>
+  <title>${this.productInfo.title || '商品'} - 带货短视频</title>
+  <scene id="1">
+    <description>Product showcase of ${this.productInfo.title || '商品'}, professional lighting</description>
+    <duration>3</duration>
+    <voiceover>大家好，今天给大家推荐一款超棒的${this.productInfo.title || '商品'}</voiceover>
+  </scene>
+  <scene id="2">
+    <description>Close-up showing product details</description>
+    <duration>5</duration>
+    <voiceover>${this.productInfo.sellingPoints || '这款产品有着出色的品质和设计'}</voiceover>
+  </scene>
+  <scene id="3">
+    <description>Call to action with product</description>
+    <duration>4</duration>
+    <voiceover>赶紧下单吧！</voiceover>
+  </scene>
+</script>
+    `;
   }
 
   /**
