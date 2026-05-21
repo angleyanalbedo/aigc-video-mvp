@@ -1,0 +1,23 @@
+{
+  "name": "aigc-video-server",
+  "version": "1.0.0",
+  "description": "AIGC 带货视频生成系统 - 后端服务",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "keywords": [
+    "aigc",
+    "video",
+    "ecommerce"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
