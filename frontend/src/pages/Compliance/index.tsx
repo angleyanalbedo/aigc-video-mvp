@@ -5,7 +5,7 @@ import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, AuditOut
 const { Option } = Select;
 const { TextArea } = Input;
 
-const API_BASE = '';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const CompliancePage = () => {
   const [loading, setLoading] = useState(false);

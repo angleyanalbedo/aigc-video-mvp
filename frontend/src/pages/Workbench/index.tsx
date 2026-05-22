@@ -41,7 +41,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 const { Panel } = Collapse;
 
-const API_BASE = '';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const WorkbenchPage: React.FC = () => {
   const [form] = Form.useForm();

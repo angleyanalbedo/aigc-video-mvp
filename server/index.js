@@ -929,8 +929,9 @@ app.use('/api/observability', observabilityRoutes);
 app.use('/api/projects', projectRoutes);
 
 // 启动服务器
-app.listen(PORT, () => {
-  console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 服务器运行在 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   console.log(`📁 上传目录: ${uploadsDir}`);
   console.log(`📁 输出目录: ${outputDir}`);
   console.log(`🤖 LLM Endpoint: ${LLM_EP}`);
@@ -940,5 +941,5 @@ app.listen(PORT, () => {
   console.log('✅ 新增 /api/materials 素材管理和检索接口');
   console.log('✅ 新增 /api/attribution 多因子归因分析接口');
   console.log('✅ 新增 /api/observability 可观测性接口');
-  logger.info('Server started successfully', { port: PORT });
+  logger.info('Server started successfully', { port: PORT, host: HOST });
 });

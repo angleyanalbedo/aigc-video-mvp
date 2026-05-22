@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Progress, Table, Alert, Button, Space, Tag, message, Descriptions } from 'antd';
 import { MonitorOutlined, DatabaseOutlined, AlertOutlined, ReloadOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 
-const API_BASE = '';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const ObservabilityPage = () => {
   const [health, setHealth] = useState(null);
