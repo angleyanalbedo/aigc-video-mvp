@@ -4,6 +4,10 @@ import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined } 
 
 const { Option } = Select;
 
+const API_BASE = window.location.hostname.includes('trae.cn') 
+  ? 'http://localhost:3001' 
+  : '';
+
 const MaterialManagementPage = () => {
   const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,9 +66,6 @@ const MaterialManagementPage = () => {
   };
 
   const handleUpload = async (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-
     try {
       const response = await fetch(`${API_BASE}/api/materials`, {
         method: 'POST',
@@ -102,8 +103,8 @@ const MaterialManagementPage = () => {
   };
 
   const getIcon = (type) => {
-    if (type.startsWith('image')) return <PictureOutlined />;
-    if (type.startsWith('video')) return <VideoCameraOutlined />;
+    if (type && type.startsWith('image')) return <PictureOutlined />;
+    if (type && type.startsWith('video')) return <VideoCameraOutlined />;
     return <PictureOutlined />;
   };
 
@@ -166,12 +167,14 @@ const MaterialManagementPage = () => {
                   hoverable
                   style={{ height: '100%' }}
                   cover={
-                    item.type.startsWith('image') ? (
+                    item.type && item.type.startsWith('image') ? (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
-                    ) : (
+                    ) : item.type && item.type.startsWith('video') ? (
                       <div style={{ height: 160, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <VideoCameraOutlined style={{ fontSize: 48, color: '#fff' }} />
                       </div>
+                    ) : (
+                      <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
                     )
                   }
                   actions={[
@@ -185,12 +188,12 @@ const MaterialManagementPage = () => {
                     description={
                       <Space direction="vertical" size="small">
                         <Space wrap>
-                          {item.tags.map(tag => (
+                          {item.tags && item.tags.map(tag => (
                             <Tag key={tag} color="blue">{tag}</Tag>
                           ))}
                         </Space>
                         <div style={{ fontSize: 12, color: '#999' }}>
-                          {new Date(item.createdAt).toLocaleString()}
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
                         </div>
                       </Space>
                     }
@@ -210,17 +213,21 @@ const MaterialManagementPage = () => {
         >
           <Descriptions column={1}>
             <Descriptions.Item label="文件名">{selectedMaterial.filename}</Descriptions.Item>
-            <Descriptions.Item label="类型">{selectedMaterial.type}</Descriptions.Item>
+            <Descriptions.Item label="类型">{selectedMaterial.type || '未知'}</Descriptions.Item>
             <Descriptions.Item label="标签">
-              {selectedMaterial.tags.map(tag => <Tag key={tag} color="blue">{tag}</Tag>)}
+              {selectedMaterial.tags && selectedMaterial.tags.map(tag => <Tag key={tag} color="blue">{tag}</Tag>)}
             </Descriptions.Item>
-            <Descriptions.Item label="上传时间">{new Date(selectedMaterial.createdAt).toLocaleString()}</Descriptions.Item>
+            <Descriptions.Item label="上传时间">
+              {selectedMaterial.createdAt ? new Date(selectedMaterial.createdAt).toLocaleString() : ''}
+            </Descriptions.Item>
           </Descriptions>
           <div style={{ marginTop: 16 }}>
-            {selectedMaterial.type.startsWith('image') ? (
+            {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
               <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%' }} />
-            ) : (
+            ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
               <video src={selectedMaterial.url} controls style={{ maxWidth: '100%' }} />
+            ) : (
+              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%' }} />
             )}
           </div>
         </Card>

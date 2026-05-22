@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
-import { Layout, Card, Steps, Button, Upload, Input, Form, message, Progress, Alert, Radio, Collapse, Timeline, Tag, Tooltip, Switch } from 'antd'
-import { UploadOutlined, FileTextOutlined, VideoCameraOutlined, DownloadOutlined, ReloadOutlined, SoundOutlined, PlayCircleOutlined, MergeCellsOutlined } from '@ant-design/icons'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Layout, Card, Steps, Button, Upload, Input, Form, message, Progress, Alert, Radio, Collapse, Timeline, Tag, Tooltip, Switch, Modal, List, Select, Empty, Space } from 'antd'
+import { UploadOutlined, FileTextOutlined, VideoCameraOutlined, DownloadOutlined, ReloadOutlined, SoundOutlined, PlayCircleOutlined, MergeCellsOutlined, FolderOutlined, PictureOutlined } from '@ant-design/icons'
 import axios from 'axios'
 
 const API_BASE = window.location.hostname.includes('trae.cn') 
@@ -51,6 +51,12 @@ const VideoCreationPage: React.FC = () => {
   const [progress, setProgress] = useState(0)
   const [statusText, setStatusText] = useState('')
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+  const [materialsFromLibrary, setMaterialsFromLibrary] = useState<any[]>([])
+  const [selectedFromLibrary, setSelectedFromLibrary] = useState<string[]>([])
+  const [libraryModalVisible, setLibraryModalVisible] = useState(false)
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchTags, setSearchTags] = useState<string[]>([])
+  const [allTags, setAllTags] = useState<string[]>([])
   const [productInfo, setProductInfo] = useState({
     title: '',
     sellingPoints: '',
@@ -71,6 +77,61 @@ const VideoCreationPage: React.FC = () => {
   
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const batchPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const loadMaterials = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/materials`)
+      const data = await response.json()
+      if (data.success) {
+        setMaterialsFromLibrary(data.materials)
+        const tags = new Set<string>()
+        data.materials.forEach((m: any) => m.tags && m.tags.forEach((t: string) => tags.add(t)))
+        setAllTags([...tags])
+      }
+    } catch (error) {
+      console.error('加载素材库失败:', error)
+    }
+  }
+
+  const searchMaterials = async () => {
+    if (!searchKeyword && searchTags.length === 0) {
+      loadMaterials()
+      return
+    }
+    try {
+      const response = await fetch(`${API_BASE}/api/materials/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: searchKeyword, tags: searchTags, topK: 50 }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setMaterialsFromLibrary(data.results)
+      }
+    } catch (error) {
+      console.error('搜索失败:', error)
+    }
+  }
+
+  const openLibraryModal = () => {
+    loadMaterials()
+    setLibraryModalVisible(true)
+  }
+
+  const selectFromLibrary = (material: any) => {
+    if (!selectedFromLibrary.includes(material.url)) {
+      setSelectedFromLibrary(prev => [...prev, material.url])
+      // 同时添加到 uploadedFiles
+      if (!uploadedFiles.includes(material.url)) {
+        setUploadedFiles(prev => [...prev, material.url])
+      }
+    }
+  }
+
+  const removeSelected = (url: string) => {
+    setSelectedFromLibrary(prev => prev.filter(u => u !== url))
+    setUploadedFiles(prev => prev.filter(u => u !== url))
+  }
 
   const clearPoll = useCallback(() => {
     if (pollRef.current) {
@@ -350,34 +411,57 @@ const VideoCreationPage: React.FC = () => {
             <div className="step-card__icon">
               <UploadOutlined />
             </div>
-            <div className="step-card__title">上传商品素材</div>
+            <div className="step-card__title">选择或上传商品素材</div>
           </div>
           <div className="step-card__content">
-            <Upload.Dragger
-              beforeUpload={handleUpload}
-              showUploadList={false}
-              accept="image/*,video/*"
-              multiple
-            >
-              <div className="upload-area">
-                <div className="upload-area__icon"><UploadOutlined /></div>
-                <div className="upload-area__text">点击或拖拽文件到此区域上传</div>
-                <div className="upload-area__hint">支持图片和视频格式，可上传多个素材</div>
-              </div>
-            </Upload.Dragger>
+            <Space direction="vertical" style={{ width: '100%', marginBottom: 24 }}>
+              <Button 
+                type="primary" 
+                icon={<FolderOutlined />}
+                size="large"
+                onClick={openLibraryModal}
+                style={{ width: '100%' }}
+              >
+                从素材库选择
+              </Button>
+              <div style={{ textAlign: 'center', color: '#999' }}>或</div>
+              <Upload.Dragger
+                beforeUpload={handleUpload}
+                showUploadList={false}
+                accept="image/*,video/*"
+                multiple
+              >
+                <div className="upload-area">
+                  <div className="upload-area__icon"><UploadOutlined /></div>
+                  <div className="upload-area__text">点击或拖拽文件到此区域上传</div>
+                  <div className="upload-area__hint">支持图片和视频格式，可上传多个素材</div>
+                </div>
+              </Upload.Dragger>
+            </Space>
+            
             {uploadedFiles.length > 0 && (
               <div className="media-preview">
                 {uploadedFiles.map((url, index) => (
-                  <div key={index} className="media-item">
+                  <div key={index} className="media-item" style={{ position: 'relative' }}>
                     {url.endsWith('.mp4') || url.endsWith('.mov') ? (
                       <video src={url} controls />
                     ) : (
                       <img src={url} alt={`素材${index + 1}`} />
                     )}
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(255,255,255,0.9)', borderRadius: 4 }}
+                      onClick={() => removeSelected(url)}
+                    >
+                      ×
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
+            
             {uploadedFiles.length > 0 && (
               <div style={{ marginTop: 24 }}>
                 <button 
@@ -736,6 +820,102 @@ const VideoCreationPage: React.FC = () => {
         />
         {steps[currentStep].content}
       </Content>
+
+      <Modal
+        title="📂 从素材库选择"
+        open={libraryModalVisible}
+        onCancel={() => setLibraryModalVisible(false)}
+        onOk={() => setLibraryModalVisible(false)}
+        width={900}
+        okText="确认选择"
+        cancelText="取消"
+      >
+        <Card title="🔍 搜索" size="small" style={{ marginBottom: 16 }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Input.Search
+              placeholder="按关键词搜索"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onSearch={searchMaterials}
+              style={{ marginBottom: 8 }}
+            />
+            <Select
+              mode="multiple"
+              placeholder="按标签筛选"
+              style={{ width: '100%', marginBottom: 8 }}
+              value={searchTags}
+              onChange={setSearchTags}
+            >
+              {allTags.map(tag => (
+                <Select.Option key={tag} value={tag}>{tag}</Select.Option>
+              ))}
+            </Select>
+            <Space>
+              <Button type="primary" onClick={searchMaterials} size="small">搜索</Button>
+              <Button onClick={() => { setSearchKeyword(''); setSearchTags([]); loadMaterials() }} size="small">重置</Button>
+            </Space>
+          </Space>
+        </Card>
+
+        {materialsFromLibrary.length === 0 ? (
+          <Empty description="暂无素材，请先在素材管理页面上传" />
+        ) : (
+          <List
+            grid={{ gutter: 16, xs: 2, sm: 3, md: 4, lg: 4, xl: 4 }}
+            dataSource={materialsFromLibrary}
+            renderItem={(item) => (
+              <List.Item>
+                <Card
+                  hoverable
+                  size="small"
+                  style={{ 
+                    height: '100%', 
+                    border: selectedFromLibrary.includes(item.url) ? '2px solid #1890ff' : undefined,
+                    background: selectedFromLibrary.includes(item.url) ? '#e6f7ff' : undefined
+                  }}
+                  cover={
+                    item.type && item.type.startsWith('image') ? (
+                      <img alt={item.filename} src={item.url} style={{ height: 120, objectFit: 'cover' }} />
+                    ) : item.type && item.type.startsWith('video') ? (
+                      <div style={{ height: 120, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <VideoCameraOutlined style={{ fontSize: 32, color: '#fff' }} />
+                      </div>
+                    ) : (
+                      <img alt={item.filename} src={item.url} style={{ height: 120, objectFit: 'cover' }} />
+                    )
+                  }
+                  onClick={() => selectFromLibrary(item)}
+                >
+                  <Card.Meta
+                    title={item.filename?.slice(0, 20) + '...'}
+                    description={
+                      <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                        <Space wrap size="small">
+                          {item.tags?.slice(0, 2).map((tag: string) => (
+                            <Tag key={tag} color="blue" style={{ fontSize: 10, padding: '1px 6px' }}>{tag}</Tag>
+                          ))}
+                        </Space>
+                        {selectedFromLibrary.includes(item.url) && (
+                          <Tag color="success" style={{ fontSize: 10, padding: '1px 6px' }}>已选择</Tag>
+                        )}
+                      </Space>
+                    }
+                  />
+                </Card>
+              </List.Item>
+            )}
+          />
+        )}
+
+        {selectedFromLibrary.length > 0 && (
+          <Alert
+            message={`已选择 ${selectedFromLibrary.length} 个素材`}
+            type="success"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
+        )}
+      </Modal>
     </>
   )
 }
