@@ -13,6 +13,7 @@ import {
   Button,
   Input,
   Select,
+  Switch,
   Upload,
   Form,
   Card,
@@ -40,7 +41,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 const { Panel } = Collapse;
 
-const API_BASE = window.location.hostname.includes('trae.cn') ? 'http://localhost:3001' : '';
+const API_BASE = '';
 
 const WorkbenchPage: React.FC = () => {
   const [form] = Form.useForm();
