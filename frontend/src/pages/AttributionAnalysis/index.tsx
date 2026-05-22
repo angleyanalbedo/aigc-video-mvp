@@ -4,6 +4,8 @@ import { BarChartOutlined, RiseOutlined, ArrowUpOutlined, ArrowDownOutlined, Rel
 
 const { Option } = Select;
 
+const API_BASE = '';
+
 const AttributionAnalysisPage = () => {
   const [loading, setLoading] = useState(false);
   const [factors, setFactors] = useState([]);

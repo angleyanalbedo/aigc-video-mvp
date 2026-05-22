@@ -5,6 +5,8 @@ import { ExperimentOutlined, BarChartOutlined, PlayCircleOutlined, PauseCircleOu
 const { Option } = Select;
 const { TextArea } = Input;
 
+const API_BASE = '';
+
 const ABTestPage = () => {
   const [loading, setLoading] = useState(false);
   const [experiments, setExperiments] = useState([]);
