@@ -30,7 +30,7 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const API_BASE = window.location.hostname.includes('trae.cn') ? 'http://localhost:3001' : '';
+const API_BASE = '';
 
 const ProjectListPage: React.FC = () => {
   const [projects, setProjects] = useState<any[]>([]);
