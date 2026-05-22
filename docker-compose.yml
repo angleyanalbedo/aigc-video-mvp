@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: aigc-video-server
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - ***REMOVED***${ARK_API_KEY:-}
+      - LLM_EP=${LLM_EP:-}
+      - VIDEO_EP=${VIDEO_EP:-}
+    volumes:
+      - server_uploads:/app/uploads
+      - server_outputs:/app/outputs
+      - server_temp:/app/temp
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aigc-video-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  server_uploads:
+  server_outputs:
+  server_temp:

@@ -1,0 +1,79 @@
+name: Deploy AIGC Video System
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            server/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Install backend dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub (optional)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+        if: github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != ''
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: ${{ github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != '' }}
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-server:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-server:${{ github.sha }}
+        if: secrets.DOCKER_HUB_USERNAME != ''
+
+      - name: Build frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: ${{ github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != '' }}
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-frontend:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-frontend:${{ github.sha }}
+        if: secrets.DOCKER_HUB_USERNAME != ''
+
+      - name: Deploy to server (placeholder)
+        run: |
+          echo "部署步骤："
+          echo "1. 配置 Docker Hub 密钥后，镜像会自动推送"
+          echo "2. 在目标服务器上使用 docker-compose 拉取并部署"
+          echo "3. 或者使用你的部署工具（如 ArgoCD、Rancher 等）"

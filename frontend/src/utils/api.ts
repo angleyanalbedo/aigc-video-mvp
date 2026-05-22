@@ -1,0 +1,136 @@
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export async function apiGet<T = any>(endpoint: string): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`);
+    
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return {
+        success: false,
+        error: '服务器返回了非 JSON 响应'
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error: any) {
+    console.error(`API GET ${endpoint} 失败:`, error);
+    return {
+      success: false,
+      error: error.message || '网络请求失败'
+    };
+  }
+}
+
+export async function apiPost<T = any>(
+  endpoint: string,
+  body?: any,
+  options?: RequestInit
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      ...options,
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      return {
+        success: false,
+        error: '服务器返回了非 JSON 响应'
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error: any) {
+    console.error(`API POST ${endpoint} 失败:`, error);
+    return {
+      success: false,
+      error: error.message || '网络请求失败'
+    };
+  }
+}
+
+export async function apiPut<T = any>(
+  endpoint: string,
+  body?: any
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error: any) {
+    console.error(`API PUT ${endpoint} 失败:`, error);
+    return {
+      success: false,
+      error: error.message || '网络请求失败'
+    };
+  }
+}
+
+export async function apiDelete<T = any>(
+  endpoint: string
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (error: any) {
+    console.error(`API DELETE ${endpoint} 失败:`, error);
+    return {
+      success: false,
+      error: error.message || '网络请求失败'
+    };
+  }
+}
+
+export { API_BASE };

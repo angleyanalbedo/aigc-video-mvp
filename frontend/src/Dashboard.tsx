@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Card, Row, Col, Statistic, Table, Progress, Tag, Spin, Empty } from 'antd'
-import { VideoCameraOutlined, EyeOutlined, ClockCircleOutlined, RiseOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import { VideoCameraOutlined, EyeOutlined, ClockCircleOutlined, RiseOutlined, ArrowUpOutlined } from '@ant-design/icons'
 import axios from 'axios'
 
 const API_BASE = window.location.hostname.includes('trae.cn') 
@@ -199,7 +199,7 @@ export default function Dashboard() {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={12}>
           <Card title="📊 近7天趋势">
-            {data.trend.map((item, index) => (
+            {data.trend.map((item) => (
               <div key={item.date} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span>{item.date}</span>
