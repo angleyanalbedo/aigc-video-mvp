@@ -45,3 +45,4 @@ coverage/
 
 # 浏览器截图
 /data/tool/browser_snapshots/
+server/data/
