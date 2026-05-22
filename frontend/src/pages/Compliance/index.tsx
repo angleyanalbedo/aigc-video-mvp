@@ -5,6 +5,8 @@ import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, AuditOut
 const { Option } = Select;
 const { TextArea } = Input;
 
+const API_BASE = '';
+
 const CompliancePage = () => {
   const [loading, setLoading] = useState(false);
   const [reviews, setReviews] = useState([]);
