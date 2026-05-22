@@ -11,6 +11,8 @@ import {
   ExperimentOutlined,
   MonitorOutlined,
   AuditOutlined,
+  ProjectOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -32,8 +34,20 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
 
   const menuItems: MenuItem[] = [
     {
+      key: 'projects',
+      path: '/projects',
+      icon: <ProjectOutlined />,
+      tooltip: '项目管理',
+    },
+    {
+      key: 'workbench',
+      path: '/workbench/1',
+      icon: <EditOutlined />,
+      tooltip: '工作台',
+    },
+    {
       key: 'video-creation',
-      path: '/',
+      path: '/video-creation',
       icon: <VideoCameraAddOutlined />,
       tooltip: '视频创作',
     },
@@ -105,8 +119,11 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   };
 
   const isActive = (item: MenuItem) => {
-    if (item.key === 'video-creation') {
-      return location.pathname === '/' || location.pathname === '/video-creation';
+    if (item.key === 'projects') {
+      return location.pathname === '/' || location.pathname === '/projects';
+    }
+    if (item.key === 'workbench') {
+      return location.pathname.startsWith('/workbench');
     }
     return location.pathname === item.path;
   };

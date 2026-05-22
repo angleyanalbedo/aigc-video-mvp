@@ -1,6 +1,9 @@
 // 加载环境变量
 require('dotenv').config();
 
+// 初始化数据库
+require('./db');
+
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
@@ -901,6 +904,9 @@ const complianceRoutes = require('./routes/compliance');
 // 引入 A/B 测试路由
 const abTestRoutes = require('./routes/abTest');
 
+// 引入项目管理路由
+const projectRoutes = require('./routes/projects');
+
 // 使用 Agent 路由
 app.use('/api/agent', agentRoutes);
 
@@ -918,6 +924,9 @@ app.use('/api/compliance', complianceRoutes);
 
 // 使用可观测性路由
 app.use('/api/observability', observabilityRoutes);
+
+// 使用项目管理路由
+app.use('/api/projects', projectRoutes);
 
 // 启动服务器
 app.listen(PORT, () => {
