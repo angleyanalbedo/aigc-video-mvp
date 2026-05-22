@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FolderOutlined,
   PlusOutlined,
@@ -30,9 +31,10 @@ import {
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
 const ProjectListPage: React.FC = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
@@ -123,7 +125,7 @@ const ProjectListPage: React.FC = () => {
 
   // 打开项目
   const openProject = (id: string) => {
-    window.location.hash = `/workbench/${id}`;
+    navigate(`/workbench/${id}`);
   };
 
   const getStatusColor = (status: string) => {
@@ -229,7 +231,7 @@ const ProjectListPage: React.FC = () => {
                             {getStatusText(project.status)}
                           </Tag>
                           <br />
-                          <Text type="secondary" ellipsis={{ rows: 2 }}>
+                          <Text type="secondary" ellipsis>
                             {project.description || '暂无描述'}
                           </Text>
                           <br /><br />
