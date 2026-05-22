@@ -1,15 +1,19 @@
 
+console.log('[DEBUG 26a] compliance.js starting');
 const express = require('express');
+console.log('[DEBUG 26b] express loaded');
 const router = express.Router();
+console.log('[DEBUG 26c] router created');
 const { ComplianceService } = require('../services/complianceService');
-
+console.log('[DEBUG 26d] ComplianceService loaded');
 const complianceService = new ComplianceService();
+console.log('[DEBUG 26e] complianceService created');
 
 /**
  * @route POST /api/compliance/reviews
  * @desc 创建新的审核任务
  */
-router.post('/reviews', (req, res) =&gt; {
+router.post('/reviews', (req, res) => {
   try {
     const { title, description, type, creator } = req.body;
 
@@ -44,7 +48,7 @@ router.post('/reviews', (req, res) =&gt; {
  * @route GET /api/compliance/reviews
  * @desc 获取审核列表
  */
-router.get('/reviews', (req, res) =&gt; {
+router.get('/reviews', (req, res) => {
   try {
     const { status, type, limit } = req.query;
     const filters = {};
@@ -73,7 +77,7 @@ router.get('/reviews', (req, res) =&gt; {
  * @route GET /api/compliance/reviews/:reviewId
  * @desc 获取单个审核任务详情
  */
-router.get('/reviews/:reviewId', (req, res) =&gt; {
+router.get('/reviews/:reviewId', (req, res) => {
   try {
     const { reviewId } = req.params;
     const review = complianceService.getReview(reviewId);
@@ -102,7 +106,7 @@ router.get('/reviews/:reviewId', (req, res) =&gt; {
  * @route POST /api/compliance/reviews/:reviewId/compliance-check
  * @desc 启动内容合规检查
  */
-router.post('/reviews/:reviewId/compliance-check', async (req, res) =&gt; {
+router.post('/reviews/:reviewId/compliance-check', async (req, res) => {
   try {
     const { reviewId } = req.params;
     const result = await complianceService.startComplianceCheck(reviewId);
@@ -124,7 +128,7 @@ router.post('/reviews/:reviewId/compliance-check', async (req, res) =&gt; {
  * @route POST /api/compliance/reviews/:reviewId/copyright-check
  * @desc 启动版权校验
  */
-router.post('/reviews/:reviewId/copyright-check', async (req, res) =&gt; {
+router.post('/reviews/:reviewId/copyright-check', async (req, res) => {
   try {
     const { reviewId } = req.params;
     const result = await complianceService.startCopyrightCheck(reviewId);
@@ -146,7 +150,7 @@ router.post('/reviews/:reviewId/copyright-check', async (req, res) =&gt; {
  * @route POST /api/compliance/reviews/:reviewId/full-review
  * @desc 执行完整审核流程
  */
-router.post('/reviews/:reviewId/full-review', async (req, res) =&gt; {
+router.post('/reviews/:reviewId/full-review', async (req, res) => {
   try {
     const { reviewId } = req.params;
     const result = await complianceService.executeFullReview(reviewId);
@@ -168,7 +172,7 @@ router.post('/reviews/:reviewId/full-review', async (req, res) =&gt; {
  * @route POST /api/compliance/reviews/:reviewId/approve
  * @desc 人工审核通过
  */
-router.post('/reviews/:reviewId/approve', (req, res) =&gt; {
+router.post('/reviews/:reviewId/approve', (req, res) => {
   try {
     const { reviewId } = req.params;
     const { note, reviewer } = req.body;
@@ -192,7 +196,7 @@ router.post('/reviews/:reviewId/approve', (req, res) =&gt; {
  * @route POST /api/compliance/reviews/:reviewId/reject
  * @desc 人工审核拒绝
  */
-router.post('/reviews/:reviewId/reject', (req, res) =&gt; {
+router.post('/reviews/:reviewId/reject', (req, res) => {
   try {
     const { reviewId } = req.params;
     const { note, reviewer } = req.body;
@@ -216,7 +220,7 @@ router.post('/reviews/:reviewId/reject', (req, res) =&gt; {
  * @route DELETE /api/compliance/reviews/:reviewId
  * @desc 删除审核任务
  */
-router.delete('/reviews/:reviewId', (req, res) =&gt; {
+router.delete('/reviews/:reviewId', (req, res) => {
   try {
     const { reviewId } = req.params;
     const success = complianceService.deleteReview(reviewId);
@@ -245,7 +249,7 @@ router.delete('/reviews/:reviewId', (req, res) =&gt; {
  * @route GET /api/compliance/stats
  * @desc 获取审核统计数据
  */
-router.get('/stats', (req, res) =&gt; {
+router.get('/stats', (req, res) => {
   try {
     const stats = complianceService.getStats();
 
@@ -263,3 +267,4 @@ router.get('/stats', (req, res) =&gt; {
 });
 
 module.exports = router;
+
