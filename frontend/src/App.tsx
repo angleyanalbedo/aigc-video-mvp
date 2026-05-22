@@ -10,27 +10,32 @@ import CompliancePage from './pages/Compliance';
 import ProjectListPage from './pages/ProjectList';
 import WorkbenchPage from './pages/Workbench';
 import Dashboard from './Dashboard';
+import StatusPage from './pages/Status';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
   return (
-    <Router>
-      <WorkbenchLayout>
-        <Routes>
-          <Route path="/" element={<ProjectListPage />} />
-          <Route path="/projects" element={<ProjectListPage />} />
-          <Route path="/workbench/:projectId" element={<WorkbenchPage />} />
-          <Route path="/video-creation" element={<VideoCreationPage />} />
-          <Route path="/task-center" element={<TaskCenterPage />} />
-          <Route path="/materials" element={<MaterialManagementPage />} />
-          <Route path="/attribution" element={<AttributionAnalysisPage />} />
-          <Route path="/abtest" element={<ABTestPage />} />
-          <Route path="/observability" element={<ObservabilityPage />} />
-          <Route path="/compliance" element={<CompliancePage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
-      </WorkbenchLayout>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <WorkbenchLayout>
+          <Routes>
+            <Route path="/status" element={<StatusPage />} />
+            <Route path="/" element={<ProjectListPage />} />
+            <Route path="/projects" element={<ProjectListPage />} />
+            <Route path="/workbench/:projectId" element={<WorkbenchPage />} />
+            <Route path="/video-creation" element={<VideoCreationPage />} />
+            <Route path="/task-center" element={<TaskCenterPage />} />
+            <Route path="/materials" element={<MaterialManagementPage />} />
+            <Route path="/attribution" element={<AttributionAnalysisPage />} />
+            <Route path="/abtest" element={<ABTestPage />} />
+            <Route path="/observability" element={<ObservabilityPage />} />
+            <Route path="/compliance" element={<CompliancePage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Routes>
+        </WorkbenchLayout>
+      </Router>
+    </ErrorBoundary>
   );
 }
 

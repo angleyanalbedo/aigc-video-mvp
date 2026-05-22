@@ -321,14 +321,32 @@ const WorkbenchPage: React.FC = () => {
   // 从素材库选择
   const handleLoadMaterials = async () => {
     try {
+      setLoading(true);
       const res = await fetch(`${API_BASE}/api/materials`);
+      
+      if (!res.ok) {
+        throw new Error(`服务器错误: ${res.status}`);
+      }
+      
+      const contentType = res.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('服务器返回了非 JSON 响应');
+      }
+      
       const data = await res.json();
       if (data.success) {
-        setAvailableMaterials(data.data);
+        setAvailableMaterials(data.data || []);
         setShowMaterialModal(true);
+      } else {
+        message.error(data.error || '加载素材失败');
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('加载素材失败:', e);
+      message.error('无法连接到服务器，请确保后端服务已启动');
+      setAvailableMaterials([]);
+      setShowMaterialModal(true);
+    } finally {
+      setLoading(false);
     }
   };
 
