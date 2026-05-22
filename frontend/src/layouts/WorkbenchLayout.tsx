@@ -1,80 +1,115 @@
-import React from 'react'
-import { Tooltip } from 'antd'
+import React from 'react';
+import { Tooltip } from 'antd';
 import {
   VideoCameraAddOutlined,
   DashboardOutlined,
   SettingOutlined,
   GithubOutlined,
-  CustomerServiceOutlined
-} from '@ant-design/icons'
-import { useNavigate, useLocation } from 'react-router-dom'
+  CustomerServiceOutlined,
+  FolderOutlined,
+  BarChartOutlined,
+  ExperimentOutlined,
+  MonitorOutlined,
+  AuditOutlined,
+} from '@ant-design/icons';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface MenuItem {
-  key: string
-  path: string
-  icon: React.ReactNode
-  tooltip: string
+  key: string;
+  path: string;
+  icon: React.ReactNode;
+  tooltip: string;
 }
 
 interface WorkbenchLayoutProps {
-  children: React.ReactNode
-  activeMenu?: string
+  children: React.ReactNode;
+  activeMenu?: string;
 }
 
 const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const menuItems: MenuItem[] = [
     {
       key: 'video-creation',
       path: '/',
       icon: <VideoCameraAddOutlined />,
-      tooltip: '视频创作'
+      tooltip: '视频创作',
     },
     {
       key: 'task-center',
       path: '/task-center',
       icon: <DashboardOutlined />,
-      tooltip: '任务中心'
-    }
-  ]
+      tooltip: '任务中心',
+    },
+    {
+      key: 'materials',
+      path: '/materials',
+      icon: <FolderOutlined />,
+      tooltip: '素材管理',
+    },
+    {
+      key: 'attribution',
+      path: '/attribution',
+      icon: <BarChartOutlined />,
+      tooltip: '归因分析',
+    },
+    {
+      key: 'abtest',
+      path: '/abtest',
+      icon: <ExperimentOutlined />,
+      tooltip: 'A/B测试',
+    },
+    {
+      key: 'observability',
+      path: '/observability',
+      icon: <MonitorOutlined />,
+      tooltip: '系统观测',
+    },
+    {
+      key: 'compliance',
+      path: '/compliance',
+      icon: <AuditOutlined />,
+      tooltip: '合规审核',
+    },
+  ];
 
   const footerItems: MenuItem[] = [
     {
       key: 'feedback',
       path: 'https://github.com',
       icon: <CustomerServiceOutlined />,
-      tooltip: '反馈问题'
+      tooltip: '反馈问题',
     },
     {
       key: 'settings',
       path: '/settings',
       icon: <SettingOutlined />,
-      tooltip: '系统设置'
+      tooltip: '系统设置',
     },
     {
       key: 'github',
       path: 'https://github.com',
       icon: <GithubOutlined />,
-      tooltip: '访问 GitHub'
-    }
-  ]
+      tooltip: '访问 GitHub',
+    },
+  ];
 
   const handleMenuClick = (item: MenuItem) => {
     if (item.key === 'github' || item.key === 'feedback') {
-      window.open(item.path, '_blank')
+      window.open(item.path, '_blank');
     } else {
-      navigate(item.path)
+      navigate(item.path);
     }
-  }
+  };
 
   const isActive = (item: MenuItem) => {
     if (item.key === 'video-creation') {
-      return location.pathname === '/' || location.pathname === '/video-creation'
+      return location.pathname === '/' || location.pathname === '/video-creation';
     }
-    return location.pathname === item.path
-  }
+    return location.pathname === item.path;
+  };
 
   return (
     <div className="workbench">
@@ -126,7 +161,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
         {children}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default WorkbenchLayout
+export default WorkbenchLayout;

@@ -7,7 +7,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// 引入 Agent 架构 (新版)
+// 引入 Agent 架构（新版）
 const { scriptAgent, videoAgent, clipAgent, orchestrator } = require('./agents');
 
 // 引入视频合成和 TTS 服务
@@ -21,6 +21,11 @@ const { withRetry, sleep, videoRetryOptions, ttsRetryOptions } = require('./util
 
 // 引入 Mock 服务
 const { mockCreateVideoTask, mockGetVideoTask, generatePlaceholderVideo } = require('./services/mockArkService');
+
+// 引入可观测性模块
+const { logger, generateTraceId } = require('./utils/logger');
+const observabilityService = require('./services/observabilityService');
+const observabilityRoutes = require('./routes/observability');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -47,6 +52,46 @@ if (!hasRealAPI) {
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 请求追踪和日志中间件
+app.use((req, res, next) => {
+  const traceId = req.headers['x-trace-id'] || generateTraceId();
+  req.traceId = traceId;
+  req.logger = logger.childWithTrace(traceId);
+  req.startTime = Date.now();
+
+  req.logger.info('Incoming request', {
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.get('user-agent')
+  });
+
+  res.on('finish', () => {
+    const duration = Date.now() - req.startTime;
+    observabilityService.trackRequest(req.method, req.path, res.statusCode, duration);
+    
+    req.logger.info('Request completed', {
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      duration: `${duration}ms`
+    });
+  });
+
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      const duration = Date.now() - req.startTime;
+      req.logger.warn('Request closed', {
+        method: req.method,
+        path: req.path,
+        duration: `${duration}ms`
+      });
+    }
+  });
+
+  next();
+});
 
 // 确保上传目录存在
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -844,8 +889,35 @@ async function downloadFile(url, destPath) {
 // 引入 Agent 路由
 const agentRoutes = require('./routes/agent');
 
+// 引入素材路由
+const materialRoutes = require('./routes/materials');
+
+// 引入归因分析路由
+const attributionRoutes = require('./routes/attribution');
+
+// 引入合规审核路由
+const complianceRoutes = require('./routes/compliance');
+
+// 引入 A/B 测试路由
+const abTestRoutes = require('./routes/abTest');
+
 // 使用 Agent 路由
 app.use('/api/agent', agentRoutes);
+
+// 使用素材路由
+app.use('/api/materials', materialRoutes);
+
+// 使用归因分析路由
+app.use('/api/attribution', attributionRoutes);
+
+// 使用 A/B 测试路由
+app.use('/api/abtest', abTestRoutes);
+
+// 使用合规审核路由
+app.use('/api/compliance', complianceRoutes);
+
+// 使用可观测性路由
+app.use('/api/observability', observabilityRoutes);
 
 // 启动服务器
 app.listen(PORT, () => {
@@ -856,4 +928,8 @@ app.listen(PORT, () => {
   console.log(`🎥 Video Endpoint: ${VIDEO_EP}`);
   console.log('✅ P1/P2 功能已启用：Agent编排、TTS、视频拼接、批量生成');
   console.log('✅ 新增 /api/agent 端到端生成接口');
+  console.log('✅ 新增 /api/materials 素材管理和检索接口');
+  console.log('✅ 新增 /api/attribution 多因子归因分析接口');
+  console.log('✅ 新增 /api/observability 可观测性接口');
+  logger.info('Server started successfully', { port: PORT });
 });
