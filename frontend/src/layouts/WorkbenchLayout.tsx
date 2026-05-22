@@ -15,6 +15,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
+import ConnectionStatus from '../components/ConnectionStatus';
 
 interface MenuItem {
   key: string;
@@ -175,6 +176,18 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
       </div>
 
       <div className="main-content">
+        <div style={{ 
+          position: 'fixed', 
+          top: 10, 
+          right: 10, 
+          zIndex: 1000,
+          background: 'white',
+          padding: '4px 12px',
+          borderRadius: '4px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <ConnectionStatus />
+        </div>
         {children}
       </div>
     </div>
