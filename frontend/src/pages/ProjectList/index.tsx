@@ -123,7 +123,7 @@ const ProjectListPage: React.FC = () => {
 
   // 打开项目
   const openProject = (id: string) => {
-    window.location.hash = `/workbench?project=${id}`;
+    window.location.hash = `/workbench/${id}`;
   };
 
   const getStatusColor = (status: string) => {
