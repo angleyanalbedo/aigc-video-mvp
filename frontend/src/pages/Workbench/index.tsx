@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   AppstoreOutlined,
   SaveOutlined,
@@ -36,18 +37,18 @@ import {
 import type { UploadFile } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
-const { Content, Sider } = Layout;
+const { Content } = Layout;
 const { Option } = Select;
 const { TextArea } = Input;
 const { Panel } = Collapse;
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
 const WorkbenchPage: React.FC = () => {
   const [form] = Form.useForm();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
-  const [materials, setMaterials] = useState<UploadFile[]>([]);
+  const [materials, setMaterials] = useState<UploadFile<any>[]>([]);
   const [script, setScript] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -58,6 +59,8 @@ const WorkbenchPage: React.FC = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [availableMaterials, setAvailableMaterials] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { projectId } = useParams();
 
   // 自动保存
   useEffect(() => {
@@ -113,6 +116,13 @@ const WorkbenchPage: React.FC = () => {
       console.error('加载项目详情失败', e);
     }
   };
+
+  // 从 URL 加载项目
+  useEffect(() => {
+    if (projectId && projectId !== currentProjectId) {
+      loadProject(projectId);
+    }
+  }, [projectId]);
 
   // 创建新项目
   const createProject = async (name = '未命名项目') => {
@@ -307,7 +317,7 @@ const WorkbenchPage: React.FC = () => {
   const handleUpload = async (info: any) => {
     if (info.file.status === 'done') {
       const fileUrl = info.file.response.url || info.file.response.data?.url;
-      const newMaterial = {
+      const newMaterial: UploadFile<any> = {
         uid: info.file.uid,
         name: info.file.name,
         status: 'done',
@@ -351,7 +361,7 @@ const WorkbenchPage: React.FC = () => {
   };
 
   const selectMaterial = (mat: any) => {
-    const newMaterial = {
+    const newMaterial: UploadFile<any> = {
       uid: mat.id,
       name: mat.filename,
       status: 'done',
@@ -430,7 +440,7 @@ const WorkbenchPage: React.FC = () => {
                         body: formData
                       });
                       const data = await res.json();
-                      onSuccess(data);
+                      if (onSuccess) onSuccess(data);
                     }}
                   >
                     <p className="ant-upload-drag-icon">
