@@ -1,8 +1,10 @@
 // 加载环境变量
 require('dotenv').config();
+console.log('[DEBUG] 1. dotenv loaded');
 
 // 初始化数据库
 require('./db');
+console.log('[DEBUG] 2. db loaded');
 
 const express = require('express');
 const cors = require('cors');
@@ -10,25 +12,35 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+console.log('[DEBUG] 3. express modules loaded');
+
 // 引入 Agent 架构（新版）
 const { scriptAgent, videoAgent, clipAgent, orchestrator } = require('./agents');
+console.log('[DEBUG] 4. agents loaded');
 
 // 引入视频合成和 TTS 服务
 const { VideoComposer, TTSService } = require('./services/videoComposer');
+console.log('[DEBUG] 5. videoComposer loaded');
 
 // 引入 Trace 服务
 const traceService = require('./services/traceService');
+console.log('[DEBUG] 6. traceService loaded');
 
 // 引入重试工具
 const { withRetry, sleep, videoRetryOptions, ttsRetryOptions } = require('./utils/retry');
+console.log('[DEBUG] 7. retry loaded');
 
 // 引入 Mock 服务
 const { mockCreateVideoTask, mockGetVideoTask, generatePlaceholderVideo } = require('./services/mockArkService');
+console.log('[DEBUG] 8. mockArkService loaded');
 
 // 引入可观测性模块
 const { logger, generateTraceId } = require('./utils/logger');
+console.log('[DEBUG] 9. logger loaded');
 const observabilityService = require('./services/observabilityService');
+console.log('[DEBUG] 10. observabilityService loaded');
 const observabilityRoutes = require('./routes/observability');
+console.log('[DEBUG] 11. observabilityRoutes loaded');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -50,11 +62,15 @@ if (!hasRealAPI) {
 } else {
   console.log('✅ 已配置火山方舟 API 密钥');
 }
+console.log('[DEBUG] 12. API config checked');
 
+console.log('[DEBUG] 13. setting up middleware');
 // ====== 中间件 ======
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+console.log('[DEBUG] 14. middleware setup done');
 
 // 请求追踪和日志中间件
 app.use((req, res, next) => {
@@ -95,6 +111,7 @@ app.use((req, res, next) => {
 
   next();
 });
+console.log('[DEBUG] 15. request tracing middleware done');
 
 // 确保上传目录存在
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -890,21 +907,32 @@ async function downloadFile(url, destPath) {
 }
 
 // 引入 Agent 路由
+console.log('[DEBUG] 20. about to require agentRoutes');
 const agentRoutes = require('./routes/agent');
+console.log('[DEBUG] 21. agentRoutes loaded');
 
 // 引入素材路由
+console.log('[DEBUG] 22. about to require materialRoutes');
 const materialRoutes = require('./routes/materials');
+console.log('[DEBUG] 23. materialRoutes loaded');
 
 // 引入归因分析路由
+console.log('[DEBUG] 24. about to require attributionRoutes');
 const attributionRoutes = require('./routes/attribution');
+console.log('[DEBUG] 25. attributionRoutes loaded');
 
 // 引入合规审核路由
+console.log('[DEBUG] 26. about to require complianceRoutes');
 const complianceRoutes = require('./routes/compliance');
+console.log('[DEBUG] 27. complianceRoutes loaded');
 
 // 引入 A/B 测试路由
+console.log('[DEBUG] 28. about to require abTestRoutes');
 const abTestRoutes = require('./routes/abTest');
+console.log('[DEBUG] 29. abTestRoutes loaded');
 
 // 引入项目管理路由
+console.log('[DEBUG] 30. about to require projectRoutes');
 const projectRoutes = require('./routes/projects');
 
 // 使用 Agent 路由
@@ -927,19 +955,30 @@ app.use('/api/observability', observabilityRoutes);
 
 // 使用项目管理路由
 app.use('/api/projects', projectRoutes);
+console.log('[DEBUG] routes registered');
 
+console.log('[DEBUG] about to call app.listen...');
 // 启动服务器
 const HOST = process.env.HOST || '0.0.0.0';
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 服务器运行在 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
-  console.log(`📁 上传目录: ${uploadsDir}`);
-  console.log(`📁 输出目录: ${outputDir}`);
-  console.log(`🤖 LLM Endpoint: ${LLM_EP}`);
-  console.log(`🎥 Video Endpoint: ${VIDEO_EP}`);
-  console.log('✅ P1/P2 功能已启用：Agent编排、TTS、视频拼接、批量生成');
-  console.log('✅ 新增 /api/agent 端到端生成接口');
-  console.log('✅ 新增 /api/materials 素材管理和检索接口');
-  console.log('✅ 新增 /api/attribution 多因子归因分析接口');
-  console.log('✅ 新增 /api/observability 可观测性接口');
-  logger.info('Server started successfully', { port: PORT, host: HOST });
-});
+console.log('[DEBUG] PORT:', PORT, 'HOST:', HOST);
+
+try {
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`🚀 服务器运行在 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+    console.log(`📁 上传目录: ${uploadsDir}`);
+    console.log(`📁 输出目录: ${outputDir}`);
+    console.log(`🤖 LLM Endpoint: ${LLM_EP}`);
+    console.log(`🎥 Video Endpoint: ${VIDEO_EP}`);
+    console.log('✅ P1/P2 功能已启用：Agent编排、TTS、视频拼接、批量生成');
+    console.log('✅ 新增 /api/agent 端到端生成接口');
+    console.log('✅ 新增 /api/materials 素材管理和检索接口');
+    console.log('✅ 新增 /api/attribution 多因子归因分析接口');
+    console.log('✅ 新增 /api/observability 可观测性接口');
+    logger.info('Server started successfully', { port: PORT, host: HOST });
+  });
+  server.on('error', (err) => {
+    console.error('[DEBUG] Server error:', err);
+  });
+} catch (err) {
+  console.error('[DEBUG] app.listen failed:', err);
+}

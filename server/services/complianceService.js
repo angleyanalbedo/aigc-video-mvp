@@ -1,4 +1,6 @@
 
+console.log('[DEBUG 26c1] complianceService.js starting');
+
 // 审核状态枚举
 const REVIEW_STATES = {
   PENDING: 'pending',
@@ -16,6 +18,7 @@ let reviewIdCounter = 1;
  */
 class ComplianceService {
   constructor() {
+    console.log('[DEBUG 26c2] ComplianceService constructor');
     this.reviewStore = reviewStore;
   }
 
@@ -322,6 +325,7 @@ class ComplianceService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
+console.log('[DEBUG 26c3] about to export ComplianceService');
 
 module.exports = {
   ComplianceService,
