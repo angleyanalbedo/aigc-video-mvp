@@ -89,7 +89,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
               key={item.key}
               title={item.tooltip}
               placement="right"
-              destroyTooltipOnHide
+              destroyOnHidden
               showArrow={false}
             >
               <div
@@ -108,7 +108,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
               key={item.key}
               title={item.tooltip}
               placement="right"
-              destroyTooltipOnHide
+              destroyOnHidden
               showArrow={false}
             >
               <div
