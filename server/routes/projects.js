@@ -165,15 +165,14 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
 
       // 写入 materials 表并绑定到该项目
       db.prepare(`
-        INSERT INTO materials (id, filename, url, type, project_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO materials (id, filename, url, type, project_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       `).run(
         matId,
         req.file.originalname,
         fileUrl,
         req.file.mimetype,
         id,
-        now,
         now
       );
 
@@ -205,15 +204,14 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
 
     // 写入 materials 表并绑定到该项目
     db.prepare(`
-      INSERT INTO materials (id, filename, url, type, project_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO materials (id, filename, url, type, project_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       matId,
       filenameFinal,
       url,
       'image',
       id,
-      now,
       now
     );
 

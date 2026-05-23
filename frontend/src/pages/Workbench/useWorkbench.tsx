@@ -62,13 +62,13 @@ export const useWorkbench = () => {
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'materials';
   const [form] = Form.useForm();
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditSceneIndex, setCurrentEditSceneIndex] = useState<number | null>(null);
-  
+
   // Agent相关状态
   const [selectedSceneForSuggestions, setSelectedSceneForSuggestions] = useState<number | null>(null);
-  const [agentSuggestions, setAgentSuggestions] = useState<Array<{id: string, title: string, content: string, type: string, cost?: number}>>([]);
+  const [agentSuggestions, setAgentSuggestions] = useState<Array<{ id: string, title: string, content: string, type: string, cost?: number }>>([]);
   const [isAgentLoading, setIsAgentLoading] = useState(false);
   const [showAgentPanel, setShowAgentPanel] = useState(true);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -95,10 +95,10 @@ export const useWorkbench = () => {
   // Agent Workflow 节点状态（供 Header 步骤条消费）
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
     { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: 'pending' },
-    { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
-    { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
-    { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
-    { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
+    { id: 'script', name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
+    { id: 'storyboard', name: '分镜编辑', agent: 'ImageAgent', layer: '执行层', status: 'pending' },
+    { id: 'video', name: '分镜渲染', agent: 'VideoAgent', layer: '执行层', status: 'pending' },
+    { id: 'clip', name: '剪辑合成', agent: 'ClipAgent', layer: '执行层', status: 'pending' },
   ]);
   const [workflowStarted, setWorkflowStarted] = useState(false);
 
@@ -122,7 +122,7 @@ export const useWorkbench = () => {
   const [script, setScript] = useState<any>(null);
   const [productInfo, setProductInfo] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  
+
   // Chat Co-pilot State
   const [chatHistory, setChatHistory] = useState<Message[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -154,14 +154,14 @@ export const useWorkbench = () => {
             // 如果视频已存在，确保状态是 completed
             if (scene.videoUrl) {
               status = 'completed';
-            } 
+            }
             // 如果图片已存在但视频不存在，状态应为 idle 或 image_completed
             else if (scene.imageUrl) {
               status = scene.status === 'completed' ? 'completed' : (scene.status || 'image_completed');
             }
             // 确保 rendering 状态被正确重置（后台不会保存渲染中状态）
             const rendering = false;
-            
+
             return {
               ...scene,
               status,
@@ -170,7 +170,7 @@ export const useWorkbench = () => {
               progress: scene.progress || 0
             };
           });
-          
+
           setScript({
             ...p.script,
             scenes: normalizedScenes
@@ -178,19 +178,19 @@ export const useWorkbench = () => {
           setWorkflowStarted(true);
           setWorkflowNodes([
             { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: p.materials?.length > 0 ? 'completed' : 'pending' },
-            { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
-            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: normalizedScenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
-            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: normalizedScenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
-            { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
+            { id: 'script', name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
+            { id: 'storyboard', name: '分镜编辑', agent: 'ImageAgent', layer: '执行层', status: normalizedScenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
+            { id: 'video', name: '分镜渲染', agent: 'VideoAgent', layer: '执行层', status: normalizedScenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
+            { id: 'clip', name: '剪辑合成', agent: 'ClipAgent', layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
           ]);
         } else {
           setWorkflowStarted(true);
           setWorkflowNodes([
             { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: p.materials?.length > 0 ? 'completed' : 'pending' },
-            { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
-            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
-            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
-            { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
+            { id: 'script', name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
+            { id: 'storyboard', name: '分镜编辑', agent: 'ImageAgent', layer: '执行层', status: 'pending' },
+            { id: 'video', name: '分镜渲染', agent: 'VideoAgent', layer: '执行层', status: 'pending' },
+            { id: 'clip', name: '剪辑合成', agent: 'ClipAgent', layer: '执行层', status: 'pending' },
           ]);
         }
         if (p.product_info) {
@@ -271,14 +271,14 @@ export const useWorkbench = () => {
       if (data.success && data.plan) {
         setClipPlan(data.plan);
         message.success('🎬 AI 剪辑师已为您制定最优剪辑方案！');
-        
+
         // Automatically sync recommended audio settings if suggested
         if (data.plan.audio) {
           const planBGM = data.plan.audio.bgm;
           const planVolume = typeof data.plan.audio.volume === 'number'
             ? Math.round(data.plan.audio.volume * 100)
             : settings.volume;
-          
+
           // Map AI recommended BGM names back to settings option keys
           let mappedBGM = settings.bgm;
           if (planBGM) {
@@ -302,7 +302,7 @@ export const useWorkbench = () => {
     } catch (err: any) {
       console.error('AI clip plan error:', err);
       message.error('AI 剪辑方案生成失败，使用默认最优剪辑方案');
-      
+
       // Load local smart default plan
       const defaultPlan = {
         clips: (script?.scenes || []).map((s: any, idx: number) => ({
@@ -550,31 +550,31 @@ export const useWorkbench = () => {
     updateScript({ ...script, scenes: newScenes });
     message.success(`${imageType === 'first' ? '首帧' : imageType === 'last' ? '尾帧' : '主图'}已清除，可以重新生成`);
   };
-  
+
   // 强制重新渲染（取消卡住的渲染任务）
   const forceRerender = (index: number) => {
     if (!script || !script.scenes) return;
-    
+
     const scene = script.scenes[index];
     const isTimeout = scene.status === 'error' && scene.errorMessage?.includes('超时');
     const isStuck = scene.rendering || scene.status === 'generating';
-    
+
     Modal.confirm({
       title: isStuck ? '⚠️ 强制取消渲染任务' : '🔄 重新渲染分镜',
       content: (
         <div>
           <p>
-            {isTimeout 
+            {isTimeout
               ? '该分镜渲染已超时（超过 3 分钟无响应）。是否强制取消并重新渲染？'
               : isStuck
                 ? '该分镜可能正在卡住。是否强制取消当前任务并重新开始渲染？'
                 : '是否重新渲染该分镜？'}
           </p>
           {scene.errorMessage && (
-            <div style={{ 
-              marginTop: 12, 
-              padding: 8, 
-              background: '#fff1f0', 
+            <div style={{
+              marginTop: 12,
+              padding: 8,
+              background: '#fff1f0',
               borderRadius: 4,
               fontSize: 12,
               color: '#cf1322'
@@ -606,13 +606,13 @@ export const useWorkbench = () => {
       }
     });
   };
-  
+
   // Agent 功能：获取智能建议
   const getAgentSuggestions = async (sceneIndex: number) => {
     if (!script || !script.scenes[sceneIndex]) return;
     setIsAgentLoading(true);
     setSelectedSceneForSuggestions(sceneIndex);
-    
+
     // 模拟 Agent 生成建议（实际项目中调用真实API）
     setTimeout(() => {
       const scene = script.scenes[sceneIndex];
@@ -650,16 +650,16 @@ export const useWorkbench = () => {
       setIsAgentLoading(false);
     }, 1000);
   };
-  
+
   // Agent 快速操作：批量优化
   const batchOptimize = (type: 'consistency' | 'duration' | 'voiceover') => {
     if (!script || !script.scenes) return;
-    
+
     message.loading(`正在执行${type === 'consistency' ? '一致性优化' : type === 'duration' ? '时长调整' : '配音优化'}...`, 1);
-    
+
     setTimeout(() => {
       const newScenes = [...script.scenes];
-      
+
       if (type === 'consistency') {
         // 统一风格
         newScenes.forEach((scene: any, idx: number) => {
@@ -680,18 +680,18 @@ export const useWorkbench = () => {
         // 配音优化（模拟）
         message.success('配音风格优化建议已生成！');
       }
-      
+
       updateScript({ ...script, scenes: newScenes });
     }, 800);
   };
-  
+
   // 应用 Agent 建议
   const applyAgentSuggestion = (suggestion: any, sceneIndex: number) => {
     if (!script || !script.scenes[sceneIndex]) return;
     const newScenes = [...script.scenes];
     const scene = { ...newScenes[sceneIndex] };
-    
-    switch(suggestion.type) {
+
+    switch (suggestion.type) {
       case 'optimization':
         scene.description = scene.description + '，专业商业摄影，自然光，清晰细节';
         break;
@@ -706,17 +706,17 @@ export const useWorkbench = () => {
         scene.shot_type = scene.shot_type === '特写' ? '中景' : '特写';
         break;
     }
-    
+
     newScenes[sceneIndex] = scene;
     updateScript({ ...script, scenes: newScenes });
     message.success(`已应用建议: ${suggestion.title}`);
   };
-  
+
   // 一键优化所有分镜
   const optimizeAllScenes = async () => {
     if (!script || !script.scenes) return;
     message.loading('Agent 正在分析和优化所有分镜...', 0);
-    
+
     setTimeout(() => {
       const newScenes = script.scenes.map((scene: any, idx: number) => {
         return {
@@ -735,7 +735,7 @@ export const useWorkbench = () => {
   const generateSingleSceneImage = async (index: number) => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
-    
+
     // Atomic state update for starting image generation
     const startScenes = [...script.scenes];
     startScenes[index] = {
@@ -772,7 +772,7 @@ export const useWorkbench = () => {
         };
         updateScript({ ...script, scenes: doneScenes });
         message.success(`分镜 ${index + 1} 视觉生图成功！`);
-        
+
         setWorkflowNodes(prev => prev.map(n => {
           if (n.id === 'image') {
             const allDone = script.scenes.every((s: any, idx: number) => idx === index ? true : (s.imageUrl || s.status === 'image_completed' || s.status === 'completed' || s.videoUrl));
@@ -820,13 +820,13 @@ export const useWorkbench = () => {
   const generateSingleSceneVideo = async (index: number) => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
-    
+
     // 如果正在渲染中，不允许再次点击
     if (scene.rendering || scene.status === 'generating') {
       message.warning('该分镜正在渲染中，请稍候...');
       return;
     }
-    
+
     // 先清理所有卡住的后端任务
     try {
       const cleanupRes = await fetch(`${API_BASE}/api/video/cleanup`, { method: 'POST' });
@@ -837,7 +837,7 @@ export const useWorkbench = () => {
     } catch (err) {
       console.warn('清理卡住任务失败，继续渲染:', err);
     }
-    
+
     // Atomic state update for starting video generation
     const startScenes = [...script.scenes];
     startScenes[index] = {
@@ -901,100 +901,80 @@ export const useWorkbench = () => {
       });
 
       const data = await res.json();
-      if (data.taskId) {
-        const taskId = data.taskId;
-        let pollCount = 0;
-        const maxPollCount = 60; // 最多轮询 60 次（3 分钟）
-        
-        // Start polling task
-        const pollInterval = setInterval(async () => {
-          pollCount++;
-          
-          try {
-            const taskRes = await fetch(`${API_BASE}/api/video/status/${taskId}`);
-            const taskData = await taskRes.json();
-            
-            if (taskData) {
-              // 如果后端返回了有效进度，使用后端的进度；否则使用估算进度
-              const displayProgress = taskData.progress || Math.min(10 + (pollCount * 5), 90);
-              updateSceneField(index, 'progress', displayProgress);
-
-              if (taskData.status === 'succeeded') {
-                clearInterval(pollInterval);
-                // Atomic state update for successful video generation
-                const doneScenes = [...script.scenes];
-                doneScenes[index] = {
-                  ...doneScenes[index],
-                  rendering: false,
-                  status: 'completed',
-                  videoUrl: taskData.videoUrl,
-                  progress: 100
-                };
-                updateScript({ ...script, scenes: doneScenes });
-                message.success(`分镜 ${index + 1} 画面渲染成功！`);
-                
-                setWorkflowNodes(prev => prev.map(n => {
-                  if (n.id === 'video') {
-                    const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
-                    return { ...n, status: allDone ? 'completed' : 'running' };
-                  }
-                  return n;
-                }));
-              } else if (taskData.status === 'failed') {
-                clearInterval(pollInterval);
-                // Atomic state update for failed video generation
-                const failScenes = [...script.scenes];
-                failScenes[index] = {
-                  ...failScenes[index],
-                  rendering: false,
-                  status: 'error',
-                  errorMessage: taskData.error || '视频生成失败，请重试'
-                };
-                updateScript({ ...script, scenes: failScenes });
-                message.error(`分镜 ${index + 1} 画面生成失败`);
-                setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
-              } else if (pollCount >= maxPollCount) {
-                // 超时处理：达到最大轮询次数后自动停止
-                clearInterval(pollInterval);
-                const timeoutScenes = [...script.scenes];
-                timeoutScenes[index] = {
-                  ...timeoutScenes[index],
-                  rendering: false,
-                  status: 'error',
-                  errorMessage: `渲染超时（超过 ${Math.round(maxPollCount * 3 / 60)} 分钟）。可能是后端任务卡住，请尝试强制重置后重新渲染。`
-                };
-                updateScript({ ...script, scenes: timeoutScenes });
-                message.warning(`⚠️ 分镜 ${index + 1} 渲染超时，已自动停止轮询。请查看错误详情或点击"强制重置"后重新渲染。`);
-                setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
-              }
-            }
-          } catch (e) {
-            console.error('轮询分镜任务错误:', e);
-          }
-        }, 3000);
-      } else {
-        // Safe fallback
-        setTimeout(() => {
-          // Atomic state update for fallback video generation
-          const fallbackScenes = [...script.scenes];
-          fallbackScenes[index] = {
-            ...fallbackScenes[index],
-            rendering: false,
-            status: 'completed',
-            videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-kitchen-counter-with-fresh-vegetables-and-fruits-41584-large.mp4'
-          };
-          updateScript({ ...script, scenes: fallbackScenes });
-          message.success(`分镜 ${index + 1} 画面生成成功 (Mock 视频已注入)`);
-          
-          setWorkflowNodes(prev => prev.map(n => {
-            if (n.id === 'video') {
-              const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
-              return { ...n, status: allDone ? 'completed' : 'running' };
-            }
-            return n;
-          }));
-        }, 4000);
+      if (!data.success || !data.taskId) {
+        throw new Error(data.error || '创建视频生成任务失败');
       }
+
+      const taskId = data.taskId;
+      let pollCount = 0;
+      const maxPollCount = 60; // 最多轮询 60 次（3 分钟）
+
+      // Start polling task
+      const pollInterval = setInterval(async () => {
+        pollCount++;
+
+        try {
+          const taskRes = await fetch(`${API_BASE}/api/video/status/${taskId}`);
+          const taskData = await taskRes.json();
+
+          if (taskData) {
+            // 如果后端返回了有效进度，使用后端的进度；否则使用估算进度
+            const displayProgress = taskData.progress || Math.min(10 + (pollCount * 5), 90);
+            updateSceneField(index, 'progress', displayProgress);
+
+            if (taskData.status === 'succeeded') {
+              clearInterval(pollInterval);
+              // Atomic state update for successful video generation
+              const doneScenes = [...script.scenes];
+              doneScenes[index] = {
+                ...doneScenes[index],
+                rendering: false,
+                status: 'completed',
+                videoUrl: taskData.videoUrl,
+                progress: 100
+              };
+              updateScript({ ...script, scenes: doneScenes });
+              message.success(`分镜 ${index + 1} 画面渲染成功！`);
+
+              setWorkflowNodes(prev => prev.map(n => {
+                if (n.id === 'video') {
+                  const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
+                  return { ...n, status: allDone ? 'completed' : 'running' };
+                }
+                return n;
+              }));
+            } else if (taskData.status === 'failed') {
+              clearInterval(pollInterval);
+              // Atomic state update for failed video generation
+              const failScenes = [...script.scenes];
+              failScenes[index] = {
+                ...failScenes[index],
+                rendering: false,
+                status: 'error',
+                errorMessage: taskData.error || '视频生成失败，请重试'
+              };
+              updateScript({ ...script, scenes: failScenes });
+              message.error(`分镜 ${index + 1} 画面生成失败`);
+              setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
+            } else if (pollCount >= maxPollCount) {
+              // 超时处理：达到最大轮询次数后自动停止
+              clearInterval(pollInterval);
+              const timeoutScenes = [...script.scenes];
+              timeoutScenes[index] = {
+                ...timeoutScenes[index],
+                rendering: false,
+                status: 'error',
+                errorMessage: `渲染超时（超过 ${Math.round(maxPollCount * 3 / 60)} 分钟）。可能是后端任务卡住，请尝试强制重置后重新渲染。`
+              };
+              updateScript({ ...script, scenes: timeoutScenes });
+              message.warning(`⚠️ 分镜 ${index + 1} 渲染超时，已自动停止轮询。请查看错误详情或点击"强制重置"后重新渲染。`);
+              setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
+            }
+          }
+        } catch (e) {
+          console.error('轮询分镜任务错误:', e);
+        }
+      }, 3000);
     } catch (e) {
       console.error('生成单个分镜失败:', e);
       // Atomic state update for failed catch block
@@ -1017,7 +997,7 @@ export const useWorkbench = () => {
       message.warning('暂无分镜场景数据！');
       return;
     }
-    
+
     // 先清理所有卡住的任务
     try {
       const cleanupRes = await fetch(`${API_BASE}/api/video/cleanup`, { method: 'POST' });
@@ -1028,15 +1008,15 @@ export const useWorkbench = () => {
     } catch (err) {
       console.error('清理卡住任务失败:', err);
     }
-    
+
     // 统计需要渲染的分镜数量
     const scenesToRender = script.scenes.filter((s: any) => !s.rendering && s.status !== 'generating');
-    
+
     if (scenesToRender.length === 0) {
       message.info('所有分镜都正在渲染中或已完成！');
       return;
     }
-    
+
     setIsRenderingAllScenes(true);
     try {
       // 批量启动所有非渲染中的分镜渲染任务（包括已完成和错误的）
@@ -1088,57 +1068,41 @@ export const useWorkbench = () => {
         })
       });
       const data = await res.json();
-      
-      if (data.batchId) {
-        const taskId = data.batchId;
-        const es = new EventSource(`${API_BASE}/api/tasks/${taskId}/stream`);
-        
-        es.onmessage = (event) => {
-          const task = JSON.parse(event.data);
-          setRenderProgress(task.progress || 0);
-          if (task.message) setRenderStatus(task.message);
-          
-          if (task.videoUrl) {
-            setFinalVideoUrl(task.videoUrl);
-          }
+      if (!data.success || !data.batchId) {
+        throw new Error(data.error || '视频批量生成请求失败');
+      }
 
-          if (task.status === 'completed' || task.status === 'failed') {
-            es.close();
-            setIsRenderingAll(false);
-            if (task.status === 'failed') {
-              message.error(task.error || '视频渲染合成失败');
-              setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
-            } else {
-              message.success('恭喜！带货视频合成输出成功！');
-              setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'completed' } : n));
-            }
-          }
-        };
+      const taskId = data.batchId;
+      const es = new EventSource(`${API_BASE}/api/tasks/${taskId}/stream`);
 
-        es.onerror = () => {
+      es.onmessage = (event) => {
+        const task = JSON.parse(event.data);
+        setRenderProgress(task.progress || 0);
+        if (task.message) setRenderStatus(task.message);
+
+        if (task.videoUrl) {
+          setFinalVideoUrl(task.videoUrl);
+        }
+
+        if (task.status === 'completed' || task.status === 'failed') {
           es.close();
           setIsRenderingAll(false);
-          message.error('后台视频编译连接发生异常');
-          setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
-        };
-      } else {
-        // Fallback synthetic compilation
-        let progressVal = 10;
-        const fallbackTimer = setInterval(() => {
-          progressVal += 20;
-          if (progressVal >= 100) {
-            clearInterval(fallbackTimer);
-            setRenderProgress(100);
-            setIsRenderingAll(false);
-            setFinalVideoUrl('https://assets.mixkit.co/videos/preview/mixkit-pouring-orange-juice-into-a-glass-41618-large.mp4');
-            message.success('带货视频一键成片合成成功 (智能 Mock 备用包)');
-            setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'completed' } : n));
+          if (task.status === 'failed') {
+            message.error(task.error || '视频渲染合成失败');
+            setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
           } else {
-            setRenderProgress(progressVal);
-            setRenderStatus(`正在执行第 ${Math.ceil(progressVal / 25)} 分镜音频和画面高精校准...`);
+            message.success('恭喜！带货视频合成输出成功！');
+            setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'completed' } : n));
           }
-        }, 1500);
-      }
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        setIsRenderingAll(false);
+        message.error('后台视频编译连接发生异常');
+        setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
+      };
     } catch (e) {
       console.error('一键成片发生异常:', e);
       setIsRenderingAll(false);
@@ -1215,7 +1179,7 @@ export const useWorkbench = () => {
     setIsPlanningClip,
     clipPlan,
     setClipPlan,
-    
+
     // Refs & Form
     chatBottomRef,
     form,
