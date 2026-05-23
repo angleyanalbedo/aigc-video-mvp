@@ -240,17 +240,8 @@ class VideoComposer {
           videoFile = scene.videoPath;
           console.log(`  🎬 使用已有分镜 ${i + 1}: ${path.basename(videoFile)}`);
         } else {
-          // 没有视频文件，生成占位视频
-          videoFile = path.join(this.taskDir, `scene_${i}.mp4`);
-          console.log(`  🎬 生成占位分镜 ${i + 1}`);
-          
-          // 动态导入 mockArkService 来避免循环依赖
-          const { generatePlaceholderVideo } = require('./mockArkService');
-          await generatePlaceholderVideo(videoFile, {
-            duration: scene.duration || 3,
-            text: `Scene ${i + 1}`,
-            color: ['red', 'green', 'blue', 'orange', 'purple'][i % 5]
-          });
+          // 没有视频文件，报错
+          throw new Error(`分镜 ${i + 1} 缺少 videoPath，必须先渲染分镜`);
         }
         
         sceneVideos.push({
@@ -313,86 +304,47 @@ class VideoComposer {
 }
 
 /**
- * TTS 服务 - Mock 版本（临时方案）
- * 真实TTS需要外部服务，但我们先实现一个简单版本，让系统运行起来
+ * TTS 服务
  */
 
 class TTSService {
   constructor() {
-    // 这里可以后续添加真实的TTS实现
   }
 
   /**
    * 生成语音和字幕
    */
   async generate(text, options = {}) {
-    console.log('  🎵 [TTS] 生成语音（Mock版本）');
+    console.log('  🎵 [TTS] 生成语音');
     
-    // 输出文件
-    const outputFile = path.join(options.outputDir || TASKS_DIR, `tts_${Date.now()}.mp3`);
-    const subtitleFile = outputFile.replace('.mp3', '.srt');
-    
-    // 生成简单字幕（基于文本分段）
-    await this.generateSimpleSubtitle(text, subtitleFile);
-    
-    // 创建一个空文件（实际TTS会写入真实音频）
-    await fs.writeFile(outputFile, Buffer.from([]));
-    
-    // 估算音频时长
-    const estimatedDuration = Math.max(3, Math.ceil(text.length / 8)); // 简单估算
-    
-    return {
-      audioFile: outputFile,
-      subtitleFile: subtitleFile,
-      duration: estimatedDuration
-    };
-  }
-
-  /**
-   * 生成简单字幕
-   */
-  async generateSimpleSubtitle(text, subtitleFile) {
-    // 简单分段（按句子）
-    const sentences = text.split(/[。！？!?\n]+/).filter(s => s.trim());
-    const durationPerSentence = 3; // 每个句子约3秒
-    
-    let srtContent = '';
-    let currentTime = 0;
-    
-    sentences.forEach((sentence, index) => {
-      if (!sentence.trim()) return;
-      
-      const startTime = this.formatSRTTime(currentTime);
-      const endTime = this.formatSRTTime(currentTime + durationPerSentence);
-      
-      srtContent += `${index + 1}\n`;
-      srtContent += `${startTime} --> ${endTime}\n`;
-      srtContent += `${sentence.trim()}\n\n`;
-      
-      currentTime += durationPerSentence;
+    const { generateTTS } = require('../agents/tools/ttsAPI');
+    const result = await generateTTS({
+      text: text,
+      voice: options.voice || 'zh-CN-XiaoxiaoNeural',
+      rate: options.rate || '+0%'
     });
     
-    await fs.writeFile(subtitleFile, srtContent, 'utf-8');
+    return {
+      audioFile: result.audioFile,
+      subtitleFile: result.subtitleFile,
+      duration: result.duration
+    };
   }
-
+  
   /**
-   * 格式化 SRT 时间
-   */
-  formatSRTTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const ms = Math.floor((seconds % 1) * 1000);
-    
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
-  }
-
-  /**
-   * 获取音频时长（Mock版本）
+   * 获取音频时长
    */
   async getAudioDuration(file) {
-    // 估算时长
-    return 10; // 默认10秒
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+    
+    try {
+      const { stdout } = await execAsync(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${file}"`);
+      return parseFloat(stdout.trim()) || 10;
+    } catch {
+      return 10;
+    }
   }
 }
 

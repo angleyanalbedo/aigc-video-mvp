@@ -30,30 +30,23 @@ console.log('[DEBUG] 6. traceService loaded');
 const { withRetry, sleep, videoRetryOptions, ttsRetryOptions } = require('./utils/retry');
 console.log('[DEBUG] 7. retry loaded');
 
-// 引入 Mock 服务
-const { mockCreateVideoTask, mockGetVideoTask, generatePlaceholderVideo } = require('./services/mockArkService');
-console.log('[DEBUG] 8. mockArkService loaded');
 const materialService = require('./services/materialService');
 
 // 引入可观测性模块
 const { logger, generateTraceId } = require('./utils/logger');
-console.log('[DEBUG] 9. logger loaded');
+console.log('[DEBUG] 8. logger loaded');
 const observabilityService = require('./services/observabilityService');
-console.log('[DEBUG] 10. observabilityService loaded');
+console.log('[DEBUG] 9. observabilityService loaded');
 const observabilityRoutes = require('./routes/observability');
-console.log('[DEBUG] 11. observabilityRoutes loaded');
+console.log('[DEBUG] 10. observabilityRoutes loaded');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // 引入后端抽象服务层
-const { videoProvider, llmProvider, hasRealAPI } = require('./services/providers');
-if (!hasRealAPI) {
-  console.warn('⚠️  警告: 未配置完整的火山方舟 API 密钥，将使用 Mock 服务');
-} else {
-  console.log('✅ 已配置火山方舟 API 密钥');
-}
-console.log('[DEBUG] 12. API config checked');
+const { videoProvider, llmProvider } = require('./services/providers');
+console.log('✅ 已加载火山方舟 API 配置');
+console.log('[DEBUG] 11. API config checked');
 
 console.log('[DEBUG] 13. setting up middleware');
 // ====== 中间件 ======
@@ -230,7 +223,6 @@ app.post('/api/video/generate', async (req, res) => {
     taskStore.set(task.id, {
       status: task.status,
       createdAt: Date.now(),
-      isMock: !hasRealAPI,
       prompt: prompt
     });
 
@@ -252,7 +244,7 @@ app.get('/api/video/status/:taskId', async (req, res) => {
   const taskInfo = taskStore.get(taskId);
 
   try {
-    console.log(`🔍 查询任务状态: ${taskId}, hasRealAPI: ${hasRealAPI}`);
+    console.log(`🔍 查询任务状态: ${taskId}`);
     
     const status = await videoProvider.getStatus(taskId);
     console.log(`📊 查询结果:`, JSON.stringify(status));
@@ -276,23 +268,7 @@ app.get('/api/video/status/:taskId', async (req, res) => {
     if (status.status === 'succeeded') {
       let finalVideoUrl = status.videoUrl;
       
-      // 如果是 Mock 任务，我们需要生成一个本地占位视频
-      if (taskId.startsWith('mock_') || (finalVideoUrl && finalVideoUrl.startsWith('mock://')) || taskInfo?.isMock) {
-        console.log(`🎬 生成占位视频 (Mock 模式)`);
-        try {
-          const mockVideoPath = path.join(outputDir, `mock_${taskId}.mp4`);
-          if (!fs.existsSync(mockVideoPath)) {
-            await generatePlaceholderVideo(mockVideoPath, {
-              duration: 15,
-              text: 'Mock Video ' + taskId.substring(0, 8),
-              color: 'blue'
-            });
-          }
-          finalVideoUrl = `http://localhost:${PORT}/outputs/mock_${taskId}.mp4`;
-        } catch (videoErr) {
-          console.warn(`⚠️ 生成占位视频失败:`, videoErr);
-        }
-      } else if (finalVideoUrl && finalVideoUrl.startsWith('http')) {
+      if (finalVideoUrl && finalVideoUrl.startsWith('http')) {
         // 真实任务成功！我们将生成的视频自动下载持久化保存至本地 outputs 目录！
         try {
           const localFilename = `real_scene_${taskId}.mp4`;
@@ -755,69 +731,6 @@ app.get('/api/traces/stats', (req, res) => {
   });
 });
 
-// ====== 新增功能：Mock 数据看板 ======
-
-// 14. Mock 数据看板
-app.get('/api/dashboard/stats', (req, res) => {
-  // 生成模拟数据
-  const now = Date.now();
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  const mockData = {
-    // 总览数据
-    overview: {
-      totalVideos: 1234,
-      totalViews: 567890,
-      avgCompletionRate: 68.5,
-      avgEngagement: 4.2,
-      todayVideos: 23,
-      todayViews: 12580
-    },
-
-    // 热门商品
-    topProducts: [
-      { id: 1, name: '轻薄羽绒服', videos: 156, views: 45000, conversionRate: 3.2 },
-      { id: 2, name: '运动鞋', videos: 98, views: 32000, conversionRate: 2.8 },
-      { id: 3, name: '智能手表', videos: 87, views: 28000, conversionRate: 4.1 },
-      { id: 4, name: '护肤套装', videos: 76, views: 24000, conversionRate: 5.2 },
-      { id: 5, name: '蓝牙耳机', videos: 65, views: 21000, conversionRate: 3.5 }
-    ],
-
-    // 最近任务
-    recentTasks: [
-      { id: 'task_001', product: '测试商品A', status: 'completed', duration: 12, createdAt: now - 3600000 },
-      { id: 'task_002', product: '测试商品B', status: 'completed', duration: 15, createdAt: now - 7200000 },
-      { id: 'task_003', product: '测试商品C', status: 'processing', duration: null, createdAt: now - 1800000 },
-      { id: 'task_004', product: '测试商品D', status: 'failed', duration: null, createdAt: now - 5400000 }
-    ],
-
-    // 趋势数据（最近7天）
-    trend: [
-      { date: new Date(now - 6 * dayMs).toISOString().split('T')[0], videos: 18, views: 8900 },
-      { date: new Date(now - 5 * dayMs).toISOString().split('T')[0], videos: 22, views: 10200 },
-      { date: new Date(now - 4 * dayMs).toISOString().split('T')[0], videos: 15, views: 7800 },
-      { date: new Date(now - 3 * dayMs).toISOString().split('T')[0], videos: 28, views: 14500 },
-      { date: new Date(now - 2 * dayMs).toISOString().split('T')[0], videos: 31, views: 16200 },
-      { date: new Date(now - 1 * dayMs).toISOString().split('T')[0], videos: 25, views: 13100 },
-      { date: new Date(now).toISOString().split('T')[0], videos: 23, views: 12580 }
-    ],
-
-    // 系统状态
-    systemStatus: {
-      apiCalls: { used: 1250, limit: 5000 },
-      videoQuota: { used: 45, limit: 100 },
-      storageUsed: '2.3 GB',
-      uptime: '5d 12h 30m'
-    }
-  };
-
-  res.json({
-    success: true,
-    data: mockData,
-    generatedAt: new Date().toISOString()
-  });
-});
-
 // 15. 获取任务历史列表
 app.get('/api/tasks', (req, res) => {
   const { limit = 20, status } = req.query;
@@ -848,7 +761,7 @@ app.get('/api/tasks', (req, res) => {
 // ====== 辅助函数 ======
 
 // 轮询视频生成完成
-async function pollVideoCompletion(taskId, isMock = false, maxAttempts = 40) {
+async function pollVideoCompletion(taskId, maxAttempts = 40) {
   console.log(`⏳ 开始轮询任务完成: ${taskId}`);
   
   for (let i = 0; i < maxAttempts; i++) {
@@ -858,18 +771,11 @@ async function pollVideoCompletion(taskId, isMock = false, maxAttempts = 40) {
 
       if (status.status === 'succeeded') {
         console.log(`✅ 任务完成: ${taskId}`);
-        if (status.videoUrl && !status.videoUrl.startsWith('mock://') && !isMock) {
+        if (status.videoUrl) {
           console.log(`🔗 使用真实视频 URL: ${status.videoUrl}`);
           return status.videoUrl;
         }
-        // 生成 Mock 视频文件
-        const mockVideoPath = path.join(tempDir, `mock_scene_${Date.now()}_${i}.mp4`);
-        await generatePlaceholderVideo(mockVideoPath, {
-          duration: 5,
-          text: `Scene ${taskId.substring(0, 8)}`,
-          color: ['red', 'green', 'blue', 'orange', 'purple'][i % 5]
-        });
-        return `file://${mockVideoPath}`;
+        throw new Error('视频生成成功但没有返回 URL');
       }
 
       if (status.status === 'failed') {
