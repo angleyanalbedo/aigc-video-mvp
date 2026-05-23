@@ -7,6 +7,7 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const fs = require('fs').promises;
 const path = require('path');
+const { videoProvider } = require('./providers');
 const execAsync = promisify(exec);
 
 // 任务存储目录
@@ -301,29 +302,13 @@ class VideoComposer {
    * 调用 Seedance API 生成视频
    */
   async callSeedance(scene) {
-    const ARK_API_KEY = 'ark-2af51d30-ed70-4061-a2cd-74f454ccc4e8-2282e';
-    const VIDEO_EP = 'ep-20260514120705-pqv86';
-    
-    const content = [{
-      type: 'text',
-      text: `${scene.description} --rs ${this.options.resolution} --rt ${this.options.ratio} --dur ${scene.duration || 5} --fps 24 --wm false`
-    }];
-    
-    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ARK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: VIDEO_EP,
-        content,
-        return_last_frame: false
-      })
+    const task = await videoProvider.createTask({
+      prompt: scene.description,
+      resolution: this.options.resolution,
+      ratio: this.options.ratio,
+      duration: scene.duration || 5
     });
-    
-    const data = await response.json();
-    return data.id; // 返回任务ID，需要轮询获取结果
+    return task.id; // 返回任务ID，需要轮询获取结果
   }
 }
 
