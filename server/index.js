@@ -45,18 +45,8 @@ console.log('[DEBUG] 11. observabilityRoutes loaded');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ====== 火山引擎配置 ======
-const ARK_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3';
-const ARK_API_KEY = process.env.ARK_API_KEY;
-
-// Doubao-Seed-2.0-pro 用于剧本生成（Chat API）
-const LLM_EP = process.env.LLM_EP;
-
-// Doubao-Seedance-1.5-pro 用于视频生成（Video API）
-const VIDEO_EP = process.env.VIDEO_EP;
-
-// 检查环境变量（不强制要求，没有则使用 Mock 服务）
-const hasRealAPI = !!(ARK_API_KEY && LLM_EP && VIDEO_EP);
+// 引入后端抽象服务层
+const { videoProvider, llmProvider, hasRealAPI } = require('./services/providers');
 if (!hasRealAPI) {
   console.warn('⚠️  警告: 未配置完整的火山方舟 API 密钥，将使用 Mock 服务');
 } else {
@@ -192,73 +182,29 @@ app.post('/api/video/generate', async (req, res) => {
     const firstScene = script.scenes[0];
     const prompt = firstScene.description;
 
-    // 构建content数组，支持多分辨率/画幅
-    const content = [
-      {
-        type: 'text',
-        text: `${prompt} --rs ${resolution} --rt ${ratio} --dur ${duration} --fps 24 --wm false`
-      }
-    ];
-
     // 如果有图片素材，添加首帧图片
+    let imageUrl = null;
     if (materials && materials.length > 0) {
-      const imageUrl = materials.find(m => !m.endsWith('.mp4') && !m.endsWith('.mov'));
-      if (imageUrl) {
-        content.push({
-          type: 'image_url',
-          image_url: { url: imageUrl }
-        });
-      }
+      imageUrl = materials.find(m => !m.endsWith('.mp4') && !m.endsWith('.mov'));
     }
 
-    console.log('🎥 正在创建视频生成任务...');
+    console.log('🎥 正在通过 VideoProvider 创建视频生成任务...');
     console.log('提示词:', prompt);
 
-    let taskId;
-    
-    if (hasRealAPI) {
-      try {
-        console.log('🔗 尝试使用真实视频生成 API');
-        const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${ARK_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: VIDEO_EP,
-            content: content,
-            return_last_frame: false
-          })
-        });
+    const task = await videoProvider.createTask({
+      prompt,
+      resolution,
+      ratio,
+      duration,
+      imageUrl
+    });
 
-        const data = await response.json();
-        console.log('视频任务创建响应:', JSON.stringify(data));
-
-        if (data.error) {
-          console.warn('⚠️ 真实 API 调用失败，使用 Mock 服务:', data.error);
-          const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-          taskId = mockTask.id;
-        } else {
-          taskId = data.id;
-        }
-      } catch (error) {
-        console.warn('⚠️ 真实 API 调用失败，使用 Mock 服务:', error);
-        const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-        taskId = mockTask.id;
-      }
-    } else {
-      console.log('🤖 使用 Mock 视频生成服务');
-      const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-      taskId = mockTask.id;
-    }
-
-    taskStore.set(taskId, { status: 'queued', createdAt: Date.now(), isMock: !hasRealAPI });
+    taskStore.set(task.id, { status: task.status, createdAt: Date.now(), isMock: !hasRealAPI });
 
     // 立即返回taskId，前端轮询获取结果
     res.json({
       success: true,
-      taskId: taskId,
+      taskId: task.id,
       message: '视频生成任务已创建'
     });
   } catch (error) {
@@ -273,46 +219,32 @@ app.get('/api/video/status/:taskId', async (req, res) => {
   const taskInfo = taskStore.get(taskId);
 
   try {
-    let data = null;
+    console.log(`🔍 查询任务状态: ${taskId}, hasRealAPI: ${hasRealAPI}`);
     
-    // 尝试 Mock 查询
-    console.log(`🔍 查询任务状态: ${taskId}, isMock: ${taskInfo?.isMock}, hasRealAPI: ${hasRealAPI}`);
+    const status = await videoProvider.getStatus(taskId);
+    console.log(`📊 查询结果:`, JSON.stringify(status));
     
-    try {
-      data = await mockGetVideoTask(taskId);
-      console.log(`📊 Mock 查询结果:`, JSON.stringify(data));
-    } catch (mockErr) {
-      console.warn(`⚠️ Mock 查询失败:`, mockErr);
+    if (status.status === 'failed') {
+      return res.json({
+        taskId,
+        status: 'failed',
+        progress: 0,
+        error: status.error || '视频生成失败'
+      });
     }
-    
-    // 如果没有数据且有真实 API，尝试真实 API
-    if (!data && hasRealAPI) {
-      try {
-        console.log(`🔗 尝试真实 API 查询`);
-        const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks/${taskId}`, {
-          headers: { 'Authorization': `Bearer ${ARK_API_KEY}` }
-        });
-        data = await response.json();
-      } catch (realErr) {
-        console.warn(`⚠️ 真实 API 也失败:`, realErr);
-      }
-    }
-    
-    // 如果还是没有数据，返回错误
-    if (!data) {
-      return res.status(404).json({ error: '任务不存在' });
-    }
-    
+
     // 准备结果
     const result = {
       taskId: taskId,
-      status: data.status || 'processing',
-      progress: data.progress || 0
+      status: status.status || 'processing',
+      progress: status.progress || 0
     };
 
-    if (data.status === 'succeeded' && data.content) {
+    if (status.status === 'succeeded') {
+      let finalVideoUrl = status.videoUrl;
+      
       // 如果是 Mock 任务，我们需要生成一个本地占位视频
-      if (taskInfo?.isMock || !hasRealAPI) {
+      if (taskId.startsWith('mock_') || (finalVideoUrl && finalVideoUrl.startsWith('mock://')) || taskInfo?.isMock) {
         console.log(`🎬 生成占位视频 (Mock 模式)`);
         try {
           const mockVideoPath = path.join(outputDir, `mock_${taskId}.mp4`);
@@ -321,17 +253,14 @@ app.get('/api/video/status/:taskId', async (req, res) => {
             text: 'Mock Video ' + taskId.substring(0, 8),
             color: 'blue'
           });
-          result.videoUrl = `http://localhost:${PORT}/outputs/mock_${taskId}.mp4`;
+          finalVideoUrl = `http://localhost:${PORT}/outputs/mock_${taskId}.mp4`;
         } catch (videoErr) {
           console.warn(`⚠️ 生成占位视频失败:`, videoErr);
-          result.videoUrl = data.content.video_url;
         }
-      } else {
-        result.videoUrl = data.content.video_url;
       }
+      
+      result.videoUrl = finalVideoUrl;
       result.progress = 100;
-    } else if (data.status === 'failed') {
-      result.error = data.error?.message || '视频生成失败';
     }
 
     console.log(`✅ 返回任务状态:`, JSON.stringify(result));
@@ -467,48 +396,15 @@ app.post('/api/video/batch-generate', async (req, res) => {
 
         // 使用重试机制调用视频生成API（支持Mock模式）
         const videoUrl = await withRetry(async () => {
-          const content = [{
-            type: 'text',
-            text: `${scene.description} --rs ${options.resolution || '720p'} --rt ${options.ratio || '9:16'} --dur ${scene.duration || 5} --fps 24 --wm false`
-          }];
-
-          let taskId;
-          
-          if (hasRealAPI) {
-            try {
-              const response = await fetch(`${ARK_BASE_URL}/contents/generations/tasks`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${ARK_API_KEY}`
-                },
-                body: JSON.stringify({
-                  model: VIDEO_EP,
-                  content: content,
-                  return_last_frame: false
-                })
-              });
-
-              const data = await response.json();
-              if (data.error) {
-                console.warn('⚠️ 真实 API 失败，使用 Mock:', data.error);
-                const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-                taskId = mockTask.id;
-              } else {
-                taskId = data.id;
-              }
-            } catch (error) {
-              console.warn('⚠️ 真实 API 失败，使用 Mock:', error);
-              const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-              taskId = mockTask.id;
-            }
-          } else {
-            const mockTask = await mockCreateVideoTask(content, { model: VIDEO_EP });
-            taskId = mockTask.id;
-          }
+          const task = await videoProvider.createTask({
+            prompt: scene.description,
+            resolution: options.resolution || '720p',
+            ratio: options.ratio || '9:16',
+            duration: scene.duration || 5
+          });
 
           // 轮询等待视频生成完成
-          return await pollVideoCompletion(taskId, !hasRealAPI);
+          return await pollVideoCompletion(task.id, !hasRealAPI);
         }, videoRetryOptions);
 
         traceService.addStep(batchId, `scene_${i + 1}_generated`, { videoUrl });
@@ -874,10 +770,10 @@ async function pollVideoCompletion(taskId, isMock = false, maxAttempts = 40) {
   
   for (let i = 0; i < maxAttempts; i++) {
     try {
-      const data = await mockGetVideoTask(taskId);
-      console.log(`  检查 ${i+1}/${maxAttempts}: ${data.status}, 进度 ${data.progress}%`);
+      const status = await videoProvider.getStatus(taskId);
+      console.log(`  检查 ${i+1}/${maxAttempts}: ${status.status}, 进度 ${status.progress}%`);
 
-      if (data.status === 'succeeded' && data.content) {
+      if (status.status === 'succeeded') {
         console.log(`✅ 任务完成: ${taskId}`);
         // 生成 Mock 视频文件
         const mockVideoPath = path.join(tempDir, `mock_scene_${Date.now()}_${i}.mp4`);
@@ -889,8 +785,8 @@ async function pollVideoCompletion(taskId, isMock = false, maxAttempts = 40) {
         return `file://${mockVideoPath}`;
       }
 
-      if (data.status === 'failed') {
-        throw new Error(data.error?.message || '视频生成失败');
+      if (status.status === 'failed') {
+        throw new Error(status.error || '视频生成失败');
       }
     } catch (err) {
       console.warn(`  ⚠️ 第 ${i+1} 次检查失败:`, err.message);
