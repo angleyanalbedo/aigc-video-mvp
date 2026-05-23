@@ -67,7 +67,7 @@ class VideoOrchestrator {
         workflowNodes: result.workflowNodes
       });
 
-      let script = await scriptAgent.generate(productInfo);
+      let script = await scriptAgent.generate(productInfo, options.projectId || null);
       result.script = script;
       result.steps.push({
         name: '剧本生成',

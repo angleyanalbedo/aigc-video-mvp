@@ -29,10 +29,31 @@ class ScriptAgent {
     this.maxScenes = 5;
   }
 
-  async generate(productInfo) {
+  async generate(productInfo, projectId = null) {
     console.log('📝 ScriptAgent: 开始生成剧本...');
 
-    const prompt = this.buildPrompt(productInfo);
+    // 1. 调用网络搜索工具
+    let searchResultContext = '';
+    try {
+      const { webSearch } = require('./tools/searchAPI');
+      const searchQuery = productInfo.title || '爆款电商产品';
+      searchResultContext = await webSearch(searchQuery);
+    } catch (err) {
+      console.error('⚠️ ScriptAgent: 调用网络搜索工具失败:', err);
+    }
+
+    // 2. 调用下载参考素材工具
+    if (projectId) {
+      try {
+        const { downloadMaterial } = require('./tools/materialDownloader');
+        // 默认模拟从 Unsplash 高精图片库下载一张电商高清素材作为项目参考图入库
+        await downloadMaterial('https://images.unsplash.com/photo-1523275335684-37898b6baf30', projectId);
+      } catch (err) {
+        console.error('⚠️ ScriptAgent: 调用下载素材工具失败:', err);
+      }
+    }
+
+    const prompt = this.buildPrompt(productInfo) + (searchResultContext ? `\n\n## 联网流行爆款参考词库/痛点（请融入你的剧本创意）:\n${searchResultContext}` : '');
 
     try {
       const script = await generateStructuredText({
