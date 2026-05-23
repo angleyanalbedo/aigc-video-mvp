@@ -121,6 +121,18 @@ export const useWorkbench = () => {
   const [project, setProject] = useState<any>(null);
   const [script, setScript] = useState<any>(null);
   const [productInfo, setProductInfo] = useState<any>(null);
+
+  // Sync refs to avoid stale closures in polling intervals and concurrent tasks
+  const scriptRef = useRef<any>(null);
+  const settingsRef = useRef<any>(settings);
+
+  useEffect(() => {
+    scriptRef.current = script;
+  }, [script]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Chat Co-pilot State
@@ -324,7 +336,7 @@ export const useWorkbench = () => {
   };
 
   // Persist Current Project State to SQLite
-  const handleSave = async (updatedScript = script, updatedSettings = settings) => {
+  const handleSave = async (updatedScript = scriptRef.current || script, updatedSettings = settingsRef.current || settings) => {
     if (!projectId) return;
     setSaveStatus('saving');
     try {
@@ -351,16 +363,26 @@ export const useWorkbench = () => {
   };
 
   // Trigger Save on crucial state updates
-  const updateScript = (newScript: any) => {
-    setScript(newScript);
-    setSaveStatus('unsaved');
-    handleSave(newScript, settings);
+  const updateScript = (newScriptOrFn: any, shouldSave = true) => {
+    setScript((prevScript: any) => {
+      const updated = typeof newScriptOrFn === 'function' ? newScriptOrFn(prevScript) : newScriptOrFn;
+      if (shouldSave) {
+        setSaveStatus('unsaved');
+        handleSave(updated, settingsRef.current);
+      }
+      return updated;
+    });
   };
 
-  const updateSettings = (newSettings: any) => {
-    setSettings(newSettings);
-    setSaveStatus('unsaved');
-    handleSave(script, newSettings);
+  const updateSettings = (newSettingsOrFn: any, shouldSave = true) => {
+    setSettings((prevSettings: any) => {
+      const updated = typeof newSettingsOrFn === 'function' ? newSettingsOrFn(prevSettings) : newSettingsOrFn;
+      if (shouldSave) {
+        setSaveStatus('unsaved');
+        handleSave(scriptRef.current, updated);
+      }
+      return updated;
+    });
   };
 
   // Conversational Agent API Trigger
@@ -425,14 +447,16 @@ export const useWorkbench = () => {
   };
 
   // Inline scene field editing
-  const updateSceneField = (sceneIndex: number, field: keyof Scene, value: any) => {
-    if (!script) return;
-    const newScenes = [...script.scenes];
-    newScenes[sceneIndex] = {
-      ...newScenes[sceneIndex],
-      [field]: value
-    };
-    updateScript({ ...script, scenes: newScenes });
+  const updateSceneField = (sceneIndex: number, field: keyof Scene, value: any, shouldSave = true) => {
+    updateScript((prevScript: any) => {
+      if (!prevScript || !prevScript.scenes) return prevScript;
+      const newScenes = [...prevScript.scenes];
+      newScenes[sceneIndex] = {
+        ...newScenes[sceneIndex],
+        [field]: value
+      };
+      return { ...prevScript, scenes: newScenes };
+    }, shouldSave);
   };
 
   // 资产面板：进入"选择注入目标"模式
@@ -818,8 +842,10 @@ export const useWorkbench = () => {
 
   // Scene level Video Generation & Polling Mock/API
   const generateSingleSceneVideo = async (index: number) => {
-    if (!script || !script.scenes) return;
-    const scene = script.scenes[index];
+    // Read from ref to avoid stale closures at start
+    const latestScript = scriptRef.current || script;
+    if (!latestScript || !latestScript.scenes) return;
+    const scene = latestScript.scenes[index];
 
     // 如果正在渲染中，不允许再次点击
     if (scene.rendering || scene.status === 'generating') {
@@ -839,16 +865,19 @@ export const useWorkbench = () => {
     }
 
     // Atomic state update for starting video generation
-    const startScenes = [...script.scenes];
-    startScenes[index] = {
-      ...startScenes[index],
-      status: 'generating',
-      rendering: true,
-      progress: 10,
-      errorMessage: null,
-      videoUrl: undefined // 重置视频 URL，以便重新渲染
-    };
-    updateScript({ ...script, scenes: startScenes });
+    updateScript((prevScript: any) => {
+      if (!prevScript || !prevScript.scenes) return prevScript;
+      const startScenes = [...prevScript.scenes];
+      startScenes[index] = {
+        ...startScenes[index],
+        status: 'generating',
+        rendering: true,
+        progress: 10,
+        errorMessage: null,
+        videoUrl: undefined // 重置视频 URL，以便重新渲染
+      };
+      return { ...prevScript, scenes: startScenes };
+    }, true);
 
     setWorkflowStarted(true);
     setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'running' } : n));
@@ -872,13 +901,16 @@ export const useWorkbench = () => {
         const ttsData = await ttsRes.json();
         if (ttsData.success) {
           // Atomic state update for successful TTS generation
-          const ttsScenes = [...script.scenes];
-          ttsScenes[index] = {
-            ...ttsScenes[index],
-            audioUrl: ttsData.audioUrl,
-            ttsEstDuration: ttsData.duration
-          };
-          updateScript({ ...script, scenes: ttsScenes });
+          updateScript((prevScript: any) => {
+            if (!prevScript || !prevScript.scenes) return prevScript;
+            const ttsScenes = [...prevScript.scenes];
+            ttsScenes[index] = {
+              ...ttsScenes[index],
+              audioUrl: ttsData.audioUrl,
+              ttsEstDuration: ttsData.duration
+            };
+            return { ...prevScript, scenes: ttsScenes };
+          }, true);
           console.log(`✅ 分镜 ${index + 1} 配音生成成功:`, ttsData.audioUrl);
         }
       } catch (err) {
@@ -920,53 +952,66 @@ export const useWorkbench = () => {
           if (taskData) {
             // 如果后端返回了有效进度，使用后端的进度；否则使用估算进度
             const displayProgress = taskData.progress || Math.min(10 + (pollCount * 5), 90);
-            updateSceneField(index, 'progress', displayProgress);
+            
+            // 重要：进度轮询状态更新应传入 shouldSave = false 避免频繁写入数据库造成竞争
+            updateSceneField(index, 'progress', displayProgress, false);
 
             if (taskData.status === 'succeeded') {
               clearInterval(pollInterval);
-              // Atomic state update for successful video generation
-              const doneScenes = [...script.scenes];
-              doneScenes[index] = {
-                ...doneScenes[index],
-                rendering: false,
-                status: 'completed',
-                videoUrl: taskData.videoUrl,
-                progress: 100
-              };
-              updateScript({ ...script, scenes: doneScenes });
+              // Atomic state update for successful video generation (shouldSave = true)
+              updateScript((prevScript: any) => {
+                if (!prevScript || !prevScript.scenes) return prevScript;
+                const doneScenes = [...prevScript.scenes];
+                doneScenes[index] = {
+                  ...doneScenes[index],
+                  rendering: false,
+                  status: 'completed',
+                  videoUrl: taskData.videoUrl,
+                  progress: 100
+                };
+                return { ...prevScript, scenes: doneScenes };
+              }, true);
               message.success(`分镜 ${index + 1} 画面渲染成功！`);
 
               setWorkflowNodes(prev => prev.map(n => {
                 if (n.id === 'video') {
-                  const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
+                  const currentScript = scriptRef.current;
+                  const allDone = currentScript?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
                   return { ...n, status: allDone ? 'completed' : 'running' };
                 }
                 return n;
               }));
             } else if (taskData.status === 'failed') {
               clearInterval(pollInterval);
-              // Atomic state update for failed video generation
-              const failScenes = [...script.scenes];
-              failScenes[index] = {
-                ...failScenes[index],
-                rendering: false,
-                status: 'error',
-                errorMessage: taskData.error || '视频生成失败，请重试'
-              };
-              updateScript({ ...script, scenes: failScenes });
+              // Atomic state update for failed video generation (shouldSave = true)
+              updateScript((prevScript: any) => {
+                if (!prevScript || !prevScript.scenes) return prevScript;
+                const failScenes = [...prevScript.scenes];
+                failScenes[index] = {
+                  ...failScenes[index],
+                  rendering: false,
+                  status: 'error',
+                  errorMessage: taskData.error || '视频生成失败，请重试'
+                };
+                return { ...prevScript, scenes: failScenes };
+              }, true);
               message.error(`分镜 ${index + 1} 画面生成失败`);
               setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
             } else if (pollCount >= maxPollCount) {
               // 超时处理：达到最大轮询次数后自动停止
               clearInterval(pollInterval);
-              const timeoutScenes = [...script.scenes];
-              timeoutScenes[index] = {
-                ...timeoutScenes[index],
-                rendering: false,
-                status: 'error',
-                errorMessage: `渲染超时（超过 ${Math.round(maxPollCount * 3 / 60)} 分钟）。可能是后端任务卡住，请尝试强制重置后重新渲染。`
-              };
-              updateScript({ ...script, scenes: timeoutScenes });
+              // Atomic state update for timeout (shouldSave = true)
+              updateScript((prevScript: any) => {
+                if (!prevScript || !prevScript.scenes) return prevScript;
+                const timeoutScenes = [...prevScript.scenes];
+                timeoutScenes[index] = {
+                  ...timeoutScenes[index],
+                  rendering: false,
+                  status: 'error',
+                  errorMessage: `渲染超时（超过 ${Math.round(maxPollCount * 3 / 60)} 分钟）。可能是后端任务卡住，请尝试强制重置后重新渲染。`
+                };
+                return { ...prevScript, scenes: timeoutScenes };
+              }, true);
               message.warning(`⚠️ 分镜 ${index + 1} 渲染超时，已自动停止轮询。请查看错误详情或点击"强制重置"后重新渲染。`);
               setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
             }
@@ -977,15 +1022,18 @@ export const useWorkbench = () => {
       }, 3000);
     } catch (e) {
       console.error('生成单个分镜失败:', e);
-      // Atomic state update for failed catch block
-      const catchScenes = [...script.scenes];
-      catchScenes[index] = {
-        ...catchScenes[index],
-        rendering: false,
-        status: 'error',
-        errorMessage: e instanceof Error ? e.message : '分镜渲染出错，请重试'
-      };
-      updateScript({ ...script, scenes: catchScenes });
+      // Atomic state update for failed catch block (shouldSave = true)
+      updateScript((prevScript: any) => {
+        if (!prevScript || !prevScript.scenes) return prevScript;
+        const catchScenes = [...prevScript.scenes];
+        catchScenes[index] = {
+          ...catchScenes[index],
+          rendering: false,
+          status: 'error',
+          errorMessage: e instanceof Error ? e.message : '分镜渲染出错，请重试'
+        };
+        return { ...prevScript, scenes: catchScenes };
+      }, true);
       message.error('分镜渲染出错');
       setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
     }
