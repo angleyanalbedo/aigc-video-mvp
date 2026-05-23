@@ -144,7 +144,9 @@ router.get('/:id/materials', (req, res) => {
 /**
  * POST /api/projects/:id/materials
  * 工作台内直接上传图片素材并绑定到指定项目
- * 无需跳转到 /materials 页面
+ * 支持两种方式：
+ * 1. 文件上传：使用 multipart/form-data，字段名为 'file'
+ * 2. URL 添加：从素材库选择时使用，发送 JSON body 包含 'url' 字段
  */
 router.post('/:id/materials', upload.single('file'), (req, res) => {
   try {
@@ -154,14 +156,52 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
       return res.status(404).json({ success: false, error: '项目不存在' });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: '未收到文件' });
+    // 方式1: 处理文件上传
+    if (req.file) {
+      const PORT = process.env.PORT || 3001;
+      const fileUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+      const now = new Date().toISOString();
+      const matId = `mat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+      // 写入 materials 表并绑定到该项目
+      db.prepare(`
+        INSERT INTO materials (id, filename, url, type, project_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        matId,
+        req.file.originalname,
+        fileUrl,
+        req.file.mimetype,
+        id,
+        now,
+        now
+      );
+
+      const material = db.prepare('SELECT * FROM materials WHERE id = ?').get(matId);
+      console.log(`✅ 工作台上传素材成功: ${req.file.originalname} → 项目 ${id}`);
+
+      res.json({
+        success: true,
+        data: {
+          ...material,
+          tags: []
+        }
+      });
+      return;
     }
 
-    const PORT = process.env.PORT || 3001;
-    const fileUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+    // 方式2: 处理 URL 添加（从素材库选择）
+    const { url, filename } = req.body;
+    if (!url) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '缺少素材 URL，请上传文件或提供素材 URL' 
+      });
+    }
+
     const now = new Date().toISOString();
     const matId = `mat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const filenameFinal = filename || `material_${matId}.jpg`;
 
     // 写入 materials 表并绑定到该项目
     db.prepare(`
@@ -169,16 +209,16 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       matId,
-      req.file.originalname,
-      fileUrl,
-      req.file.mimetype,
+      filenameFinal,
+      url,
+      'image',
       id,
       now,
       now
     );
 
     const material = db.prepare('SELECT * FROM materials WHERE id = ?').get(matId);
-    console.log(`✅ 工作台上传素材成功: ${req.file.originalname} → 项目 ${id}`);
+    console.log(`✅ 从素材库添加素材成功: ${filenameFinal} → 项目 ${id}`);
 
     res.json({
       success: true,
@@ -188,7 +228,7 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
       }
     });
   } catch (error) {
-    console.error('工作台上传素材失败:', error);
+    console.error('工作台添加素材失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

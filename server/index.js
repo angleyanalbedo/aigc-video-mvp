@@ -44,9 +44,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // 引入后端抽象服务层
-const { videoProvider, llmProvider } = require('./services/providers');
+const { videoProvider, llmProvider, hasRealAPI } = require('./services/providers');
 console.log('✅ 已加载火山方舟 API 配置');
 console.log('[DEBUG] 11. API config checked');
+console.log(`[DEBUG] API 状态: hasRealAPI=${hasRealAPI}`);
 
 console.log('[DEBUG] 13. setting up middleware');
 // ====== 中间件 ======
@@ -135,6 +136,27 @@ app.use('/outputs', express.static(outputDir));
 
 // ====== 内存中的任务状态 ======
 const taskStore = new Map();
+const TASK_TIMEOUT = 10 * 60 * 1000; // 10 分钟超时
+
+// ====== 定期清理过期任务 ======
+setInterval(() => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [taskId, task] of taskStore.entries()) {
+    // 如果任务创建超过 10 分钟且状态仍然是 'processing' 或 'running'
+    if (now - task.createdAt > TASK_TIMEOUT && 
+        (task.status === 'processing' || task.status === 'running' || task.status === 'queued')) {
+      console.log(`🧹 清理过期任务: ${taskId} (状态: ${task.status}, 创建于 ${Math.round((now - task.createdAt) / 1000 / 60)} 分钟前)`);
+      taskStore.delete(taskId);
+      cleanedCount++;
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`✅ 已清理 ${cleanedCount} 个过期任务，当前剩余 ${taskStore.size} 个任务`);
+  }
+}, 5 * 60 * 1000); // 每 5 分钟检查一次
 
 // ====== API 路由 ======
 
@@ -310,6 +332,50 @@ app.get('/api/video/status/:taskId', async (req, res) => {
   }
 });
 
+// 4.1 清理卡住的任务
+app.post('/api/video/cleanup', (req, res) => {
+  const now = Date.now();
+  let cleanedCount = 0;
+  const cleanedTasks = [];
+  
+  for (const [taskId, task] of taskStore.entries()) {
+    // 清理超过 5 分钟的卡住任务
+    if (now - task.createdAt > 5 * 60 * 1000 && 
+        (task.status === 'processing' || task.status === 'running' || task.status === 'queued')) {
+      console.log(`🧹 手动清理卡住任务: ${taskId}`);
+      taskStore.delete(taskId);
+      cleanedCount++;
+      cleanedTasks.push(taskId);
+    }
+  }
+  
+  res.json({
+    success: true,
+    message: `已清理 ${cleanedCount} 个卡住的任务`,
+    cleanedTasks,
+    remainingTasks: taskStore.size
+  });
+});
+
+// 4.2 获取所有任务状态（调试用）
+app.get('/api/video/tasks', (req, res) => {
+  const tasks = [];
+  for (const [taskId, task] of taskStore.entries()) {
+    const age = Math.round((Date.now() - task.createdAt) / 1000);
+    tasks.push({
+      taskId,
+      status: task.status,
+      age: `${age}秒`,
+      prompt: task.prompt?.substring(0, 50) + '...'
+    });
+  }
+  res.json({
+    success: true,
+    tasks,
+    total: tasks.length
+  });
+});
+
 // 5. TTS 配音生成
 app.post('/api/tts/generate', async (req, res) => {
   const { text, options = {} } = req.body;
@@ -433,7 +499,7 @@ app.post('/api/video/batch-generate', async (req, res) => {
           message: `正在生成分镜 ${i + 1}/${scenes.length}`
         });
 
-        // 使用重试机制调用视频生成API（支持Mock模式）
+        // 使用重试机制调用视频生成API
         const videoUrl = await withRetry(async () => {
           const task = await videoProvider.createTask({
             prompt: scene.description,
@@ -443,8 +509,9 @@ app.post('/api/video/batch-generate', async (req, res) => {
             imageUrl: scene.imageUrl || scene.referenceImageUrl || null
           });
 
-          // 轮询等待视频生成完成
-          return await pollVideoCompletion(task.id, !hasRealAPI);
+          // 轮询等待视频生成完成（最多等待 180 次 × 3 秒 = 9 分钟）
+          console.log(`📹 任务已创建: ${task.id}，开始轮询（最多等待 9 分钟）...`);
+          return await pollVideoCompletion(task.id, 180);
         }, videoRetryOptions);
 
         traceService.addStep(batchId, `scene_${i + 1}_generated`, { videoUrl });
@@ -761,35 +828,49 @@ app.get('/api/tasks', (req, res) => {
 // ====== 辅助函数 ======
 
 // 轮询视频生成完成
-async function pollVideoCompletion(taskId, maxAttempts = 40) {
-  console.log(`⏳ 开始轮询任务完成: ${taskId}`);
+async function pollVideoCompletion(taskId, maxAttempts = 180) {
+  const intervalMs = 3000; // 每 3 秒查询一次
+  const totalMinutes = Math.round(maxAttempts * intervalMs / 1000 / 60);
+  console.log(`⏳ 开始轮询任务完成: ${taskId}（最多 ${maxAttempts} 次检查，约 ${totalMinutes} 分钟）`);
   
   for (let i = 0; i < maxAttempts; i++) {
     try {
       const status = await videoProvider.getStatus(taskId);
-      console.log(`  检查 ${i+1}/${maxAttempts}: ${status.status}, 进度 ${status.progress}%`);
+      console.log(`  检查 ${i+1}/${maxAttempts}: 状态=${status.status}, 进度=${status.progress}%`);
 
       if (status.status === 'succeeded') {
         console.log(`✅ 任务完成: ${taskId}`);
         if (status.videoUrl) {
-          console.log(`🔗 使用真实视频 URL: ${status.videoUrl}`);
+          console.log(`🔗 使用视频 URL: ${status.videoUrl}`);
           return status.videoUrl;
         }
         throw new Error('视频生成成功但没有返回 URL');
       }
 
       if (status.status === 'failed') {
-        throw new Error(status.error || '视频生成失败');
+        // 明确的终态失败，直接抛出，不再继续轮询
+        throw new Error(status.error || '视频生成失败（API 返回 failed 状态）');
+      }
+      
+      // 长时间运行时给出提示
+      if (i > 0 && i % 20 === 0) {
+        const elapsed = Math.round(i * intervalMs / 1000 / 60);
+        console.log(`⏰ 仍在等待... 已等待 ${elapsed} 分钟，还剩约 ${totalMinutes - elapsed} 分钟`);
       }
     } catch (err) {
-      console.warn(`  ⚠️ 第 ${i+1} 次检查失败:`, err.message);
+      // 如果是终态错误（failed / 无URL），直接向上抛出，停止轮询
+      if (err.message.includes('failed') || err.message.includes('没有返回 URL')) {
+        throw err;
+      }
+      // 网络抖动等临时错误，记录后继续轮询
+      console.warn(`  ⚠️ 第 ${i+1} 次查询网络异常（将继续轮询）:`, err.message);
     }
 
-    // 等待2秒后重试
-    await sleep(2000);
+    // 等待后重试
+    await sleep(intervalMs);
   }
 
-  throw new Error('视频生成超时');
+  throw new Error(`视频生成超时（等待超过 ${totalMinutes} 分钟仍未完成）。请检查火山引擎 API 状态或配额。`);
 }
 
 // 下载文件（支持 file:// 协议）
