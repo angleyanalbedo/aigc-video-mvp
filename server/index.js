@@ -1114,6 +1114,9 @@ const memoryRoutes = require('./routes/memory');
 // 引入 Skill 管理路由
 const skillRoutes = require('./routes/skills');
 
+// 引入 Copilot 路由
+const copilotRoutes = require('./routes/copilot');
+
 // 使用 Agent 路由
 app.use('/api/agent', agentRoutes);
 
@@ -1141,7 +1144,11 @@ app.use('/api/memory', memoryRoutes);
 // 使用 Skill 管理路由
 app.use('/api/skills', skillRoutes);
 
+// 使用 Copilot 路由
+app.use('/api/copilot', copilotRoutes);
+
 console.log('[DEBUG] routes registered');
+console.log('✅ 新增 /api/copilot 智能对话和无限画布接口');
 
 console.log('[DEBUG] about to call app.listen...');
 // 启动服务器

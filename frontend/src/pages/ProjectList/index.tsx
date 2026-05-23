@@ -7,7 +7,8 @@ import {
   DeleteOutlined,
   CopyOutlined,
   FileTextOutlined,
-  CalendarOutlined
+  CalendarOutlined,
+  RobotOutlined
 } from '@ant-design/icons';
 import {
   Card,
@@ -25,7 +26,8 @@ import {
   message,
   List,
   Statistic,
-  Empty
+  Empty,
+  Tooltip
 } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
@@ -148,6 +150,11 @@ const ProjectListPage: React.FC = () => {
     navigate(`/workbench/${id}`);
   };
 
+  // 打开 Copilot AI 助手
+  const openCopilot = (id: string) => {
+    navigate(`/copilot/${id}`);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'default';
@@ -233,6 +240,9 @@ const ProjectListPage: React.FC = () => {
                       </div>
                     }
                     actions={[
+                      <Tooltip title="Copilot AI 助手" key="copilot">
+                        <RobotOutlined onClick={(e) => { e.stopPropagation(); openCopilot(project.id); }} />
+                      </Tooltip>,
                       <EditOutlined key="edit" onClick={(e) => { e.stopPropagation(); openProject(project.id); }} />,
                       <CopyOutlined key="copy" onClick={(e) => { e.stopPropagation(); handleDuplicate(project.id); }} />,
                       <Popconfirm

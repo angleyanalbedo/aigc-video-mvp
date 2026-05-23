@@ -100,3 +100,93 @@ CREATE TABLE IF NOT EXISTS agent_memory_summaries (
 
 CREATE INDEX IF NOT EXISTS idx_summaries_agent ON agent_memory_summaries(agent_name);
 CREATE INDEX IF NOT EXISTS idx_summaries_session ON agent_memory_summaries(session_id);
+
+-- 无限画布工作台新增表
+
+CREATE TABLE IF NOT EXISTS canvas_nodes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  node_type TEXT NOT NULL,
+  node_data TEXT NOT NULL,
+  position_x REAL NOT NULL,
+  position_y REAL NOT NULL,
+  width REAL DEFAULT 200,
+  height REAL DEFAULT 150,
+  style TEXT,
+  metadata TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_canvas_nodes_project ON canvas_nodes(project_id);
+CREATE INDEX IF NOT EXISTS idx_canvas_nodes_type ON canvas_nodes(node_type);
+
+CREATE TABLE IF NOT EXISTS canvas_connections (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  source_node_id TEXT NOT NULL,
+  target_node_id TEXT NOT NULL,
+  connection_type TEXT NOT NULL,
+  label TEXT,
+  style TEXT,
+  metadata TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (source_node_id) REFERENCES canvas_nodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (target_node_id) REFERENCES canvas_nodes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_connections_project ON canvas_connections(project_id);
+CREATE INDEX IF NOT EXISTS idx_connections_source ON canvas_connections(source_node_id);
+CREATE INDEX IF NOT EXISTS idx_connections_target ON canvas_connections(target_node_id);
+
+CREATE TABLE IF NOT EXISTS operation_history (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  session_id TEXT,
+  agent_name TEXT NOT NULL,
+  operation_type TEXT NOT NULL,
+  target_node_id TEXT,
+  source_intent_id TEXT,
+  operation_details TEXT NOT NULL,
+  status TEXT DEFAULT 'pending',
+  user_confirmation BOOLEAN DEFAULT FALSE,
+  result TEXT,
+  error TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  confirmed_at DATETIME,
+  executed_at DATETIME,
+  completed_at DATETIME,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_operations_project ON operation_history(project_id);
+CREATE INDEX IF NOT EXISTS idx_operations_status ON operation_history(status);
+CREATE INDEX IF NOT EXISTS idx_operations_session ON operation_history(session_id);
+CREATE INDEX IF NOT EXISTS idx_operations_agent ON operation_history(agent_name);
+
+CREATE TABLE IF NOT EXISTS chat_sessions (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  title TEXT,
+  status TEXT DEFAULT 'active',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_project ON chat_sessions(project_id);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  message_type TEXT DEFAULT 'text',
+  content TEXT NOT NULL,
+  metadata TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id);

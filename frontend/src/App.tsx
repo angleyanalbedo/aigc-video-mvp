@@ -9,6 +9,7 @@ import ObservabilityPage from './pages/Observability';
 import CompliancePage from './pages/Compliance';
 import ProjectListPage from './pages/ProjectList';
 import WorkbenchPage from './pages/Workbench';
+import CopilotPage from './pages/Copilot';
 import Dashboard from './Dashboard';
 import StatusPage from './pages/Status';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -26,6 +27,9 @@ function App() {
         <Routes>
           {/* Dynamic, Focused Workbench Studio (Sidebar adapts to project context) */}
           <Route path="/workbench/:projectId" element={<DashboardWrapper><WorkbenchPage /></DashboardWrapper>} />
+          
+          {/* Copilot AI Agent Studio - No side panel layout */}
+          <Route path="/copilot/:projectId" element={<CopilotPage />} />
 
           {/* Global Management Portal (With Left Sidebar Navigation) */}
           <Route path="/" element={<DashboardWrapper><ProjectListPage /></DashboardWrapper>} />
