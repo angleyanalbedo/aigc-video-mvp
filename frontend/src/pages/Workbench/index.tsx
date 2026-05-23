@@ -29,6 +29,7 @@ import {
   DatabaseOutlined,
   InboxOutlined,
   UploadOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import AssetPanel from './AssetPanel';
 import {
@@ -55,6 +56,7 @@ import {
   List,
   Radio,
   Collapse,
+  Table,
 } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
@@ -96,6 +98,7 @@ interface Scene {
   // 商品参考图注入
   referenceImageId?: string | null;
   referenceImageUrl?: string | null;
+  referenceAudioUrl?: string | null;
   // 画布预留字段
   x?: number | null;
   y?: number | null;
@@ -123,7 +126,7 @@ const WorkbenchPage: React.FC = () => {
   
   // Agent相关状态
   const [selectedSceneForSuggestions, setSelectedSceneForSuggestions] = useState<number | null>(null);
-  const [agentSuggestions, setAgentSuggestions] = useState<Array<{id: string, title: string, content: string, type: string, cost: number}>>([]);
+  const [agentSuggestions, setAgentSuggestions] = useState<Array<{id: string, title: string, content: string, type: string, cost?: number}>>([]);
   const [isAgentLoading, setIsAgentLoading] = useState(false);
   const [showAgentPanel, setShowAgentPanel] = useState(true);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
@@ -778,7 +781,7 @@ const WorkbenchPage: React.FC = () => {
     message.loading('Agent 正在分析和优化所有分镜...', 0);
     
     setTimeout(() => {
-      const newScenes = script.scenes.map((scene, idx) => {
+      const newScenes = script.scenes.map((scene: any, idx: number) => {
         return {
           ...scene,
           lighting: 'natural',
@@ -1145,7 +1148,8 @@ const WorkbenchPage: React.FC = () => {
             voice: settings.voice,
             volume: settings.volume,
             speed: settings.speed,
-            bgm: settings.bgm
+            bgm: settings.bgm,
+            enableTTS: settings.enableTTS
           }
         })
       });
@@ -1695,7 +1699,7 @@ const WorkbenchPage: React.FC = () => {
                   message.loading('正在添加选中素材到项目...', 0);
                   try {
                     // 为每个选中的素材添加到项目
-                    const newMaterials = [];
+                    const newMaterials: any[] = [];
                     for (const materialUrl of selectedLibraryMaterials) {
                       const res = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
                         method: 'POST',
@@ -3676,6 +3680,16 @@ const WorkbenchPage: React.FC = () => {
                       value={settings.volume}
                       onChange={(val) => updateSettings({ ...settings, volume: val })}
                     />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text strong style={{ color: '#fff' }}>7. 启用 AI 旁白配音</Text>
+                      <Switch checked={settings.enableTTS} onChange={(val) => updateSettings({ ...settings, enableTTS: val })} />
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {settings.enableTTS ? '✅ 所有分镜将自动生成 AI 配音' : '❌ 仅使用背景音乐，无配音旁白'}
+                    </Text>
                   </div>
 
                   <Divider style={{ margin: '12px 0', borderTopColor: '#27272a' }} />
