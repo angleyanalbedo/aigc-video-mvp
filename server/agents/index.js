@@ -4,6 +4,8 @@ const clipAgent = require('./clipAgent');
 const imageAgent = require('./imageAgent');
 const assetAgent = require('./assetAgent');
 const { VideoOrchestrator, STATES } = require('./orchestrator');
+const { memoryManager, vectorStore, embeddingService } = require('./memory');
+const skillLoader = require('./skills/skillLoader');
 
 module.exports = {
   scriptAgent,
@@ -13,5 +15,9 @@ module.exports = {
   assetAgent,
   orchestrator: new VideoOrchestrator(),
   VideoOrchestrator,
-  STATES
+  STATES,
+  memoryManager,
+  vectorStore,
+  embeddingService,
+  skillLoader
 };

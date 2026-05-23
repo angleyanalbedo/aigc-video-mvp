@@ -62,7 +62,7 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    const result = await agentChatService.modifyScript(currentScript, message, productContext);
+    const result = await agentChatService.modifyScript(currentScript, message, productContext, projectId);
 
     // If script is successfully processed, auto-persist the updated script structure.
     if (projectId && result.script) {

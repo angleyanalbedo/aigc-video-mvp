@@ -1,30 +1,44 @@
-/**
- * AssetAgent — 决策层素材分析 Agent
- *
- * 职责：深度智能提取用户上传或关联的产品图片/视频/文档元数据，
- * 提炼核心卖点、消费人群和带货视频视觉调性，并直接回流到创意策划大脑。
- */
-
 const { generateStructuredText } = require('./tools/llm');
+const { memoryManager } = require('./memory');
+const skillLoader = require('./skills/skillLoader');
+
+const FALLBACK_PROMPT = `你是一个资深的电商 AIGC 视觉与文案分析专家。
+你的职责是智能解析用户上传/选中的商品图片、视频或描述性素材，提取出商品的卖点、目标受众、商品品类与价格区间，并为其量身定制带货视频的推荐风格和主打语调。
+
+请务必输出符合以下 Schema 的 JSON 结果，不需要任何 markdown 包裹，确保可以直接解析为 JSON。`;
 
 class AssetAgent {
   constructor() {
     this.name = '素材分析 Agent';
     this.layer = '决策层';
+    this.agentName = 'AssetAgent';
+    this.skillId = 'AssetAgent_analysis';
   }
 
-  /**
-   * 分析素材，提取核心卖点、目标受众和视频创意风格
-   * @param {Array} materials - 素材数组，每个包含 filename, type, content, tags 等
-   * @returns {Promise<{title: string, sellingPoints: string, targetAudience: string, style: string, price: string}>}
-   */
+  getSystemPrompt() {
+    const skillPrompt = skillLoader.loadPrompt(this.skillId);
+    return skillPrompt || FALLBACK_PROMPT;
+  }
+
   async analyze(materials) {
     console.log(`🔍 AssetAgent: 开始分析 ${materials.length} 个项目素材...`);
 
-    const SYSTEM_PROMPT = `你是一个资深的电商 AIGC 视觉与文案分析专家。
-你的职责是智能解析用户上传/选中的商品图片、视频或描述性素材，提取出商品的卖点、目标受众、商品品类与价格区间，并为其量身定制带货视频的推荐风格和主打语调。
+    const sessionId = `asset_${Date.now()}`;
 
-请务必输出符合以下 Schema 的 JSON 结果，不需要任何 markdown 包裹，确保可以直接解析为 JSON。`;
+    await memoryManager.addShortTerm({
+      agentName: this.agentName,
+      sessionId,
+      content: `分析 ${materials.length} 个素材: ${materials.map(m => m.filename || m.type || 'unknown').join(', ')}`,
+      metadata: { role: 'user', materialCount: materials.length },
+      importance: 0.5
+    });
+
+    const memories = await memoryManager.recall({
+      agentName: this.agentName,
+      sessionId,
+      query: `素材分析 ${materials.map(m => m.tags || m.filename || '').join(' ')}`
+    });
+    const memoryContext = memoryManager.buildContextString(memories);
 
     const schema = {
       type: "object",
@@ -38,7 +52,7 @@ class AssetAgent {
       required: ["title", "sellingPoints", "targetAudience", "style", "price"]
     };
 
-    const prompt = `## 待分析的项目素材列表
+    let prompt = `## 待分析的项目素材列表
 ${JSON.stringify(materials, null, 2)}
 
 ## 任务说明
@@ -46,18 +60,37 @@ ${JSON.stringify(materials, null, 2)}
 如果素材为空或仅含随机默认名，请构思一份通用的爆款电商带货素材分析模版。
 输出 JSON：`;
 
+    if (memoryContext) {
+      prompt += `\n\n## 跨会话记忆上下文（请保持分析连续性）\n${memoryContext}`;
+    }
+
     try {
       const response = await generateStructuredText({
-        system: SYSTEM_PROMPT,
+        system: this.getSystemPrompt(),
         prompt,
         schema
+      });
+
+      await memoryManager.addShortTerm({
+        agentName: this.agentName,
+        sessionId,
+        content: `素材分析完成: ${response.title}，风格建议: ${response.style}`,
+        metadata: { role: 'assistant', analysisResult: response },
+        importance: 0.7
+      });
+
+      await memoryManager.addLongTerm({
+        agentName: this.agentName,
+        sessionId,
+        content: `商品"${response.title}"分析: 卖点=${response.sellingPoints}, 受众=${response.targetAudience}, 风格=${response.style}`,
+        metadata: { title: response.title, style: response.style },
+        importance: 0.8
       });
 
       console.log('✅ AssetAgent: 素材分析完成！');
       return response;
     } catch (error) {
       console.error('❌ AssetAgent: 素材分析失败，降级使用智能默认分析数据:', error.message);
-      // 优雅降级兜底方案
       return {
         title: materials[0]?.filename?.replace(/\.[^/.]+$/, "") || '高品质爆款智能产品',
         sellingPoints: '极致匠心做工，多功能集成，操作静音简便，全方位保障生活品质。',

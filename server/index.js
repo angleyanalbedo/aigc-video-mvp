@@ -929,6 +929,12 @@ console.log('[DEBUG] 29. abTestRoutes loaded');
 console.log('[DEBUG] 30. about to require projectRoutes');
 const projectRoutes = require('./routes/projects');
 
+// 引入记忆管理路由
+const memoryRoutes = require('./routes/memory');
+
+// 引入 Skill 管理路由
+const skillRoutes = require('./routes/skills');
+
 // 使用 Agent 路由
 app.use('/api/agent', agentRoutes);
 
@@ -949,6 +955,13 @@ app.use('/api/observability', observabilityRoutes);
 
 // 使用项目管理路由
 app.use('/api/projects', projectRoutes);
+
+// 使用记忆管理路由
+app.use('/api/memory', memoryRoutes);
+
+// 使用 Skill 管理路由
+app.use('/api/skills', skillRoutes);
+
 console.log('[DEBUG] routes registered');
 
 console.log('[DEBUG] about to call app.listen...');
