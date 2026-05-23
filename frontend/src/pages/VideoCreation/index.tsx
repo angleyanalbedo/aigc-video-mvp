@@ -83,9 +83,14 @@ const VideoCreationPage: React.FC = () => {
       const response = await fetch(`${API_BASE}/api/materials`)
       const data = await response.json()
       if (data.success) {
-        setMaterialsFromLibrary(data.materials)
+        const list = data.data || data.materials || []
+        setMaterialsFromLibrary(list)
         const tags = new Set<string>()
-        data.materials.forEach((m: any) => m.tags && m.tags.forEach((t: string) => tags.add(t)))
+        list.forEach((m: any) => {
+          if (m.tags && Array.isArray(m.tags)) {
+            m.tags.forEach((t: string) => tags.add(t))
+          }
+        })
         setAllTags([...tags])
       }
     } catch (error) {
@@ -106,7 +111,7 @@ const VideoCreationPage: React.FC = () => {
       })
       const data = await response.json()
       if (data.success) {
-        setMaterialsFromLibrary(data.results)
+        setMaterialsFromLibrary(data.results || data.data || [])
       }
     } catch (error) {
       console.error('搜索失败:', error)
@@ -537,18 +542,58 @@ const VideoCreationPage: React.FC = () => {
                 />
                 
                 <Collapse defaultActiveKey={['1']}>
-                  <Panel header="📋 查看完整剧本" key="1">
+                  <Panel header="📋 查看与精细修改完整剧本 (可直接在输入框中改字)" key="1">
                     <Timeline>
                       {generatedScript.scenes.map((scene, index) => (
                         <Timeline.Item key={scene.id}>
-                          <Card size="small" style={{ borderLeft: '3px solid #1890ff' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Card size="small" style={{ borderLeft: '3px solid #1890ff', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                               <strong>分镜 {index + 1}</strong>
-                              <Tag color="blue">{scene.duration}秒</Tag>
+                              <Space>
+                                <span style={{ fontSize: 11, color: '#888' }}>时长:</span>
+                                <Input
+                                  type="number"
+                                  value={scene.duration}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 3;
+                                    const newScenes = [...generatedScript.scenes];
+                                    newScenes[index] = { ...newScenes[index], duration: val };
+                                    const total = newScenes.reduce((sum, s) => sum + (s.duration || 3), 0);
+                                    setGeneratedScript({ ...generatedScript, scenes: newScenes, totalDuration: total });
+                                    calculateTracks(newScenes);
+                                  }}
+                                  style={{ width: 60, height: 22, fontSize: 11, padding: '2px 4px' }}
+                                />
+                                <span style={{ fontSize: 11, color: '#888' }}>秒</span>
+                                <Tag color="blue">{scene.shot}</Tag>
+                              </Space>
                             </div>
-                            <p style={{ marginTop: 8, marginBottom: 4 }}><strong>镜头:</strong> {scene.shot}</p>
-                            <p style={{ marginBottom: 4, color: '#666', fontSize: 12 }}><strong>画面:</strong> {scene.description}</p>
-                            <p style={{ color: '#1890ff' }}><SoundOutlined /> <strong>旁白:</strong> {scene.voiceover}</p>
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ fontSize: 11, color: '#666', marginBottom: 2 }}><strong>画面视觉设计：</strong></div>
+                              <TextArea
+                                value={scene.description}
+                                rows={2}
+                                onChange={(e) => {
+                                  const newScenes = [...generatedScript.scenes];
+                                  newScenes[index] = { ...newScenes[index], description: e.target.value };
+                                  setGeneratedScript({ ...generatedScript, scenes: newScenes });
+                                  calculateTracks(newScenes);
+                                }}
+                                style={{ fontSize: 12, background: '#fafafa' }}
+                              />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 11, color: '#1890ff', marginBottom: 2 }}><SoundOutlined /> <strong>旁白配音：</strong></div>
+                              <Input
+                                value={scene.voiceover}
+                                onChange={(e) => {
+                                  const newScenes = [...generatedScript.scenes];
+                                  newScenes[index] = { ...newScenes[index], voiceover: e.target.value };
+                                  setGeneratedScript({ ...generatedScript, scenes: newScenes });
+                                }}
+                                style={{ fontSize: 12, color: '#1890ff', background: '#fafafa' }}
+                              />
+                            </div>
                           </Card>
                         </Timeline.Item>
                       ))}
@@ -815,6 +860,23 @@ const VideoCreationPage: React.FC = () => {
         
         <Steps
           current={currentStep}
+          onChange={(newStep) => {
+            // Allow going backward freely
+            if (newStep < currentStep) {
+              setCurrentStep(newStep);
+              return;
+            }
+            // Allow going forward only if current stage requirements are satisfied
+            if (newStep === 1 && uploadedFiles.length > 0) {
+              setCurrentStep(1);
+            } else if (newStep === 2 && generatedScript) {
+              setCurrentStep(2);
+            } else if (newStep === 3 && videoUrl) {
+              setCurrentStep(3);
+            } else {
+              message.warning('请先完成当前步骤的前置操作');
+            }
+          }}
           items={steps.map(step => ({ title: step.title, icon: step.icon }))}
           style={{ marginBottom: 32 }}
         />
