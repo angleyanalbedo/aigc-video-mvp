@@ -1,11 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { Tooltip, message as antdMessage, Spin } from 'antd';
+import React, { useState, useRef, useMemo } from 'react';
+import { Tooltip, message as antdMessage, Spin, Input } from 'antd';
 import {
   PlusOutlined,
   PictureOutlined,
   LeftOutlined,
   RightOutlined,
   CheckCircleFilled,
+  SearchOutlined,
 } from '@ant-design/icons';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
@@ -38,7 +39,19 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
   const [collapsed, setCollapsed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredMaterials = useMemo(() => {
+    if (!searchKeyword.trim()) {
+      return materials;
+    }
+    const keyword = searchKeyword.toLowerCase();
+    return materials.filter(m => 
+      m.filename.toLowerCase().includes(keyword) ||
+      (m.type && m.type.toLowerCase().includes(keyword))
+    );
+  }, [materials, searchKeyword]);
 
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -185,9 +198,27 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
         </div>
       )}
 
+      {/* 搜索框 */}
+      <div style={{ padding: '8px', flexShrink: 0 }}>
+        <Input
+          prefix={<SearchOutlined style={{ color: '#52525b', fontSize: 12 }} />}
+          placeholder="搜索素材..."
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          style={{
+            background: '#202023',
+            border: '1px solid #2e2e33',
+            color: '#fff',
+            fontSize: 11,
+            height: 28,
+          }}
+          allowClear
+        />
+      </div>
+
       {/* 素材网格 */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-        {materials.length === 0 ? (
+        {filteredMaterials.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -197,9 +228,9 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
             }}
           >
             <PictureOutlined style={{ fontSize: 24, display: 'block', marginBottom: 8 }} />
-            暂无素材
+            {searchKeyword ? '未找到匹配的素材' : '暂无素材'}
             <br />
-            点击下方上传
+            {!searchKeyword && '点击下方上传'}
           </div>
         ) : (
           <div
@@ -209,7 +240,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
               gap: 6,
             }}
           >
-            {materials.map((m) => {
+            {filteredMaterials.map((m) => {
               const isInjecting = injectingMaterialId === m.id;
               const isHovered = hoveredId === m.id;
               return (

@@ -15,6 +15,8 @@ import {
   ScissorOutlined,
   SyncOutlined,
   CloseCircleOutlined,
+  EditOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons';
 import AssetPanel from './AssetPanel';
 import {
@@ -34,7 +36,9 @@ import {
   Slider,
   message,
   Empty,
-  Tooltip
+  Tooltip,
+  Modal,
+  Form,
 } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
@@ -63,6 +67,8 @@ interface Scene {
   // 状态机
   status: SceneStatus;
   imageUrl?: string;
+  firstFrameUrl?: string;
+  lastFrameUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
   ttsEstDuration?: number;
@@ -75,6 +81,10 @@ interface Scene {
   // 画布预留字段
   x?: number | null;
   y?: number | null;
+  // 新增字段
+  cameraAngle?: string;
+  lighting?: string;
+  colorTone?: string;
 }
 
 interface WorkflowNode {
@@ -89,6 +99,9 @@ interface WorkflowNode {
 const WorkbenchPage: React.FC = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentEditSceneIndex, setCurrentEditSceneIndex] = useState<number | null>(null);
 
   // Strict check on mounting
   useEffect(() => {
@@ -445,6 +458,99 @@ const WorkbenchPage: React.FC = () => {
 
   // 取消注入模式
   const cancelInjectMode = () => setInjectingMaterial(null);
+
+  // 打开分镜编辑模态框
+  const openEditModal = (index: number) => {
+    if (!script || !script.scenes) return;
+    const scene = script.scenes[index];
+    form.setFieldsValue({
+      description: scene.description,
+      voiceover: scene.voiceover,
+      duration: scene.duration,
+      shot_type: scene.shot_type,
+      emotion: scene.emotion,
+      transition: scene.transition,
+      cameraAngle: scene.cameraAngle || '',
+      lighting: scene.lighting || '',
+      colorTone: scene.colorTone || '',
+    });
+    setCurrentEditSceneIndex(index);
+    setIsModalOpen(true);
+  };
+
+  // 关闭模态框
+  const closeEditModal = () => {
+    setIsModalOpen(false);
+    setCurrentEditSceneIndex(null);
+  };
+
+  // 保存分镜编辑
+  const saveSceneEdit = () => {
+    if (currentEditSceneIndex === null || !script || !script.scenes) return;
+    const values = form.getFieldsValue();
+    const newScenes = [...script.scenes];
+    newScenes[currentEditSceneIndex] = {
+      ...newScenes[currentEditSceneIndex],
+      ...values,
+    };
+    updateScript({ ...script, scenes: newScenes });
+    setIsModalOpen(false);
+    setCurrentEditSceneIndex(null);
+    message.success('分镜编辑已保存！');
+  };
+
+  // 上传首帧或尾帧
+  const uploadFrameImage = (index: number, frameType: 'first' | 'last' | 'main') => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        message.loading(`正在上传图片...`, 0);
+        try {
+          const res = await fetch(`${API_BASE}/api/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          const uploadData = await res.json();
+          message.destroy();
+          if (uploadData.success && uploadData.url) {
+            const field = frameType === 'first' ? 'firstFrameUrl' : frameType === 'last' ? 'lastFrameUrl' : 'imageUrl';
+            updateSceneField(index, field, uploadData.url);
+            if (frameType === 'main') {
+              updateSceneField(index, 'status', 'image_completed');
+            }
+            message.success(`图片上传成功！`);
+          } else {
+            throw new Error(uploadData.error || '上传失败');
+          }
+        } catch (err: any) {
+          message.error('上传失败: ' + err.message);
+        }
+      }
+    };
+    input.click();
+  };
+
+  // 清除分镜图片
+  const clearSceneImage = (index: number, imageType: 'first' | 'last' | 'main') => {
+    if (!script || !script.scenes) return;
+    const field = imageType === 'first' ? 'firstFrameUrl' : imageType === 'last' ? 'lastFrameUrl' : 'imageUrl';
+    console.log(`Clearing ${imageType} image at index ${index}, field: ${field}`);
+    const newScenes = [...script.scenes];
+    newScenes[index] = {
+      ...newScenes[index],
+      [field]: null
+    };
+    if (imageType === 'main') {
+      newScenes[index].status = 'idle';
+    }
+    updateScript({ ...script, scenes: newScenes });
+    message.success(`${imageType === 'first' ? '首帧' : imageType === 'last' ? '尾帧' : '主图'}已清除，可以重新生成`);
+  };
 
 
 
@@ -1372,7 +1478,7 @@ const WorkbenchPage: React.FC = () => {
                   setProjectMaterials(prev => [newMaterial, ...prev]);
                 }}
               />
-              
+
               <Card
                 title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜编辑 Co-pilot</span>}
                 bordered={false}
@@ -1382,7 +1488,7 @@ const WorkbenchPage: React.FC = () => {
                 {/* Chat Message Lists for Storyboard */}
                 <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10, paddingRight: 4 }}>
                   <div style={{ fontSize: 11, color: '#818cf8', marginBottom: 12, padding: '6px 10px', background: 'rgba(99,102,241,0.08)', borderRadius: 6 }}>
-                    💬 <b>分镜导演 Agent</b>：我可以帮您批量重写分镜描述、修改转场、微调台词旁白或调整时长。可以直接和我说：“把所有镜头的色彩改为冷色调”
+                    💬 <strong>分镜导演 Agent</strong>：我可以帮您批量重写分镜描述、修改转场、微调台词旁白或调整时长。可以直接和我说："把所有镜头的色彩改为冷色调"
                   </div>
                   {chatHistory.slice(1).map((msg, index) => (
                     <div key={index} style={{
@@ -1489,7 +1595,7 @@ const WorkbenchPage: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Space>
                                 <span style={{ color: '#fff', fontWeight: 600 }}>分镜 {index + 1}</span>
-                                {scene.imageUrl ? (
+                                {!!scene.imageUrl ? (
                                   <Tag color="blue">首帧已就绪</Tag>
                                 ) : (
                                   <Tag color="default">待生图/待上传</Tag>
@@ -1499,6 +1605,18 @@ const WorkbenchPage: React.FC = () => {
                                 )}
                                 {scene.status === 'error' && <Tag color="error">失败</Tag>}
                               </Space>
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(index);
+                                }}
+                                style={{ color: '#818cf8', padding: 0 }}
+                              >
+                                编辑
+                              </Button>
                             </div>
                           }
                         >
@@ -1540,8 +1658,28 @@ const WorkbenchPage: React.FC = () => {
                                     <LoadingOutlined style={{ fontSize: 24, color: '#6366f1', marginBottom: 8 }} />
                                     <div style={{ fontSize: 11, color: '#888' }}>正在生图...</div>
                                   </div>
-                                ) : scene.imageUrl ? (
-                                  <img src={scene.imageUrl} alt="首帧图片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : !!scene.imageUrl ? (
+                                  <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                    <img src={scene.imageUrl} alt="首帧图片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    <Button
+                                      size="small"
+                                      danger
+                                      icon={<DeleteOutlined />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        clearSceneImage(index, 'main');
+                                      }}
+                                      style={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        right: 4,
+                                        opacity: 0.8,
+                                        height: 24,
+                                        minWidth: 24,
+                                        padding: '0 4px',
+                                      }}
+                                    />
+                                  </div>
                                 ) : (
                                   <div style={{ textAlign: 'center', color: '#52525b', padding: 8 }}>
                                     <PictureOutlined style={{ fontSize: 24, marginBottom: 8 }} />
@@ -1736,6 +1874,101 @@ const WorkbenchPage: React.FC = () => {
                                       <Option value="中景">中景</Option>
                                       <Option value="全景">全景</Option>
                                     </Select>
+                                  </Col>
+                                </Row>
+                                <Divider style={{ margin: '8px 0', borderColor: '#27272a' }} />
+                                <Row gutter={8}>
+                                  {/* 首帧 */}
+                                  <Col span={12}>
+                                    <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>首帧</Text>
+                                    <div style={{
+                                      height: 60,
+                                      background: '#09090b',
+                                      border: '1px dashed #27272a',
+                                      borderRadius: 4,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      overflow: 'hidden',
+                                      position: 'relative',
+                                    }} onClick={(e) => {
+                                      e.stopPropagation();
+                                      uploadFrameImage(index, 'first');
+                                    }}>
+                                      {!!scene.firstFrameUrl ? (
+                                        <>
+                                          <img src={scene.firstFrameUrl} alt="首帧" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          <Button
+                                            size="small"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              clearSceneImage(index, 'first');
+                                            }}
+                                            style={{
+                                              position: 'absolute',
+                                              top: 2,
+                                              right: 2,
+                                              opacity: 0.8,
+                                              height: 18,
+                                              minWidth: 18,
+                                              padding: '0 2px',
+                                              fontSize: 10,
+                                            }}
+                                          />
+                                        </>
+                                      ) : (
+                                        <span style={{ fontSize: 9, color: '#52525b' }}>点击上传</span>
+                                      )}
+                                    </div>
+                                  </Col>
+                                  {/* 尾帧 */}
+                                  <Col span={12}>
+                                    <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>尾帧</Text>
+                                    <div style={{
+                                      height: 60,
+                                      background: '#09090b',
+                                      border: '1px dashed #27272a',
+                                      borderRadius: 4,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                      overflow: 'hidden',
+                                      position: 'relative',
+                                    }} onClick={(e) => {
+                                      e.stopPropagation();
+                                      uploadFrameImage(index, 'last');
+                                    }}>
+                                      {!!scene.lastFrameUrl ? (
+                                        <>
+                                          <img src={scene.lastFrameUrl} alt="尾帧" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                          <Button
+                                            size="small"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              clearSceneImage(index, 'last');
+                                            }}
+                                            style={{
+                                              position: 'absolute',
+                                              top: 2,
+                                              right: 2,
+                                              opacity: 0.8,
+                                              height: 18,
+                                              minWidth: 18,
+                                              padding: '0 2px',
+                                              fontSize: 10,
+                                            }}
+                                          />
+                                        </>
+                                      ) : (
+                                        <span style={{ fontSize: 9, color: '#52525b' }}>点击上传</span>
+                                      )}
+                                    </div>
                                   </Col>
                                 </Row>
                               </Space>
@@ -2187,6 +2420,247 @@ const WorkbenchPage: React.FC = () => {
         )}
 
       </Content>
+
+      {/* 分镜编辑模态框 */}
+      <Modal
+        title={
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 600 }}>
+            编辑分镜 {currentEditSceneIndex !== null ? currentEditSceneIndex + 1 : ''}
+          </div>
+        }
+        open={isModalOpen}
+        onCancel={closeEditModal}
+        onOk={saveSceneEdit}
+        okText="保存"
+        cancelText="取消"
+        maskClosable={false}
+        styles={{
+          content: { background: '#18181b', border: '1px solid #27272a' },
+          header: { borderBottom: '1px solid #27272a', background: '#18181b' },
+          footer: { borderTop: '1px solid #27272a', background: '#18181b' }
+        }}
+        width={700}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            emotion: '',
+            transition: 'fade',
+            cameraAngle: '',
+            lighting: '',
+            colorTone: ''
+          }}
+        >
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                name="description"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>分镜视觉提示词</span>}
+              >
+                <TextArea
+                  rows={3}
+                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                name="voiceover"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>旁白配音</span>}
+              >
+                <TextArea
+                  rows={2}
+                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="duration"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>时长（秒）</span>}
+              >
+                <Input
+                  type="number"
+                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="shot_type"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>镜头类型</span>}
+              >
+                <Select style={{ background: '#202023', color: '#fff' }}>
+                  <Option value="特写">特写</Option>
+                  <Option value="中景">中景</Option>
+                  <Option value="全景">全景</Option>
+                  <Option value="近景">近景</Option>
+                  <Option value="远景">远景</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="transition"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>转场</span>}
+              >
+                <Select style={{ background: '#202023', color: '#fff' }}>
+                  <Option value="fade">渐入渐出</Option>
+                  <Option value="cut">硬切</Option>
+                  <Option value="flash">闪白</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider style={{ borderColor: '#27272a', margin: '16px 0' }} />
+
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="cameraAngle"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>拍摄角度</span>}
+              >
+                <Select placeholder="选择角度" style={{ background: '#202023', color: '#fff' }}>
+                  <Option value="平视">平视</Option>
+                  <Option value="俯视">俯视</Option>
+                  <Option value="仰视">仰视</Option>
+                  <Option value="侧拍">侧拍</Option>
+                  <Option value="斜拍">斜拍</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="lighting"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>光线类型</span>}
+              >
+                <Select placeholder="选择光线" style={{ background: '#202023', color: '#fff' }}>
+                  <Option value="自然光">自然光</Option>
+                  <Option value="暖光">暖光</Option>
+                  <Option value="冷光">冷光</Option>
+                  <Option value="柔光">柔光</Option>
+                  <Option value="硬光">硬光</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="colorTone"
+                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>色调</span>}
+              >
+                <Select placeholder="选择色调" style={{ background: '#202023', color: '#fff' }}>
+                  <Option value="冷色调">冷色调</Option>
+                  <Option value="暖色调">暖色调</Option>
+                  <Option value="黑白">黑白</Option>
+                  <Option value="复古">复古</Option>
+                  <Option value="鲜艳">鲜艳</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {currentEditSceneIndex !== null && script && script.scenes[currentEditSceneIndex] && (
+            <>
+              <Divider style={{ borderColor: '#27272a', margin: '16px 0' }} />
+              <Text style={{ color: '#a1a1aa', fontSize: 12, display: 'block', marginBottom: 12 }}>
+                首尾帧预览（点击图片可重新上传）
+              </Text>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div style={{
+                    height: 100,
+                    background: '#09090b',
+                    border: '1px dashed #27272a',
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }} onClick={() => uploadFrameImage(currentEditSceneIndex, 'first')}>
+                    {!!script.scenes[currentEditSceneIndex].firstFrameUrl ? (
+                      <>
+                        <img
+                          src={script.scenes[currentEditSceneIndex].firstFrameUrl}
+                          alt="首帧"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <Button
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearSceneImage(currentEditSceneIndex, 'first');
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            opacity: 0.8,
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#52525b' }}>点击上传首帧</span>
+                    )}
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div style={{
+                    height: 100,
+                    background: '#09090b',
+                    border: '1px dashed #27272a',
+                    borderRadius: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }} onClick={() => uploadFrameImage(currentEditSceneIndex, 'last')}>
+                    {!!script.scenes[currentEditSceneIndex].lastFrameUrl ? (
+                      <>
+                        <img
+                          src={script.scenes[currentEditSceneIndex].lastFrameUrl}
+                          alt="尾帧"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <Button
+                          size="small"
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearSceneImage(currentEditSceneIndex, 'last');
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            opacity: 0.8,
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#52525b' }}>点击上传尾帧</span>
+                    )}
+                  </div>
+                </Col>
+              </Row>
+            </>
+          )}
+        </Form>
+      </Modal>
     </Layout>
   );
 };
