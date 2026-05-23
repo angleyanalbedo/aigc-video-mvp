@@ -9,12 +9,12 @@ const API_BASE = window.location.hostname.includes('trae.cn')
   : '';
 
 const MaterialManagementPage = () => {
-  const [materials, setMaterials] = useState([]);
+  const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [searchTags, setSearchTags] = useState([]);
-  const [allTags, setAllTags] = useState([]);
-  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [searchTags, setSearchTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
 
   useEffect(() => {
     loadMaterials();

@@ -1,19 +1,27 @@
 const scriptAgent = require('./scriptAgent');
 const videoAgent = require('./videoAgent');
 const clipAgent = require('./clipAgent');
+const reviewAgent = require('./reviewAgent');
 
 const STATES = {
   IDLE: 'idle',
   PLANNING: 'planning',
   GENERATING_SCRIPT: 'generating_script',
+  REVIEWING: 'reviewing',
   GENERATING_VIDEOS: 'generating_videos',
   COMPOSING: 'composing',
   ADDING_AUDIO: 'adding_audio',
-  REVIEWING: 'reviewing',
   COMPLETED: 'completed',
   FAILED: 'failed'
 };
 
+/**
+ * VideoOrchestrator — 三层 Agent 编排器
+ *
+ * 决策层：ScriptAgent  — 生成结构化带货剧本
+ * 监督层：ReviewAgent  — 规则校验质量，触发有条件 LLM 修复
+ * 执行层：VideoAgent + ClipAgent — 分镜渲染与剪辑合成
+ */
 class VideoOrchestrator {
   constructor() {
     this.name = '带货视频生成编排器';
@@ -36,69 +44,142 @@ class VideoOrchestrator {
       options,
       startTime,
       steps: [],
+      // 三层 Agent 工作流节点（供前端 Header 步骤条消费）
+      workflowNodes: [
+        { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending', output: null },
+        { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending', output: null },
+        { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending', output: null },
+        { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending', output: null },
+      ],
       state: STATES.IDLE
     };
 
     try {
+      // ─────────────────────────────────────────────────────────
+      // 决策层：ScriptAgent 生成剧本
+      // ─────────────────────────────────────────────────────────
       this.state = STATES.GENERATING_SCRIPT;
+      this._updateNode(result, 'script', 'running');
       this.emitProgress(onProgress, {
         state: this.state,
-        message: '📝 剧本 Agent 正在生成剧本...',
-        progress: 10
+        message: '📝 剧本 Agent 正在生成带货剧本...',
+        progress: 10,
+        workflowNodes: result.workflowNodes
       });
 
-      const script = await scriptAgent.generate(productInfo);
+      let script = await scriptAgent.generate(productInfo);
       result.script = script;
       result.steps.push({
         name: '剧本生成',
         state: 'completed',
         duration: Date.now() - startTime,
-        data: { sceneCount: script.scenes?.length || 0 }
+        data: { sceneCount: script.scenes?.length || 0, title: script.title }
+      });
+      this._updateNode(result, 'script', 'completed', {
+        sceneCount: script.scenes?.length || 0,
+        title: script.title
       });
 
+      // ─────────────────────────────────────────────────────────
+      // 监督层：ReviewAgent 纯规则校验（零延迟）
+      // ─────────────────────────────────────────────────────────
+      this.state = STATES.REVIEWING;
+      this._updateNode(result, 'review', 'running');
+      this.emitProgress(onProgress, {
+        state: this.state,
+        message: '🔍 质量审核 Agent 正在检查剧本质量...',
+        progress: 25,
+        workflowNodes: result.workflowNodes
+      });
+
+      const reviewStart = Date.now();
+      const reviewResult = reviewAgent.reviewScript(script);
+
+      // 仅当评分严重不足时才触发 LLM 二次修复（避免不必要延迟）
+      if (!reviewResult.passed && reviewResult.score < 60) {
+        console.log(`⚠️ 剧本评分 ${reviewResult.score}/100，触发 LLM 修复...`);
+        this.emitProgress(onProgress, {
+          state: this.state,
+          message: `🔧 剧本质量不足（${reviewResult.score}分），AI 正在自动修复...`,
+          progress: 30,
+          workflowNodes: result.workflowNodes
+        });
+        script = await scriptAgent.refine(script, reviewResult.suggestions);
+        result.script = script;
+      }
+
+      result.steps.push({
+        name: '质量审核',
+        state: 'completed',
+        duration: Date.now() - reviewStart,
+        data: { score: reviewResult.score, issueCount: reviewResult.issues.length }
+      });
+      this._updateNode(result, 'review', 'completed', {
+        score: reviewResult.score,
+        issues: reviewResult.issues,
+        refined: !reviewResult.passed && reviewResult.score < 60
+      });
+
+      // ─────────────────────────────────────────────────────────
+      // 执行层：VideoAgent 分镜渲染
+      // ─────────────────────────────────────────────────────────
       this.state = STATES.GENERATING_VIDEOS;
+      this._updateNode(result, 'video', 'running');
       this.emitProgress(onProgress, {
         state: this.state,
         message: '🎬 视频 Agent 正在生成分镜视频...',
-        progress: 40
+        progress: 40,
+        workflowNodes: result.workflowNodes
       });
 
-      const videoStartTime = Date.now();
+      const videoStart = Date.now();
       const videoResult = await videoAgent.generateSingle(script, options, (videoProgress) => {
         this.emitProgress(onProgress, {
           state: this.state,
-          message: `🎬 视频生成中 (${videoProgress.current}/${videoProgress.total})...`,
-          progress: 40 + Math.round(videoProgress.progress * 0.3)
+          message: `🎬 分镜渲染中 (${videoProgress.current}/${videoProgress.total})...`,
+          progress: 40 + Math.round(videoProgress.progress * 0.3),
+          workflowNodes: result.workflowNodes
         });
       });
+
       result.videos = videoResult.videos;
       result.steps.push({
         name: '视频生成',
         state: 'completed',
-        duration: Date.now() - videoStartTime,
-        data: {
-          successCount: videoResult.successCount,
-          failedCount: videoResult.failedCount
-        }
+        duration: Date.now() - videoStart,
+        data: { successCount: videoResult.successCount, failedCount: videoResult.failedCount }
+      });
+      this._updateNode(result, 'video', 'completed', {
+        successCount: videoResult.successCount,
+        failedCount: videoResult.failedCount
       });
 
+      // ─────────────────────────────────────────────────────────
+      // 执行层：ClipAgent 剪辑合成
+      // ─────────────────────────────────────────────────────────
       this.state = STATES.COMPOSING;
+      this._updateNode(result, 'clip', 'running');
       this.emitProgress(onProgress, {
         state: this.state,
         message: '✂️ 剪辑 Agent 正在合成视频...',
-        progress: 75
+        progress: 75,
+        workflowNodes: result.workflowNodes
       });
 
-      const clipStartTime = Date.now();
+      const clipStart = Date.now();
       const clipResult = await clipAgent.execute(script, videoResult.videos, options);
       result.finalVideo = clipResult.video;
       result.steps.push({
         name: '视频剪辑',
         state: 'completed',
-        duration: Date.now() - clipStartTime,
+        duration: Date.now() - clipStart,
         data: { duration: clipResult.duration }
       });
+      this._updateNode(result, 'clip', 'completed', { duration: clipResult.duration });
 
+      // ─────────────────────────────────────────────────────────
+      // 完成
+      // ─────────────────────────────────────────────────────────
       this.state = STATES.COMPLETED;
       result.state = STATES.COMPLETED;
       result.endTime = Date.now();
@@ -108,6 +189,7 @@ class VideoOrchestrator {
         state: this.state,
         message: '✅ 视频生成完成！',
         progress: 100,
+        workflowNodes: result.workflowNodes,
         result: {
           videoUrl: result.finalVideo,
           duration: result.totalDuration
@@ -115,7 +197,6 @@ class VideoOrchestrator {
       });
 
       console.log(`✅ VideoOrchestrator: 执行完成，耗时 ${result.totalDuration}ms`);
-
       return result;
 
     } catch (error) {
@@ -127,16 +208,18 @@ class VideoOrchestrator {
       result.endTime = Date.now();
       result.totalDuration = result.endTime - result.startTime;
 
-      result.steps.push({
-        name: '错误处理',
-        state: 'failed',
-        error: error.message
+      // 标记当前运行中的节点为失败
+      result.workflowNodes.forEach(node => {
+        if (node.status === 'running') node.status = 'failed';
       });
+
+      result.steps.push({ name: '错误处理', state: 'failed', error: error.message });
 
       this.emitProgress(onProgress, {
         state: this.state,
         message: `❌ 生成失败: ${error.message}`,
         progress: 0,
+        workflowNodes: result.workflowNodes,
         error: error.message
       });
 
@@ -185,6 +268,16 @@ class VideoOrchestrator {
     return await this.execute(productInfo, options, onProgress);
   }
 
+  // ─── 内部工具方法 ─────────────────────────────────────────────
+
+  _updateNode(result, nodeId, status, output = null) {
+    const node = result.workflowNodes.find(n => n.id === nodeId);
+    if (node) {
+      node.status = status;
+      if (output) node.output = output;
+    }
+  }
+
   emitProgress(onProgress, data) {
     if (typeof onProgress === 'function') {
       onProgress({
@@ -205,7 +298,6 @@ class VideoOrchestrator {
 
   getSteps() {
     const steps = [];
-
     switch (this.state) {
       case STATES.PLANNING:
         steps.push({ name: '任务规划', state: 'active' });
@@ -214,30 +306,36 @@ class VideoOrchestrator {
         steps.push({ name: '任务规划', state: 'completed' });
         steps.push({ name: '剧本生成', state: 'active' });
         break;
+      case STATES.REVIEWING:
+        steps.push({ name: '任务规划', state: 'completed' });
+        steps.push({ name: '剧本生成', state: 'completed' });
+        steps.push({ name: '质量审核', state: 'active' });
+        break;
       case STATES.GENERATING_VIDEOS:
         steps.push({ name: '任务规划', state: 'completed' });
         steps.push({ name: '剧本生成', state: 'completed' });
+        steps.push({ name: '质量审核', state: 'completed' });
         steps.push({ name: '视频生成', state: 'active' });
         break;
       case STATES.COMPOSING:
         steps.push({ name: '任务规划', state: 'completed' });
         steps.push({ name: '剧本生成', state: 'completed' });
+        steps.push({ name: '质量审核', state: 'completed' });
         steps.push({ name: '视频生成', state: 'completed' });
         steps.push({ name: '视频剪辑', state: 'active' });
         break;
       case STATES.COMPLETED:
         steps.push({ name: '任务规划', state: 'completed' });
         steps.push({ name: '剧本生成', state: 'completed' });
+        steps.push({ name: '质量审核', state: 'completed' });
         steps.push({ name: '视频生成', state: 'completed' });
         steps.push({ name: '视频剪辑', state: 'completed' });
         break;
       case STATES.FAILED:
         steps.push({ name: '任务规划', state: 'completed' });
-        steps.push({ name: '剧本生成', state: 'completed' });
-        steps.push({ name: '视频生成', state: 'failed' });
+        steps.push({ name: '剧本生成', state: 'failed' });
         break;
     }
-
     return steps;
   }
 }

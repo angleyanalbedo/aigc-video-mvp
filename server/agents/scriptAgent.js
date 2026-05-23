@@ -88,7 +88,21 @@ class ScriptAgent {
         description: scene.description,
         voiceover: scene.voiceover,
         duration: scene.duration || 3,
-        shot: scene.shot || '中景'
+        shot_type: scene.shot || scene.shot_type || '中景',
+        emotion: scene.emotion || '积极',
+        transition: scene.transition || 'fade',
+        // 状态机初始化
+        status: 'idle',
+        videoUrl: null,
+        audioUrl: null,
+        ttsEstDuration: null,
+        generatedAt: null,
+        // 商品参考图注入
+        referenceImageId: null,
+        referenceImageUrl: null,
+        // 画布预留字段（未来升级 React Flow 零改动）
+        x: null,
+        y: null,
       })),
       totalDuration,
       createdAt: Date.now()
@@ -99,7 +113,7 @@ class ScriptAgent {
     const title = productInfo.title || '商品';
     const sellingPoints = productInfo.sellingPoints || '优质商品';
 
-    return {
+    const script = {
       title: `${title} - 带货视频`,
       scenes: [
         {
@@ -130,9 +144,10 @@ class ScriptAgent {
           duration: 3,
           shot: '特写'
         }
-      ],
-      totalDuration: 15,
-      createdAt: Date.now(),
+      ]
+    };
+    return {
+      ...this.formatOutput(script),
       isFallback: true
     };
   }

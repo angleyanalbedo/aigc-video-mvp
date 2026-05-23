@@ -11,8 +11,12 @@ import {
   PictureOutlined,
   AudioOutlined,
   RocketOutlined,
-  CheckCircleOutlined
+  CheckCircleOutlined,
+  ScissorOutlined,
+  SyncOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
+import AssetPanel from './AssetPanel';
 import {
   Layout,
   Button,
@@ -46,16 +50,39 @@ interface Message {
   timestamp: Date;
 }
 
+type SceneStatus = 'idle' | 'generating' | 'completed' | 'error';
+
 interface Scene {
+  id?: number;
   description: string;
   duration: number;
   voiceover: string;
   shot_type: string;
   emotion: string;
   transition: string;
+  // 状态机
+  status: SceneStatus;
   videoUrl?: string;
+  audioUrl?: string;
+  ttsEstDuration?: number;
+  generatedAt?: number;
   rendering?: boolean;
   progress?: number;
+  // 商品参考图注入
+  referenceImageId?: string | null;
+  referenceImageUrl?: string | null;
+  // 画布预留字段
+  x?: number | null;
+  y?: number | null;
+}
+
+interface WorkflowNode {
+  id: string;
+  name: string;
+  agent: string;
+  layer: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  output?: any;
 }
 
 const WorkbenchPage: React.FC = () => {
@@ -101,6 +128,22 @@ const WorkbenchPage: React.FC = () => {
   const [renderStatus, setRenderStatus] = useState('');
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
+  // Agent Workflow 节点状态（供 Header 步骤条消费）
+  const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
+    { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
+    { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending' },
+    { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
+    { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
+  ]);
+  const [workflowStarted, setWorkflowStarted] = useState(false);
+
+  // 资产注入模式：正在等待用户点选目标分镜的素材
+  const [injectingMaterial, setInjectingMaterial] = useState<{ id: string; url: string } | null>(null);
+
+  // 项目素材列表（AssetPanel 数据源）
+  const [projectMaterials, setProjectMaterials] = useState<any[]>([]);
+
+
   // Auto-save Status
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
 
@@ -113,8 +156,19 @@ const WorkbenchPage: React.FC = () => {
       if (data.success && data.data) {
         const p = data.data;
         setProject(p);
-        if (p.script) setScript(p.script);
+        if (p.script) {
+          setScript(p.script);
+          setWorkflowStarted(true);
+          setWorkflowNodes([
+            { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
+            { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'completed' },
+            { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
+            { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
+          ]);
+        }
         if (p.settings) setSettings({ ...settings, ...p.settings });
+        // 初始化资产面板数据
+        if (p.materials) setProjectMaterials(p.materials);
 
         // Initialize Chat Pilot Greeting once project is loaded
         const materialsSummary = p.materials && p.materials.length > 0
@@ -163,6 +217,82 @@ const WorkbenchPage: React.FC = () => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
+  // AI Video Editing Agent State
+  const [isPlanningClip, setIsPlanningClip] = useState(false);
+  const [clipPlan, setClipPlan] = useState<any>(null);
+
+  const handleGenerateClipPlan = async () => {
+    if (!script) {
+      message.warning('请先生成分镜剧本才能规划剪辑方案！');
+      return;
+    }
+    setIsPlanningClip(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/agent/clip-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script,
+          materials: project?.materials || [],
+          options: settings
+        })
+      });
+      const data = await response.json();
+      if (data.success && data.plan) {
+        setClipPlan(data.plan);
+        message.success('🎬 AI 剪辑师已为您制定最优剪辑方案！');
+        
+        // Automatically sync recommended audio settings if suggested
+        if (data.plan.audio) {
+          const planBGM = data.plan.audio.bgm;
+          const planVolume = typeof data.plan.audio.volume === 'number'
+            ? Math.round(data.plan.audio.volume * 100)
+            : settings.volume;
+          
+          // Map AI recommended BGM names back to settings option keys
+          let mappedBGM = settings.bgm;
+          if (planBGM) {
+            if (planBGM.includes('cheerful') || planBGM.includes('欢快')) mappedBGM = 'cheerful.mp3';
+            else if (planBGM.includes('energetic') || planBGM.includes('动感') || planBGM.includes('Edm')) mappedBGM = 'energetic.mp3';
+            else if (planBGM.includes('jazz') || planBGM.includes('温馨') || planBGM.includes('舒缓')) mappedBGM = 'smooth_jazz.mp3';
+            else if (planBGM.includes('none') || planBGM.includes('不配') || planBGM === 'none') mappedBGM = 'none';
+          }
+
+          const updated = {
+            ...settings,
+            bgm: mappedBGM,
+            volume: planVolume
+          };
+          updateSettings(updated);
+          message.info(`🤖 已自动为您应用 AI 剪辑师推荐的背景音乐 (${mappedBGM === 'none' ? '无背景乐' : mappedBGM}) 与配音音量 (${planVolume}%)！`);
+        }
+      } else {
+        throw new Error(data.error || 'Failed to generate plan');
+      }
+    } catch (err: any) {
+      console.error('AI clip plan error:', err);
+      message.error('AI 剪辑方案生成失败，使用默认最优剪辑方案');
+      
+      // Load local smart default plan
+      const defaultPlan = {
+        clips: (script?.scenes || []).map((s: any, idx: number) => ({
+          sceneId: idx + 1,
+          transition: settings.transition,
+          duration: s.duration || 3,
+          audioSync: 'sync'
+        })),
+        audio: {
+          tts: true,
+          bgm: 'cheerful.mp3',
+          volume: 0.8
+        }
+      };
+      setClipPlan(defaultPlan);
+    } finally {
+      setIsPlanningClip(false);
+    }
+  };
+
   // Persist Current Project State to SQLite
   const handleSave = async (updatedScript = script, updatedSettings = settings) => {
     if (!projectId) return;
@@ -210,6 +340,10 @@ const WorkbenchPage: React.FC = () => {
     setChatInput('');
     setIsChatting(true);
 
+    // Update workflow steps to show ScriptAgent is running
+    setWorkflowStarted(true);
+    setWorkflowNodes(prev => prev.map(n => n.id === 'script' ? { ...n, status: 'running' } : n));
+
     const updatedHistory: Message[] = [
       ...chatHistory,
       { role: 'user', content: userMsg, timestamp: new Date() }
@@ -236,6 +370,14 @@ const WorkbenchPage: React.FC = () => {
         if (data.script) {
           setScript(data.script);
           setSaveStatus('saved'); // Behind the scenes, the endpoint auto-saves
+          // Script & Review done
+          setWorkflowNodes(prev => prev.map(n => {
+            if (n.id === 'script' || n.id === 'review') return { ...n, status: 'completed' };
+            return n;
+          }));
+        } else {
+          // If no script returned but chat succeeds, restore script to completed
+          setWorkflowNodes(prev => prev.map(n => n.id === 'script' ? { ...n, status: 'completed' } : n));
         }
       } else {
         throw new Error(data.error || 'Chat processing error');
@@ -263,14 +405,42 @@ const WorkbenchPage: React.FC = () => {
     updateScript({ ...script, scenes: newScenes });
   };
 
+  // 资产面板：进入"选择注入目标"模式
+  const handleInjectMode = (materialId: string, materialUrl: string) => {
+    setInjectingMaterial({ id: materialId, url: materialUrl });
+    message.info('请点击目标分镜卡片完成参考图注入', 2);
+  };
+
+  // 分镜卡片被点击时，若处于注入模式则执行注入
+  const handleSceneCardClick = (sceneIndex: number) => {
+    if (!injectingMaterial || !script) return;
+    const newScenes = [...script.scenes];
+    newScenes[sceneIndex] = {
+      ...newScenes[sceneIndex],
+      referenceImageId: injectingMaterial.id,
+      referenceImageUrl: injectingMaterial.url,
+    };
+    updateScript({ ...script, scenes: newScenes });
+    setInjectingMaterial(null);
+    message.success(`✅ 参考图已注入分镜 ${sceneIndex + 1}`);
+  };
+
+  // 取消注入模式
+  const cancelInjectMode = () => setInjectingMaterial(null);
+
+
+
   // Scene level Video Generation & Polling Mock/API
   const generateSingleSceneVideo = async (index: number) => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
     
     // Set Scene Status to Rendering
+    updateSceneField(index, 'status', 'generating');
     updateSceneField(index, 'rendering', true);
     updateSceneField(index, 'progress', 10);
+    setWorkflowStarted(true);
+    setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'running' } : n));
 
     try {
       // Direct post to single render endpoint
@@ -299,12 +469,22 @@ const WorkbenchPage: React.FC = () => {
               if (task.status === 'completed') {
                 clearInterval(pollInterval);
                 updateSceneField(index, 'rendering', false);
+                updateSceneField(index, 'status', 'completed');
                 updateSceneField(index, 'videoUrl', task.result);
                 message.success(`分镜 ${index + 1} 画面渲染成功！`);
+                setWorkflowNodes(prev => prev.map(n => {
+                  if (n.id === 'video') {
+                    const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
+                    return { ...n, status: allDone ? 'completed' : 'running' };
+                  }
+                  return n;
+                }));
               } else if (task.status === 'failed') {
                 clearInterval(pollInterval);
                 updateSceneField(index, 'rendering', false);
+                updateSceneField(index, 'status', 'error');
                 message.error(`分镜 ${index + 1} 画面生成失败`);
+                setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
               }
             }
           } catch (e) {
@@ -315,15 +495,25 @@ const WorkbenchPage: React.FC = () => {
         // Safe fallback
         setTimeout(() => {
           updateSceneField(index, 'rendering', false);
+          updateSceneField(index, 'status', 'completed');
           // Auto fill a mock placeholder video
           updateSceneField(index, 'videoUrl', 'https://assets.mixkit.co/videos/preview/mixkit-kitchen-counter-with-fresh-vegetables-and-fruits-41584-large.mp4');
           message.success(`分镜 ${index + 1} 画面生成成功 (Mock 视频已注入)`);
+          setWorkflowNodes(prev => prev.map(n => {
+            if (n.id === 'video') {
+              const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
+              return { ...n, status: allDone ? 'completed' : 'running' };
+            }
+            return n;
+          }));
         }, 4000);
       }
     } catch (e) {
       console.error('生成单个分镜失败:', e);
       updateSceneField(index, 'rendering', false);
+      updateSceneField(index, 'status', 'error');
       message.error('分镜渲染出错');
+      setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
     }
   };
 
@@ -338,6 +528,9 @@ const WorkbenchPage: React.FC = () => {
     setRenderProgress(0);
     setRenderStatus('正在拼装视音频资产并合成渲染...');
     setFinalVideoUrl(null);
+
+    setWorkflowStarted(true);
+    setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'running' } : n));
 
     try {
       const res = await fetch(`${API_BASE}/api/video/batch-generate`, {
@@ -376,8 +569,10 @@ const WorkbenchPage: React.FC = () => {
             setIsRenderingAll(false);
             if (task.status === 'failed') {
               message.error(task.error || '视频渲染合成失败');
+              setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
             } else {
               message.success('恭喜！带货视频合成输出成功！');
+              setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'completed' } : n));
             }
           }
         };
@@ -386,6 +581,7 @@ const WorkbenchPage: React.FC = () => {
           es.close();
           setIsRenderingAll(false);
           message.error('后台视频编译连接发生异常');
+          setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
         };
       } else {
         // Fallback synthetic compilation
@@ -398,6 +594,7 @@ const WorkbenchPage: React.FC = () => {
             setIsRenderingAll(false);
             setFinalVideoUrl('https://assets.mixkit.co/videos/preview/mixkit-pouring-orange-juice-into-a-glass-41618-large.mp4');
             message.success('带货视频一键成片合成成功 (智能 Mock 备用包)');
+            setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'completed' } : n));
           } else {
             setRenderProgress(progressVal);
             setRenderStatus(`正在执行第 ${Math.ceil(progressVal / 25)} 分镜音频和画面高精校准...`);
@@ -407,6 +604,7 @@ const WorkbenchPage: React.FC = () => {
     } catch (e) {
       console.error('一键成片发生异常:', e);
       setIsRenderingAll(false);
+      setWorkflowNodes(prev => prev.map(n => n.id === 'clip' ? { ...n, status: 'failed' } : n));
     }
   };
 
@@ -414,43 +612,115 @@ const WorkbenchPage: React.FC = () => {
     <Layout style={{ height: '100%', minHeight: '100%', background: '#09090b', color: '#e4e4e7' }}>
       {/* Premium Dark Navigation Header */}
       <div style={{
-        padding: '16px 24px',
         background: '#121214',
         borderBottom: '1px solid #1f1f23',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
+        flexShrink: 0,
       }}>
-        <Space size="large">
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined style={{ color: '#fff' }} />}
-            onClick={() => navigate('/projects')}
-          />
-          <div>
-            <Title level={4} style={{ margin: 0, color: '#fff' }}>🎬 {project?.name || '创意工作台'}</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              {project?.description ? `绑定素材: ${project.materials?.length || 0} 个 | ${project.description.slice(0, 40)}` : '创意无限，全 AI 驱动视频生成器'}
-            </Text>
-          </div>
-        </Space>
+        {/* Row 1: Project title + save controls */}
+        <div style={{
+          padding: '12px 24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <Space size="large">
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined style={{ color: '#fff' }} />}
+              onClick={() => navigate('/projects')}
+            />
+            <div>
+              <Title level={4} style={{ margin: 0, color: '#fff' }}>🎬 {project?.name || '创意工作台'}</Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {project?.description ? `绑定素材: ${projectMaterials.length} 个 | ${project.description.slice(0, 40)}` : '创意无限，全 AI 驱动视频生成器'}
+              </Text>
+            </div>
+          </Space>
 
-        <Space size="middle">
-          {saveStatus === 'saved' && <Tag color="success"><CheckCircleOutlined /> 自动保存已同步</Tag>}
-          {saveStatus === 'saving' && <Tag color="processing"><LoadingOutlined /> 自动保存中</Tag>}
-          {saveStatus === 'unsaved' && <Tag color="warning">⚠️ 本地有待同步修改</Tag>}
-          
-          <Button
-            type="primary"
-            icon={<SaveOutlined />}
-            loading={saveStatus === 'saving'}
-            onClick={() => handleSave()}
-            style={{ borderRadius: 6, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none' }}
-          >
-            强制保存
-          </Button>
-        </Space>
+          <Space size="middle">
+            {saveStatus === 'saved' && <Tag color="success"><CheckCircleOutlined /> 自动保存已同步</Tag>}
+            {saveStatus === 'saving' && <Tag color="processing"><LoadingOutlined /> 自动保存中</Tag>}
+            {saveStatus === 'unsaved' && <Tag color="warning">⚠️ 本地有待同步修改</Tag>}
+            
+            <Button
+              type="primary"
+              icon={<SaveOutlined />}
+              loading={saveStatus === 'saving'}
+              onClick={() => handleSave()}
+              style={{ borderRadius: 6, background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none' }}
+            >
+              强制保存
+            </Button>
+          </Space>
+        </div>
+
+        {/* Row 2: Agent Workflow 步骤条（仅触发过流程后显示） */}
+        {workflowStarted && (
+          <div style={{
+            padding: '0 24px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0,
+            overflowX: 'auto',
+          }}>
+            {workflowNodes.map((node, idx) => {
+              const tabMap: Record<string, string> = {
+                script: 'script', review: 'script', video: 'storyboard', clip: 'render'
+              };
+              const statusColor: Record<string, string> = {
+                pending: '#3f3f46',
+                running: '#6366f1',
+                completed: '#10b981',
+                failed: '#ef4444',
+              };
+              const statusIcon: Record<string, React.ReactNode> = {
+                pending: <span style={{ fontSize: 10 }}>○</span>,
+                running: <SyncOutlined spin style={{ fontSize: 10 }} />,
+                completed: <CheckCircleOutlined style={{ fontSize: 10 }} />,
+                failed: <CloseCircleOutlined style={{ fontSize: 10 }} />,
+              };
+              return (
+                <React.Fragment key={node.id}>
+                  <Tooltip title={`${node.agent} · ${node.layer}`} placement="bottom">
+                    <div
+                      onClick={() => navigate(`/workbench/${projectId}?tab=${tabMap[node.id] || 'script'}`)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '3px 10px',
+                        borderRadius: 20,
+                        background: node.status === 'pending' ? 'transparent' : `${statusColor[node.status]}18`,
+                        border: `1px solid ${statusColor[node.status]}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span style={{ color: statusColor[node.status] }}>
+                        {statusIcon[node.status]}
+                      </span>
+                      <span style={{ fontSize: 11, color: node.status === 'pending' ? '#52525b' : '#e4e4e7', fontWeight: node.status !== 'pending' ? 600 : 400 }}>
+                        {node.name}
+                      </span>
+                      {node.status === 'completed' && node.output?.score !== undefined && (
+                        <span style={{ fontSize: 9, color: '#10b981' }}>{node.output.score}分</span>
+                      )}
+                      {node.status === 'completed' && node.output?.sceneCount !== undefined && (
+                        <span style={{ fontSize: 9, color: '#10b981' }}>{node.output.sceneCount}镜</span>
+                      )}
+                    </div>
+                  </Tooltip>
+                  {idx < workflowNodes.length - 1 && (
+                    <div style={{ width: 20, height: 1, background: '#27272a', flexShrink: 0 }} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
+
 
       {/* Main Dual-Column Content Panels */}
       <Content style={{ padding: 24, flex: 1, overflow: 'hidden' }}>
@@ -562,28 +832,16 @@ const WorkbenchPage: React.FC = () => {
                       }}>
                         <div style={{ width: 60, flexShrink: 0 }}>
                           <Tag color="geekblue" style={{ borderRadius: 4 }}>镜 {index + 1}</Tag>
-                          <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>⏱️ {scene.duration}秒</div>
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ marginBottom: 6 }}>
-                            <span style={{ fontSize: 11, color: '#818cf8', fontWeight: 600 }}>[画面构图 - {scene.shot_type}]</span>
-                            <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600, marginLeft: 12 }}>[情感情绪 - {scene.emotion}]</span>
-                          </div>
-                          <Paragraph style={{ color: '#e4e4e7', fontSize: 13, marginBottom: 8 }}>
-                            <strong>画面视觉：</strong>{scene.description}
-                          </Paragraph>
-                          <Paragraph style={{ color: '#a1a1aa', fontSize: 13, margin: 0, fontStyle: 'italic' }}>
-                            🎤 “ {scene.voiceover} ”
-                          </Paragraph>
+                        <div style={{ flex: 1 }}>
+                          <Paragraph style={{ color: '#fff', fontSize: 13, margin: '0 0 4px 0' }}>{scene.description}</Paragraph>
+                          <Text style={{ color: '#6366f1', fontSize: 11 }}>旁白: {scene.voiceover}</Text>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <Empty
-                    description={<span style={{ color: '#a1a1aa' }}>暂无剧本。在左侧发送消息给 AI 导演开始创作！</span>}
-                    style={{ marginTop: 80 }}
-                  />
+                  <Empty description={<span style={{ color: '#52525b' }}>暂无剧本，请先与 AI 导演沟通生成</span>} />
                 )}
               </Card>
             </Col>
@@ -591,73 +849,56 @@ const WorkbenchPage: React.FC = () => {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 2: STORYBOARD EDITOR (INLINE FORM + SCENE LEVEL RENDER) */}
+        {/* TAB 2: STORYBOARD CANVAS */}
         {/* ============================================================== */}
         {activeTab === 'storyboard' && (
           <Row gutter={24} style={{ height: '100%' }}>
-            {/* Left: Chat scene adjustments & project base asset palette */}
-            <Col span={6} style={{ height: '100%' }}>
-              <Space direction="vertical" size="middle" style={{ width: '100%', height: '100%' }}>
-                <Card
-                  title={<span style={{ color: '#fff' }}><PictureOutlined /> 项目绑定商品素材</span>}
-                  bordered={false}
-                  style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
-                  bodyStyle={{ padding: 12 }}
-                >
-                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 12 }}>
-                    您可以将以下商品原图作为控制图参考（垫图）生成一致性更好的分镜：
-                  </Text>
-                  {project?.materials && project.materials.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {project.materials.map((m: any) => (
-                        <Tooltip key={m.id} title={m.filename}>
-                          <div style={{
-                            border: '1px solid #27272a',
-                            borderRadius: 6,
-                            overflow: 'hidden',
-                            position: 'relative',
-                            cursor: 'pointer',
-                            height: 70
-                          }}>
-                            {m.type?.startsWith('image') ? (
-                              <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', background: '#27272a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>🎥</div>
-                            )}
-                          </div>
-                        </Tooltip>
-                      ))}
-                    </div>
-                  ) : (
-                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无绑定素材" style={{ padding: 12 }} />
-                  )}
-                </Card>
-
-                <Card
-                  title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜精细指令</span>}
-                  bordered={false}
-                  style={{ background: '#18181b', borderRadius: 12, flex: 1, overflowY: 'auto' }}
-                  bodyStyle={{ padding: 12 }}
-                >
-                  <Paragraph style={{ color: '#a1a1aa', fontSize: 12 }}>
-                    如果您需要批量微调画面，可在当前面板与大模型协作：“*把所有镜头升级为高大上的暖光影色调*”。
-                  </Paragraph>
-                  <TextArea
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="输入微调分镜指令..."
-                    rows={3}
-                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', marginBottom: 10 }}
-                  />
-                  <Button type="primary" block onClick={handleSendChatMessage}>发送分镜指令</Button>
-                </Card>
-              </Space>
+            {/* Left: Asset Panel & Controls */}
+            <Col span={6} style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+              <AssetPanel
+                projectId={projectId!}
+                materials={projectMaterials}
+                injectingMaterialId={injectingMaterial?.id || null}
+                onInjectMode={handleInjectMode}
+                onMaterialUploaded={(newMaterial) => {
+                  setProjectMaterials(prev => [newMaterial, ...prev]);
+                }}
+              />
+              
+              <Card
+                title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜精细指令</span>}
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12, flex: 1, overflowY: 'auto' }}
+                bodyStyle={{ padding: 12 }}
+              >
+                <Paragraph style={{ color: '#a1a1aa', fontSize: 12 }}>
+                  如果您需要批量微调画面，可在当前面板与大模型协作：“*把所有镜头升级为高大上的暖光影色调*”。
+                </Paragraph>
+                <TextArea
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="输入微调分镜指令..."
+                  rows={3}
+                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', marginBottom: 10 }}
+                />
+                <Button type="primary" block onClick={handleSendChatMessage}>发送分镜指令</Button>
+              </Card>
             </Col>
 
             {/* Right: Grid of Scene Form Cards */}
             <Col span={18} style={{ height: '100%', overflowY: 'auto' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景画幅生成）</span>}
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景画幅生成）</span>
+                    {injectingMaterial && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: '#818cf8' }}>点击分镜卡片注入参考图 →</span>
+                        <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
+                      </div>
+                    )}
+                  </div>
+                }
                 bordered={false}
                 style={{ background: '#18181b', borderRadius: 12 }}
               >
@@ -666,20 +907,42 @@ const WorkbenchPage: React.FC = () => {
                     {script.scenes.map((scene: Scene, index: number) => (
                       <Col span={12} key={index}>
                         <Card
-                          style={{ background: '#18181c', border: '1px solid #27272a', borderRadius: 8 }}
+                          hoverable={!!injectingMaterial}
+                          onClick={() => {
+                            if (injectingMaterial) {
+                              handleSceneCardClick(index);
+                            }
+                          }}
+                          style={{
+                            background: '#18181c',
+                            border: injectingMaterial ? '2px dashed #6366f1' : '1px solid #27272a',
+                            borderRadius: 8,
+                            cursor: injectingMaterial ? 'pointer' : 'default',
+                            transition: 'all 0.2s ease',
+                            boxShadow: injectingMaterial ? '0 0 12px rgba(99, 102, 241, 0.4)' : 'none'
+                          }}
                           bodyStyle={{ padding: 16 }}
                           title={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#fff' }}><Tag color="indigo">分镜 {index + 1}</Tag></span>
+                              <Space>
+                                <span style={{ color: '#fff', fontWeight: 600 }}>分镜 {index + 1}</span>
+                                {scene.status === 'completed' && <Tag color="success">已完成</Tag>}
+                                {(scene.rendering || scene.status === 'generating') && <Tag color="processing" icon={<LoadingOutlined />}>渲染中</Tag>}
+                                {scene.status === 'error' && <Tag color="error">失败</Tag>}
+                                {(!scene.status || scene.status === 'idle') && <Tag color="default">待生成</Tag>}
+                              </Space>
                               <Button
                                 type="primary"
                                 size="small"
-                                icon={scene.rendering ? <LoadingOutlined /> : <PlayCircleOutlined />}
-                                loading={scene.rendering}
-                                onClick={() => generateSingleSceneVideo(index)}
+                                icon={scene.rendering || scene.status === 'generating' ? <LoadingOutlined /> : <PlayCircleOutlined />}
+                                loading={scene.rendering || scene.status === 'generating'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  generateSingleSceneVideo(index);
+                                }}
                                 style={{ borderRadius: 4, background: '#10b981', border: 'none' }}
                               >
-                                {scene.rendering ? `渲染中 ${scene.progress || 10}%` : '生成当前画面'}
+                                {scene.rendering || scene.status === 'generating' ? `渲染中 ${scene.progress || 10}%` : '生成当前画面'}
                               </Button>
                             </div>
                           }
@@ -688,6 +951,7 @@ const WorkbenchPage: React.FC = () => {
                             {/* Left part of card: Preview player / generator placeholder */}
                             <Col span={10}>
                               <div style={{
+                                position: 'relative',
                                 width: '100%',
                                 height: 160,
                                 background: '#09090b',
@@ -698,9 +962,27 @@ const WorkbenchPage: React.FC = () => {
                                 justifyContent: 'center',
                                 overflow: 'hidden'
                               }}>
+                                {/* Reference image corner badge */}
+                                {scene.referenceImageUrl && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: 6,
+                                    left: 6,
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 4,
+                                    border: '1.5px solid #6366f1',
+                                    overflow: 'hidden',
+                                    zIndex: 10,
+                                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.6)'
+                                  }} title="已关联商品参考图">
+                                    <img src={scene.referenceImageUrl} alt="参考图" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  </div>
+                                )}
+
                                 {scene.videoUrl ? (
                                   <video src={scene.videoUrl} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : scene.rendering ? (
+                                ) : (scene.rendering || scene.status === 'generating') ? (
                                   <div style={{ textAlign: 'center', padding: 8 }}>
                                     <LoadingOutlined style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
                                     <div style={{ fontSize: 11, color: '#888' }}>高精渲染中...</div>
@@ -945,16 +1227,17 @@ const WorkbenchPage: React.FC = () => {
         )}
 
         {/* ============================================================== */}
+        {/* ============================================================== */}
         {/* TAB 4: COMPILATION & OUTPUT */}
         {/* ============================================================== */}
         {activeTab === 'render' && (
           <Row gutter={24} style={{ height: '100%' }}>
-            {/* Left: Resolution, Ratio and transition configs & trigger */}
-            <Col span={10}>
+            {/* Left: Resolution, Ratio, transition configs & AI Clip Agent planner */}
+            <Col span={10} style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%', overflowY: 'auto', paddingRight: 4 }}>
               <Card
                 title={<span style={{ color: '#fff' }}><RocketOutlined /> 视频最终渲染编译设置</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
+                style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
@@ -1019,6 +1302,65 @@ const WorkbenchPage: React.FC = () => {
                     {isRenderingAll ? '正在执行高精编译成片...' : '🎬 一键合成发布带货视频'}
                   </Button>
                 </Space>
+              </Card>
+
+              {/* AI Video Editor Agent (ClipAgent) */}
+              <Card
+                title={<span style={{ color: '#fff' }}><ScissorOutlined /> AI 剪辑师 Copilot</span>}
+                bordered={false}
+                style={{ background: '#12121e', borderRadius: 12, flexShrink: 0 }}
+                bodyStyle={{ padding: 16 }}
+              >
+                {!clipPlan ? (
+                  <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                    <Paragraph style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 16 }}>
+                      AI 剪辑师可以智能分析分镜剧本节奏，编排最佳转场，并精确配平旁白配音与背景乐（BGM）比例！
+                    </Paragraph>
+                    <Button
+                      type="primary"
+                      icon={<ScissorOutlined />}
+                      loading={isPlanningClip}
+                      onClick={handleGenerateClipPlan}
+                      style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', border: 'none', borderRadius: 6, height: 40 }}
+                    >
+                      {isPlanningClip ? 'AI 剪辑师正在深度分析中...' : '🧠 召唤 AI 剪辑师制定智能剪辑方案'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ background: '#1a1a2e', padding: 12, borderRadius: 8, marginBottom: 12, borderLeft: '4px solid #6366f1' }}>
+                      <div style={{ fontWeight: 600, color: '#fff', fontSize: 13.5, marginBottom: 4 }}>🎉 智能剪辑编排方案已应用：</div>
+                      <div style={{ color: '#34d399', fontSize: 12, marginBottom: 4 }}>
+                        🎵 推荐背景乐: <strong>{clipPlan.audio?.bgm || '欢快乐活'}</strong> | 音量: <strong>{Math.round((clipPlan.audio?.volume || 0.2) * 100)}%</strong>
+                      </div>
+                      <div style={{ color: '#a1a1aa', fontSize: 11.5 }}>
+                        AI 建议: 配音音量设为 80% (当前为 {settings.volume}%)，与 BGM 保持完美听觉平衡，防止背景音嘈杂。
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 11.5, display: 'block', marginBottom: 6 }}>🎬 分镜智能剪切轨道 (AI Storyboard Transitions):</Text>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {clipPlan.clips?.slice(0, 6).map((clip: any, idx: number) => (
+                          <Tag key={idx} color="purple" style={{ borderRadius: 4, margin: 0, padding: '2px 8px', fontSize: 11 }}>
+                            镜 {clip.sceneId || idx + 1} ➔ {clip.transition === 'fade' ? '🌀 渐变' : clip.transition === 'flash' ? '✨ 闪白' : '⚡ 硬切'}
+                          </Tag>
+                        ))}
+                        {clipPlan.clips?.length > 6 && <Tag color="default" style={{ borderRadius: 4, margin: 0, padding: '2px 8px', fontSize: 11 }}>+ {clipPlan.clips.length - 6} 个分镜</Tag>}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="dashed"
+                      block
+                      onClick={handleGenerateClipPlan}
+                      loading={isPlanningClip}
+                      style={{ color: '#818cf8', borderColor: '#4f46e5', background: 'transparent', height: 32, borderRadius: 6 }}
+                    >
+                      🔄 重新评估剪辑方案
+                    </Button>
+                  </div>
+                )}
               </Card>
             </Col>
 

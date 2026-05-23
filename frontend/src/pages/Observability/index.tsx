@@ -5,10 +5,10 @@ import { MonitorOutlined, DatabaseOutlined, AlertOutlined, ReloadOutlined, Check
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 const ObservabilityPage = () => {
-  const [health, setHealth] = useState(null);
-  const [systemMetrics, setSystemMetrics] = useState(null);
-  const [requestMetrics, setRequestMetrics] = useState(null);
-  const [alerts, setAlerts] = useState([]);
+  const [health, setHealth] = useState<any>(null);
+  const [systemMetrics, setSystemMetrics] = useState<any>(null);
+  const [requestMetrics, setRequestMetrics] = useState<any>(null);
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ const ObservabilityPage = () => {
     }
   };
 
-  const handleResolveAlert = async (id) => {
+  const handleResolveAlert = async (id: any) => {
     try {
       const response = await fetch(`${API_BASE}/api/observability/alerts/${id}/resolve`, { method: 'POST' });
       const data = await response.json();
@@ -60,7 +60,7 @@ const ObservabilityPage = () => {
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: any) => {
     switch (status) {
       case 'healthy': return '#52c41a';
       case 'degraded': return '#faad14';
@@ -70,16 +70,16 @@ const ObservabilityPage = () => {
   };
 
   const columns = [
-    { title: '时间', dataIndex: 'timestamp', key: 'timestamp', render: (t) => new Date(t).toLocaleString() },
-    { title: '级别', dataIndex: 'level', key: 'level', render: (level) => (
+    { title: '时间', dataIndex: 'timestamp', key: 'timestamp', render: (t: any) => new Date(t).toLocaleString() },
+    { title: '级别', dataIndex: 'level', key: 'level', render: (level: any) => (
       <Tag color={level === 'critical' ? 'red' : level === 'warning' ? 'orange' : 'blue'}>{level}</Tag>
     )},
     { title: '来源', dataIndex: 'source', key: 'source' },
     { title: '消息', dataIndex: 'message', key: 'message' },
-    { title: '状态', dataIndex: 'resolved', key: 'resolved', render: (resolved) => (
+    { title: '状态', dataIndex: 'resolved', key: 'resolved', render: (resolved: any) => (
       resolved ? <Tag color="success">已处理</Tag> : <Tag color="warning">未处理</Tag>
     )},
-    { title: '操作', key: 'actions', render: (_, record, index) => {
+    { title: '操作', key: 'actions', render: (_: any, record: any, index: any) => {
       const alertId = record.id !== undefined ? record.id : index;
       return (
         !record.resolved && (
@@ -92,9 +92,9 @@ const ObservabilityPage = () => {
   const endpointColumns = [
     { title: '端点', dataIndex: 'endpoint', key: 'endpoint' },
     { title: '请求数', dataIndex: 'count', key: 'count' },
-    { title: '平均响应时间', dataIndex: 'avgDuration', key: 'avgDuration', render: (d) => `${d.toFixed(2)}ms` },
+    { title: '平均响应时间', dataIndex: 'avgDuration', key: 'avgDuration', render: (d: any) => `${d.toFixed(2)}ms` },
     { title: '错误数', dataIndex: 'errors', key: 'errors' },
-    { title: '错误率', dataIndex: 'errorRate', key: 'errorRate', render: (rate) => <Progress percent={rate} size="small" status={rate > 10 ? 'exception' : 'normal'} /> },
+    { title: '错误率', dataIndex: 'errorRate', key: 'errorRate', render: (rate: any) => <Progress percent={rate} size="small" status={rate > 10 ? 'exception' : 'normal'} /> },
   ];
 
   return (
@@ -116,7 +116,7 @@ const ObservabilityPage = () => {
               <Statistic title="运行时间" value={health.uptime} prefix={<ClockCircleOutlined />} />
             </Col>
             <Col span={6}>
-              <Statistic title="当前时间" value={health.timestamp} render={() => new Date(health.timestamp).toLocaleString()} />
+              <Statistic title="当前时间" value={new Date(health.timestamp).toLocaleString()} />
             </Col>
             <Col span={6}>
               <Statistic title="版本" value={health.version} />
@@ -189,7 +189,7 @@ const ObservabilityPage = () => {
       )}
 
       <Card title="⚠️ 告警列表">
-        <Table columns={columns} dataSource={alerts} rowKey={(record, index) => index} pagination={{ pageSize: 5 }} />
+        <Table columns={columns} dataSource={alerts} rowKey={(record: any, index?: number) => record.id || String(index)} pagination={{ pageSize: 5 }} />
       </Card>
     </div>
   );
