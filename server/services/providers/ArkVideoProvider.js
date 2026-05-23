@@ -64,9 +64,22 @@ class ArkVideoProvider extends BaseVideoProvider {
       if (data.error) {
         throw new Error(data.error.message || 'API Error');
       }
+      
+      // 基于状态计算进度
+      let progress = 0;
+      if (data.status === 'queued') {
+        progress = 10;
+      } else if (data.status === 'running') {
+        progress = 50; // 运行中时显示中等进度
+      } else if (data.status === 'succeeded') {
+        progress = 100;
+      } else if (data.status === 'failed') {
+        progress = 0;
+      }
+      
       return {
         status: data.status,
-        progress: data.status === 'succeeded' ? 100 : 0,
+        progress,
         videoUrl: data.content?.video_url || null,
         error: data.error?.message || null
       };
