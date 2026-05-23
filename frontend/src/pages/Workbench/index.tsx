@@ -88,6 +88,7 @@ interface Scene {
   generatedAt?: number;
   rendering?: boolean;
   progress?: number;
+  errorMessage?: string;
   // 商品参考图注入
   referenceImageId?: string | null;
   referenceImageUrl?: string | null;
@@ -195,13 +196,40 @@ const WorkbenchPage: React.FC = () => {
         const p = data.data;
         setProject(p);
         if (p.script) {
-          setScript(p.script);
+          // 修复分镜状态：确保渲染状态被正确初始化
+          const normalizedScenes = p.script.scenes?.map((scene: any) => {
+            // 确保状态字段存在且有效
+            let status = scene.status || 'idle';
+            // 如果视频已存在，确保状态是 completed
+            if (scene.videoUrl) {
+              status = 'completed';
+            } 
+            // 如果图片已存在但视频不存在，状态应为 idle 或 image_completed
+            else if (scene.imageUrl) {
+              status = scene.status === 'completed' ? 'completed' : (scene.status || 'image_completed');
+            }
+            // 确保 rendering 状态被正确重置（后台不会保存渲染中状态）
+            const rendering = false;
+            
+            return {
+              ...scene,
+              status,
+              rendering,
+              errorMessage: scene.errorMessage || null,
+              progress: scene.progress || 0
+            };
+          });
+          
+          setScript({
+            ...p.script,
+            scenes: normalizedScenes
+          });
           setWorkflowStarted(true);
           setWorkflowNodes([
             { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: p.materials?.length > 0 ? 'completed' : 'pending' },
             { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
-            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
-            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
+            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: normalizedScenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
+            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: normalizedScenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
             { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
           ]);
         } else {
@@ -586,12 +614,14 @@ const WorkbenchPage: React.FC = () => {
         message.loading('正在重置渲染状态...', 1);
         setTimeout(() => {
           const newScenes = [...script.scenes];
+          // 保持首帧和配音数据，只重置渲染相关状态
           newScenes[index] = {
             ...newScenes[index],
             rendering: false,
-            status: 'idle',
+            status: newScenes[index].imageUrl ? 'image_completed' : 'idle',
             progress: 0,
-            videoUrl: null
+            videoUrl: null,
+            errorMessage: null
           };
           updateScript({ ...script, scenes: newScenes });
           message.success('✅ 渲染状态已重置，现在可以重新开始渲染');
@@ -816,13 +846,21 @@ const WorkbenchPage: React.FC = () => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
     
+    // 如果正在渲染中，不允许再次点击
+    if (scene.rendering || scene.status === 'generating') {
+      message.warning('该分镜正在渲染中，请稍候...');
+      return;
+    }
+    
     // Atomic state update for starting video generation
     const startScenes = [...script.scenes];
     startScenes[index] = {
       ...startScenes[index],
       status: 'generating',
       rendering: true,
-      progress: 10
+      progress: 10,
+      errorMessage: null,
+      videoUrl: undefined // 重置视频 URL，以便重新渲染
     };
     updateScript({ ...script, scenes: startScenes });
 
@@ -914,7 +952,8 @@ const WorkbenchPage: React.FC = () => {
                 failScenes[index] = {
                   ...failScenes[index],
                   rendering: false,
-                  status: 'error'
+                  status: 'error',
+                  errorMessage: taskData.error || '视频生成失败，请重试'
                 };
                 updateScript({ ...script, scenes: failScenes });
                 message.error(`分镜 ${index + 1} 画面生成失败`);
@@ -955,7 +994,8 @@ const WorkbenchPage: React.FC = () => {
       catchScenes[index] = {
         ...catchScenes[index],
         rendering: false,
-        status: 'error'
+        status: 'error',
+        errorMessage: e instanceof Error ? e.message : '分镜渲染出错，请重试'
       };
       updateScript({ ...script, scenes: catchScenes });
       message.error('分镜渲染出错');
@@ -969,15 +1009,24 @@ const WorkbenchPage: React.FC = () => {
       message.warning('暂无分镜场景数据！');
       return;
     }
+    
+    // 统计需要渲染的分镜数量
+    const scenesToRender = script.scenes.filter((s: any) => !s.rendering && s.status !== 'generating');
+    
+    if (scenesToRender.length === 0) {
+      message.info('所有分镜都正在渲染中或已完成！');
+      return;
+    }
+    
     setIsRenderingAllScenes(true);
     try {
-      // 批量启动所有非 completed / 非渲染中 的分镜渲染任务
+      // 批量启动所有非渲染中的分镜渲染任务（包括已完成和错误的）
       script.scenes.forEach((s: any, idx: number) => {
-        if (s.status !== 'completed' && !s.rendering) {
+        if (!s.rendering && s.status !== 'generating') {
           generateSingleSceneVideo(idx);
         }
       });
-      message.success('已成功一键启动所有未渲染分镜的生成任务！');
+      message.success(`已成功一键启动 ${scenesToRender.length} 个分镜的渲染任务！`);
     } catch (e) {
       console.error(e);
       message.error('一键启动失败，请检查网络');
@@ -2438,8 +2487,10 @@ const WorkbenchPage: React.FC = () => {
                                   <Tag color="processing" icon={<LoadingOutlined />}>正在生成</Tag>
                                 ) : scene.status === 'error' ? (
                                   <Tag color="error" icon={<CloseCircleOutlined />}>渲染失败</Tag>
+                                ) : scene.imageUrl ? (
+                                  <Tag color="blue">首帧就绪</Tag>
                                 ) : (
-                                  <Tag color="default">等待渲染</Tag>
+                                  <Tag color="default">待处理</Tag>
                                 )}
                                 {scene.audioUrl && <Tag color="cyan">配音同步</Tag>}
                                 
@@ -2598,81 +2649,95 @@ const WorkbenchPage: React.FC = () => {
                           )}
 
                           {/* Render Actions */}
-                          {!scene.rendering || scene.status !== 'generating' ? (
-                            <div>
-                              {!scene.videoUrl ? (
+                          {/* 渲染操作区域 */}
+                          <div>
+                            {/* 错误信息显示 */}
+                            {scene.status === 'error' && scene.errorMessage && (
+                              <div style={{
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: 6,
+                                padding: '8px 10px',
+                                marginBottom: 10,
+                                fontSize: 11,
+                                color: '#fca5a5'
+                              }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <CloseCircleOutlined /> 渲染失败
+                                </div>
+                                <div style={{ wordBreak: 'break-word' }}>
+                                  {scene.errorMessage}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 渲染中 */}
+                            {scene.rendering || scene.status === 'generating' ? (
+                              <Space direction="vertical" style={{ width: '100%' }} size={6}>
                                 <Button
-                                  type="primary"
+                                  type="dashed"
+                                  danger
                                   block
-                                  icon={<PlayCircleOutlined />}
-                                  onClick={() => generateSingleSceneVideo(index)}
-                                  disabled={!scene.imageUrl}
+                                  icon={<CloseCircleOutlined />}
+                                  onClick={() => forceRerender(index)}
                                   style={{
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                    border: 'none',
                                     borderRadius: 6,
                                     height: 32
                                   }}
                                 >
-                                  🎥 渲染分镜视频
+                                  ⏹️ 取消渲染任务
                                 </Button>
-                              ) : (
-                                <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                                <Text type="secondary" style={{ fontSize: 10, textAlign: 'center' }}>
+                                  {scene.progress ? `${scene.progress}%` : '渲染中...'}
+                                </Text>
+                              </Space>
+                            ) : (
+                              <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                                {/* 主要渲染按钮 */}
+                                <Button
+                                  type={scene.status === 'error' ? 'primary' : 'primary'}
+                                  block
+                                  icon={scene.status === 'error' ? <SyncOutlined /> : scene.videoUrl ? <SyncOutlined /> : <PlayCircleOutlined />}
+                                  onClick={() => generateSingleSceneVideo(index)}
+                                  style={{
+                                    background: scene.status === 'error' 
+                                      ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                                      : scene.videoUrl 
+                                        ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
+                                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    border: 'none',
+                                    color: '#fff',
+                                    borderRadius: 6,
+                                    height: 36,
+                                    fontSize: 13
+                                  }}
+                                >
+                                  {scene.status === 'error' 
+                                    ? '🔄 重新渲染' 
+                                    : scene.videoUrl 
+                                      ? '🔄 重新渲染分镜' 
+                                      : '🎥 渲染分镜视频'}
+                                </Button>
+                                
+                                {/* 强制重置按钮 - 只有在错误或卡住时显示 */}
+                                {scene.status === 'error' || (scene.progress && scene.progress > 0 && !scene.videoUrl) ? (
                                   <Button
-                                    type="default"
+                                    type="dashed"
+                                    danger
                                     block
-                                    onClick={() => generateSingleSceneVideo(index)}
+                                    icon={<ThunderboltOutlined />}
+                                    onClick={() => forceRerender(index)}
                                     style={{
-                                      background: 'transparent',
-                                      border: '1px dashed #3f3f46',
-                                      color: '#a1a1aa',
                                       borderRadius: 6,
-                                      height: 32
+                                      height: 28
                                     }}
                                   >
-                                    🔄 重新渲染分镜
+                                    ⚡ 强制重置状态
                                   </Button>
-                                  
-                                  {/* 强制重新渲染按钮 - 针对渲染失败或卡住的情况 */}
-                                  {scene.status === 'error' || (scene.progress && scene.progress > 0 && !scene.videoUrl) ? (
-                                    <Button
-                                      type="dashed"
-                                      danger
-                                      block
-                                      icon={<ThunderboltOutlined />}
-                                      onClick={() => forceRerender(index)}
-                                      style={{
-                                        borderRadius: 6,
-                                        height: 28
-                                      }}
-                                    >
-                                      ⚡ 强制重置并重新渲染（如渲染卡住）
-                                    </Button>
-                                  ) : null}
-                                </Space>
-                              )}
-                            </div>
-                          ) : (
-                            /* 渲染进行中 - 显示取消按钮 */
-                            <Space direction="vertical" style={{ width: '100%' }} size={6}>
-                              <Button
-                                type="dashed"
-                                danger
-                                block
-                                icon={<CloseCircleOutlined />}
-                                onClick={() => forceRerender(index)}
-                                style={{
-                                  borderRadius: 6,
-                                  height: 32
-                                }}
-                              >
-                                ⏹️ 取消渲染任务
-                              </Button>
-                              <Text type="secondary" style={{ fontSize: 10, textAlign: 'center' }}>
-                                {scene.progress ? `${scene.progress}%` : '渲染中...'}
-                              </Text>
-                            </Space>
-                          )}
+                                ) : null}
+                              </Space>
+                            )}
+                          </div>
                         </Card>
                       </Col>
                     ))}

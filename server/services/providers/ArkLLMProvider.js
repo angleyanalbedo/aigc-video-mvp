@@ -2,10 +2,11 @@ const BaseLLMProvider = require('./BaseLLMProvider');
 const { createOpenAI } = require('@ai-sdk/openai');
 
 class ArkLLMProvider extends BaseLLMProvider {
-  constructor({ apiKey, llmEp }) {
+  constructor({ apiKey, llmEp, imageEp }) {
     super();
     this.apiKey = apiKey;
     this.llmEp = llmEp;
+    this.imageEp = imageEp;
     
     this.ark = createOpenAI({
       name: 'volcengine',
@@ -66,6 +67,10 @@ class ArkLLMProvider extends BaseLLMProvider {
 
   async generateImage({ prompt, width = 1024, height = 1024 }) {
     try {
+      if (!this.imageEp) {
+        throw new Error('Image generation endpoint not configured. Please set IMAGE_EP in .env file.');
+      }
+      
       const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
         method: 'POST',
         headers: {
@@ -73,7 +78,7 @@ class ArkLLMProvider extends BaseLLMProvider {
           'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
-          model: this.llmEp,
+          model: this.imageEp,
           prompt,
           width,
           height
