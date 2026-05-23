@@ -272,7 +272,7 @@ class VideoComposer {
       
       // 5. 移动到输出目录
       const finalOutputPath = path.join(this.options.outputDir, `composed_${this.taskId}.mp4`);
-      fs.copyFileSync(composedVideo, finalOutputPath);
+      await fs.copyFile(composedVideo, finalOutputPath);
       
       // 6. 保存结果信息
       const result = {

@@ -10,6 +10,8 @@ class ArkVideoProvider extends BaseVideoProvider {
 
   async createTask({ prompt, resolution = '720p', ratio = '9:16', duration = 5 }) {
     try {
+      // NOTE: Volcengine doubao-seedance-1.5-pro video generation engine strictly only supports 
+      // 4-second duration outputs. To avoid API rejection, we force --dur to be 4.
       const response = await fetch(`${this.baseUrl}/contents/generations/tasks`, {
         method: 'POST',
         headers: {
@@ -20,7 +22,7 @@ class ArkVideoProvider extends BaseVideoProvider {
           model: this.videoEp,
           content: [{
             type: 'text',
-            text: `${prompt} --rs ${resolution} --rt ${ratio} --dur ${duration} --fps 24 --wm false`
+            text: `${prompt} --rs ${resolution} --rt ${ratio} --dur 4 --fps 24 --wm false`
           }],
           return_last_frame: false
         })
