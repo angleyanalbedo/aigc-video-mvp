@@ -15,7 +15,7 @@ const fs = require('fs');
 console.log('[DEBUG] 3. express modules loaded');
 
 // 引入 Agent 架构（新版）
-const { scriptAgent, videoAgent, clipAgent, orchestrator } = require('./agents');
+const { scriptAgent, videoAgent, clipAgent, orchestrator, imageAgent } = require('./agents');
 console.log('[DEBUG] 4. agents loaded');
 
 // 引入视频合成和 TTS 服务
@@ -168,28 +168,55 @@ app.post('/api/script/generate', async (req, res) => {
   }
 });
 
-// 3. 创建视频生成任务（调用 Seedance Video API）
+// 3.1. 创建图片生成任务（调用 ImageAgent）
+app.post('/api/image/generate', async (req, res) => {
+  const { prompt, referenceImageUrl, sceneIndex } = req.body;
+  try {
+    const result = await imageAgent.generateImage(prompt, referenceImageUrl);
+    res.json({
+      success: true,
+      imageUrl: result.imageUrl,
+      sceneIndex
+    });
+  } catch (error) {
+    console.error('图片生成失败:', error);
+    res.status(500).json({ success: false, error: '图片生成失败: ' + error.message });
+  }
+});
+
+// 3. 创建视频生成任务（调用 Seedance Video API，支持首帧图片 Image-to-Video 模式）
 app.post('/api/video/generate', async (req, res) => {
-  const { script, materials, options } = req.body;
+  const { script, materials, options, prompt: directPrompt, imageUrl: directImageUrl, duration: directDuration } = req.body;
 
   // 支持的分辨率和画幅
   const resolution = options?.resolution || '720p';  // 480p, 720p
   const ratio = options?.ratio || '9:16';            // 16:9, 9:16, 1:1, 4:3
-  const duration = options?.duration || 5;           // 2-12秒
+  const duration = directDuration || options?.duration || 5;           // 2-12秒
 
   try {
-    // 使用第一个分镜的描述生成视频
-    const firstScene = script.scenes[0];
-    const prompt = firstScene.description;
+    let prompt = directPrompt;
+    let imageUrl = directImageUrl;
 
-    // 如果有图片素材，添加首帧图片
-    let imageUrl = null;
-    if (materials && materials.length > 0) {
-      imageUrl = materials.find(m => !m.endsWith('.mp4') && !m.endsWith('.mov'));
+    if (!prompt && script && script.scenes && script.scenes.length > 0) {
+      const firstScene = script.scenes[0];
+      prompt = firstScene.description;
+      imageUrl = firstScene.imageUrl || firstScene.referenceImageUrl;
+    }
+
+    if (!prompt) {
+      return res.status(400).json({ success: false, error: '缺少视频生成提示词 prompt' });
+    }
+
+    // 如果没有传递直接图片，但有 materials 数组，从 materials 提取
+    if (!imageUrl && materials && materials.length > 0) {
+      imageUrl = materials.find(m => typeof m === 'string' && !m.endsWith('.mp4') && !m.endsWith('.mov'));
     }
 
     console.log('🎥 正在通过 VideoProvider 创建视频生成任务...');
     console.log('提示词:', prompt);
+    if (imageUrl) {
+      console.log('首帧图片:', imageUrl);
+    }
 
     const task = await videoProvider.createTask({
       prompt,
@@ -209,7 +236,7 @@ app.post('/api/video/generate', async (req, res) => {
     });
   } catch (error) {
     console.error('视频生成失败:', error);
-    res.status(500).json({ error: '视频生成失败: ' + error.message });
+    res.status(500).json({ success: false, error: '视频生成失败: ' + error.message });
   }
 });
 
