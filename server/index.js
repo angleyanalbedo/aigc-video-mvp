@@ -228,19 +228,22 @@ app.post('/api/video/generate', async (req, res) => {
       imageUrl = materials.find(m => typeof m === 'string' && !m.endsWith('.mp4') && !m.endsWith('.mov'));
     }
 
-    console.log('🎥 正在通过 VideoProvider 创建视频生成任务...');
+    console.log('🎥 正在通过 VideoProvider 创建远程视频生成任务 (带自动重试)...');
     console.log('提示词:', prompt);
     if (imageUrl) {
       console.log('首帧图片:', imageUrl);
     }
 
-    const task = await videoProvider.createTask({
-      prompt,
-      resolution,
-      ratio,
-      duration,
-      imageUrl
-    });
+    // 使用 withRetry 自动重试以应对远端大模型服务过载或网络抖动
+    const task = await withRetry(async () => {
+      return await videoProvider.createTask({
+        prompt,
+        resolution,
+        ratio,
+        duration,
+        imageUrl
+      });
+    }, videoRetryOptions);
 
     taskStore.set(task.id, {
       status: task.status,

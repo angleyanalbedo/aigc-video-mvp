@@ -1,4 +1,45 @@
 const BaseVideoProvider = require('./BaseVideoProvider');
+const fs = require('fs');
+const path = require('path');
+
+async function uploadLocalImageToPublic(imageUrl) {
+  if (!imageUrl) return null;
+  
+  try {
+    const urlPath = new URL(imageUrl).pathname;
+    const filename = path.basename(urlPath);
+    const uploadsDir = path.join(__dirname, '../../uploads');
+    const localPath = path.join(uploadsDir, filename);
+    
+    if (!fs.existsSync(localPath)) {
+      console.warn(`⚠️ [ArkVideoProvider] 本地文件不存在: ${localPath}`);
+      return null;
+    }
+    
+    const fileBuffer = fs.readFileSync(localPath);
+    const fileBlob = new Blob([fileBuffer], { type: 'image/png' });
+    
+    const formData = new FormData();
+    formData.append('file', fileBlob, 'image.png');
+    
+    console.log(`📤 [ArkVideoProvider] 正在将本地分镜图上传至公共临时图床以供 Seedance API 读取: ${localPath}`);
+    const response = await fetch('https://tmpfiles.org/api/v1/upload', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const resData = await response.json();
+    if (resData.status === 'success' && resData.data?.url) {
+      const publicUrl = resData.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+      console.log(`✅ [ArkVideoProvider] 临时图床直链生成成功: ${publicUrl}`);
+      return publicUrl;
+    }
+    throw new Error('上传接口返回失败状态: ' + JSON.stringify(resData));
+  } catch (err) {
+    console.error('⚠️ [ArkVideoProvider] 上传临时图床失败，降级使用文本模式:', err.message);
+    return null;
+  }
+}
 
 class ArkVideoProvider extends BaseVideoProvider {
   constructor({ apiKey, videoEp }) {
@@ -13,15 +54,19 @@ class ArkVideoProvider extends BaseVideoProvider {
       // NOTE: Volcengine doubao-seedance-1.5-pro video generation engine strictly only supports 
       // 4-second duration outputs. To avoid API rejection, we force --dur to be 4.
       const content = [];
-      if (imageUrl && !imageUrl.includes('localhost') && !imageUrl.includes('127.0.0.1')) {
+      
+      let finalImageUrl = imageUrl;
+      if (imageUrl && (imageUrl.includes('localhost') || imageUrl.includes('127.0.0.1'))) {
+        finalImageUrl = await uploadLocalImageToPublic(imageUrl);
+      }
+
+      if (finalImageUrl) {
         content.push({
           type: 'image',
           image_url: {
-            url: imageUrl
+            url: finalImageUrl
           }
         });
-      } else if (imageUrl) {
-        console.warn(`⚠️ ArkVideoProvider: 检测到本地或 localhost 格式的 imageUrl: "${imageUrl}"。为防止火山引擎 API 因无法解析本地局域网地址而报错，已自动忽略首帧图参数，降级为纯文本生成视频。`);
       }
       content.push({
         type: 'text',
