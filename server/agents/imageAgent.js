@@ -25,52 +25,33 @@ class ImageAgent {
       console.log(`🔗 ImageAgent: 已挂载商品参考图: ${referenceImageUrl}`);
     }
 
-    const apiKey = process.env.ARK_API_KEY;
-    const llmEp = process.env.LLM_EP;
+    const { llmProvider } = require('../services/providers');
     let resultUrl = null;
 
-    // 1. 尝试调用真实火山方舟 CV 生图大模型接口
-    if (apiKey && llmEp) {
-      try {
-        console.log(`📡 ImageAgent: 正在调用火山方舟 CV 接口, Model (LLM_EP): ${llmEp}...`);
-        
-        // 智能拼接融合电商产品 Prompts
-        const enhancedPrompt = referenceImageUrl
-          ? `High-end commercial product photography, extremely detailed, reference style: ${referenceImageUrl}, scene context: ${prompt}`
-          : `High-end commercial product rendering, photorealistic, premium e-commerce style, scene context: ${prompt}`;
+    // 1. 尝试调用 llmProvider.generateImage 抽象接口进行真实生图
+    try {
+      console.log(`📡 ImageAgent: 正在调用 llmProvider.generateImage 抽象接口...`);
+      
+      // 智能拼接融合电商产品 Prompts
+      const enhancedPrompt = referenceImageUrl
+        ? `High-end commercial product photography, extremely detailed, reference style: ${referenceImageUrl}, scene context: ${prompt}`
+        : `High-end commercial product rendering, photorealistic, premium e-commerce style, scene context: ${prompt}`;
 
-        const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/cv/generations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: llmEp,
-            prompt: enhancedPrompt,
-            width: 1024,
-            height: 1024
-          })
-        });
-
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error.message || 'CV API Error');
-        }
-
-        if (data.data && data.data[0] && data.data[0].url) {
-          resultUrl = data.data[0].url;
-          console.log(`✅ ImageAgent: 真实多模态大模型生图成功! -> ${resultUrl}`);
-        }
-      } catch (err) {
-        console.warn(`⚠️ ImageAgent: 真实大模型调用失败，降级为 Mock 模式. 错误信息: ${err.message}`);
-      }
+      const url = await llmProvider.generateImage({
+        prompt: enhancedPrompt,
+        width: 1024,
+        height: 1024
+      });
+      
+      resultUrl = url;
+      console.log(`✅ ImageAgent: 真实多模态大模型生图成功! -> ${resultUrl}`);
+    } catch (err) {
+      console.warn(`⚠️ ImageAgent: 真实大模型调用失败，降级为 Mock 模式. 错误信息: ${err.message}`);
     }
 
-    // 2. 容灾降级：高品质精美电商 Unsplash 素材库
+    // 2. 容灾降级：使用预置高清电商图库 Mock 生图
     if (!resultUrl) {
-      console.log('💡 ImageAgent: 使用预置高品质产品关键帧 Mock 资源库...');
-      
+      console.log('💡 ImageAgent: 正在通过 MockLLMProvider 回退高品质产品关键帧...');
       const mockImages = [
         'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80', // 精致腕表
         'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80', // 爆款跑鞋
@@ -81,7 +62,6 @@ class ImageAgent {
       ];
 
       resultUrl = mockImages[Math.floor(Math.random() * mockImages.length)];
-      
       if (prompt.toLowerCase().includes('watch') || prompt.includes('表')) {
         resultUrl = mockImages[0];
       } else if (prompt.toLowerCase().includes('shoe') || prompt.includes('鞋')) {
@@ -93,9 +73,6 @@ class ImageAgent {
       } else if (referenceImageUrl) {
         resultUrl = Math.random() < 0.7 ? referenceImageUrl : resultUrl;
       }
-      
-      // 模拟 1.5 秒耗时以贴合真实计算感
-      await new Promise(resolve => setTimeout(resolve, 1500));
       console.log(`✅ ImageAgent: 关键帧 Mock 生图成功! -> ${resultUrl}`);
     }
 

@@ -6,7 +6,7 @@ import {
   PlayCircleOutlined,
   ArrowLeftOutlined,
   VideoCameraOutlined,
-  CustomerServiceOutlined,
+  PlusOutlined,
   LoadingOutlined,
   PictureOutlined,
   AudioOutlined,
@@ -101,9 +101,11 @@ const WorkbenchPage: React.FC = () => {
   // Unified State
   const [project, setProject] = useState<any>(null);
   const [script, setScript] = useState<any>(null);
+  const [productInfo, setProductInfo] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   
   const [searchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'script';
+  const activeTab = searchParams.get('tab') || 'materials';
   
   // Chat Co-pilot State
   const [chatHistory, setChatHistory] = useState<Message[]>([]);
@@ -132,11 +134,11 @@ const WorkbenchPage: React.FC = () => {
 
   // Agent Workflow 节点状态（供 Header 步骤条消费）
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
-    { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
-    { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending' },
-    { id: 'image',  name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
-    { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
-    { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
+    { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: 'pending' },
+    { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
+    { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
+    { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
+    { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
   ]);
   const [workflowStarted, setWorkflowStarted] = useState(false);
 
@@ -163,12 +165,24 @@ const WorkbenchPage: React.FC = () => {
           setScript(p.script);
           setWorkflowStarted(true);
           setWorkflowNodes([
-            { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
-            { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'completed' },
-            { id: 'image',  name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
-            { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
-            { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
+            { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: p.materials?.length > 0 ? 'completed' : 'pending' },
+            { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
+            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
+            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
+            { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
           ]);
+        } else {
+          setWorkflowStarted(true);
+          setWorkflowNodes([
+            { id: 'materials', name: '素材分析', agent: 'AssetAgent', layer: '决策层', status: p.materials?.length > 0 ? 'completed' : 'pending' },
+            { id: 'script',    name: '剧本策划', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
+            { id: 'storyboard',name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
+            { id: 'video',     name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
+            { id: 'clip',      name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
+          ]);
+        }
+        if (p.product_info) {
+          setProductInfo(p.product_info);
         }
         if (p.settings) setSettings({ ...settings, ...p.settings });
         // 初始化资产面板数据
@@ -842,7 +856,11 @@ const WorkbenchPage: React.FC = () => {
           }}>
             {workflowNodes.map((node, idx) => {
               const tabMap: Record<string, string> = {
-                script: 'script', review: 'script', image: 'storyboard', video: 'storyboard', clip: 'render'
+                materials: 'materials',
+                script: 'script',
+                storyboard: 'storyboard',
+                video: 'video',
+                clip: 'render'
               };
               const statusColor: Record<string, string> = {
                 pending: '#3f3f46',
@@ -902,6 +920,319 @@ const WorkbenchPage: React.FC = () => {
       {/* Main Dual-Column Content Panels */}
       <Content style={{ padding: 24, flex: 1, overflow: 'hidden' }}>
         
+        {/* ============================================================== */}
+        {/* TAB 0: MATERIAL ANALYSIS PANEL */}
+        {/* ============================================================== */}
+        {activeTab === 'materials' && (
+          <Row gutter={24} style={{ height: '100%' }}>
+            {/* Left: Materials List & Upload */}
+            <Col span={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Card
+                title={<span style={{ color: '#fff' }}><PictureOutlined /> 商品参考素材库</span>}
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 20 }}
+              >
+                <div style={{ flexShrink: 0, marginBottom: 16 }}>
+                  <Paragraph style={{ color: '#a1a1aa', fontSize: 13, margin: 0 }}>
+                    请在此处上传该商品的图片素材（如：商品图、使用场景图、卖点说明图）。这些素材将作为大模型自动生成分镜、参考图的底蕴基础。
+                  </Paragraph>
+                </div>
+                
+                {/* Drag-Drop and Uploader Grid */}
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: 20 }}>
+                  <Row gutter={[12, 12]}>
+                    <Col span={8}>
+                      <div
+                        onClick={() => {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = 'image/*';
+                          input.onchange = async (e: any) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              message.loading(`正在上传 "${file.name}"...`, 0);
+                              try {
+                                const res = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
+                                  method: 'POST',
+                                  body: formData
+                                });
+                                const uploadData = await res.json();
+                                message.destroy();
+                                if (uploadData.success && uploadData.data) {
+                                  message.success('素材上传成功！');
+                                  setProjectMaterials((prev: any[]) => [uploadData.data, ...prev]);
+                                  setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                                } else {
+                                  throw new Error(uploadData.error || '上传失败');
+                                }
+                              } catch (err: any) {
+                                message.error('上传失败: ' + err.message);
+                              }
+                            }
+                          };
+                          input.click();
+                        }}
+                        style={{
+                          height: 100,
+                          background: 'rgba(99,102,241,0.08)',
+                          border: '1.5px dashed #4f46e5',
+                          borderRadius: 8,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <PlusOutlined style={{ fontSize: 20, color: '#818cf8', marginBottom: 6 }} />
+                        <span style={{ fontSize: 11, color: '#818cf8' }}>上传新素材</span>
+                      </div>
+                    </Col>
+                    {projectMaterials.map((m: any) => (
+                      <Col span={8} key={m.id}>
+                        <div style={{
+                          height: 100,
+                          borderRadius: 8,
+                          overflow: 'hidden',
+                          border: '1px solid #27272a',
+                          position: 'relative'
+                        }}>
+                          <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            background: 'rgba(0,0,0,0.6)',
+                            padding: '2px 6px',
+                            fontSize: 10,
+                            color: '#a1a1aa',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }} title={m.filename}>
+                            {m.filename}
+                          </div>
+                        </div>
+                      </Col>
+                    ))}
+                  </Row>
+                  {projectMaterials.length === 0 && (
+                    <div style={{ textAlign: 'center', color: '#52525b', padding: '60px 0' }}>
+                      <PictureOutlined style={{ fontSize: 36, display: 'block', margin: '0 auto 12px' }} />
+                      暂无关联素材，您可以点击上方按钮开始上传商品图
+                    </div>
+                  )}
+                </div>
+              </Card>
+            </Col>
+
+            {/* Right: AI Asset Analysis Panel */}
+            <Col span={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <Card
+                title={<span style={{ color: '#fff' }}><RocketOutlined /> AI 核心卖点提炼与分析</span>}
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 20 }}
+              >
+                {!productInfo && !isAnalyzing ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 40px' }}>
+                    <div style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: '50%',
+                      background: 'rgba(99,102,241,0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 24,
+                      border: '1px solid rgba(99,102,241,0.2)'
+                    }}>
+                      <RocketOutlined style={{ fontSize: 36, color: '#818cf8' }} />
+                    </div>
+                    <Title level={4} style={{ color: '#fff', marginBottom: 12 }}>唤醒 AI 导演深度提炼商品核心数据</Title>
+                    <Paragraph style={{ color: '#a1a1aa', fontSize: 13.5, lineHeight: 1.6, marginBottom: 24 }}>
+                      您上传的产品素材是大模型策划脑暴的燃料。通过 AI 素材提取 Agent，系统将智能解析产品特点、自动提炼 3 个绝对吸睛的带货痛点，并锁受众群体与视频主调。
+                    </Paragraph>
+                    <Space size="middle">
+                      <Button
+                        type="primary"
+                        icon={<RocketOutlined />}
+                        size="large"
+                        loading={isAnalyzing}
+                        onClick={async () => {
+                          setIsAnalyzing(true);
+                          try {
+                            const res = await fetch(`${API_BASE}/api/agent/analyze-materials`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ projectId })
+                            });
+                            const data = await res.json();
+                            if (data.success && data.productInfo) {
+                              setProductInfo(data.productInfo);
+                              setProject((prev: any) => ({ ...prev, product_info: data.productInfo }));
+                              setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                              message.success('🚀 AI 素材特征提炼成功！');
+                            } else {
+                              throw new Error(data.error || '分析失败');
+                            }
+                          } catch (err: any) {
+                            message.error('智能提炼异常: ' + err.message);
+                          } finally {
+                            setIsAnalyzing(false);
+                          }
+                        }}
+                        style={{
+                          height: 48,
+                          padding: '0 32px',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                          border: 'none',
+                          borderRadius: 8,
+                          fontWeight: 600,
+                          fontSize: 14,
+                          boxShadow: '0 8px 20px -6px rgba(99, 102, 241, 0.4)'
+                        }}
+                      >
+                        💡 AI 智能分析商品素材
+                      </Button>
+                      <Button
+                        type="default"
+                        size="large"
+                        onClick={() => {
+                          const shell = {
+                            title: project?.name || '爆款商品',
+                            sellingPoints: '极致匠心做工，多功能集成，操作简便。',
+                            targetAudience: '追求高品质生活方式的年轻消费群体。',
+                            style: '时尚极简，温馨治愈。',
+                            price: '面议/性价比优选'
+                          };
+                          setProductInfo(shell);
+                          setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                          message.info('已跳过素材提取，已生成默认产品策划模版。');
+                        }}
+                        style={{ height: 48, borderRadius: 8, background: '#27272a', color: '#fff', border: '1px solid #3f3f46' }}
+                      >
+                        直接配置剧本 ➔
+                      </Button>
+                    </Space>
+                  </div>
+                ) : isAnalyzing ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <LoadingOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 20 }} />
+                    <Title level={5} style={{ color: '#fff', marginBottom: 8 }}>AI 素材特征提取 Agent 正在读取解析中...</Title>
+                    <Text type="secondary" style={{ fontSize: 12 }}>FFmpeg 与 Vision LLM 正在提取图片卖点、分析流行痛点，请稍候片刻...</Text>
+                  </div>
+                ) : (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16, paddingRight: 4 }}>
+                      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                        <div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🛒 商品带货名称 / 策划标题</Text></div>
+                          <Input
+                            value={productInfo.title}
+                            onChange={(e) => setProductInfo({ ...productInfo, title: e.target.value })}
+                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                          />
+                        </div>
+                        <div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>💎 商品核心卖点与亮点摘要 (80字内)</Text></div>
+                          <TextArea
+                            value={productInfo.sellingPoints}
+                            onChange={(e) => setProductInfo({ ...productInfo, sellingPoints: e.target.value })}
+                            rows={3}
+                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6 }}
+                          />
+                        </div>
+                        <Row gutter={16}>
+                          <Col span={12}>
+                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>👥 精准目标受众群体</Text></div>
+                            <Input
+                              value={productInfo.targetAudience}
+                              onChange={(e) => setProductInfo({ ...productInfo, targetAudience: e.target.value })}
+                              style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                            />
+                          </Col>
+                          <Col span={12}>
+                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🏷️ 售价参考区间</Text></div>
+                            <Input
+                              value={productInfo.price}
+                              onChange={(e) => setProductInfo({ ...productInfo, price: e.target.value })}
+                              style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                            />
+                          </Col>
+                        </Row>
+                        <div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🎨 建议短视频整体创意调性</Text></div>
+                          <Input
+                            value={productInfo.style}
+                            onChange={(e) => setProductInfo({ ...productInfo, style: e.target.value })}
+                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                          />
+                        </div>
+                      </Space>
+                    </div>
+
+                    <div style={{ flexShrink: 0, borderTop: '1px solid #27272a', paddingTop: 16, display: 'flex', justifyContent: 'space-between' }}>
+                      <Button
+                        type="dashed"
+                        onClick={() => {
+                          setProductInfo(null);
+                        }}
+                        style={{ background: 'transparent', color: '#a1a1aa', border: '1px dashed #3f3f46' }}
+                      >
+                        重新分析素材
+                      </Button>
+                      <Button
+                        type="primary"
+                        icon={<RocketOutlined />}
+                        onClick={async () => {
+                          message.loading('正在同步商品特征至数据库...', 0);
+                          try {
+                            const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                productInfo
+                              })
+                            });
+                            const data = await res.json();
+                            message.destroy();
+                            if (data.success) {
+                              setProject((prev: any) => ({ ...prev, product_info: productInfo }));
+                              setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                              message.success('✅ 商品分析特征已保存！');
+                              navigate(`/workbench/${projectId}?tab=script`);
+                            } else {
+                              throw new Error(data.error || '保存特征失败');
+                            }
+                          } catch (err: any) {
+                            message.error('同步失败: ' + err.message);
+                          }
+                        }}
+                        style={{
+                          height: 40,
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          border: 'none',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          padding: '0 24px'
+                        }}
+                      >
+                        🚀 保存分析，开始剧本策划
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </Col>
+          </Row>
+        )}
+
         {/* ============================================================== */}
         {/* TAB 1: SCRIPT COORDINATION PANEL */}
         {/* ============================================================== */}
@@ -1043,22 +1374,66 @@ const WorkbenchPage: React.FC = () => {
               />
               
               <Card
-                title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜精细指令</span>}
+                title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜编辑 Co-pilot</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, flex: 1, overflowY: 'auto' }}
-                bodyStyle={{ padding: 12 }}
+                style={{ background: '#18181b', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 12 }}
               >
-                <Paragraph style={{ color: '#a1a1aa', fontSize: 12 }}>
-                  如果您需要批量微调画面，可在当前面板与大模型协作：“*把所有镜头升级为高大上的暖光影色调*”。
-                </Paragraph>
-                <TextArea
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="输入微调分镜指令..."
-                  rows={3}
-                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', marginBottom: 10 }}
-                />
-                <Button type="primary" block onClick={handleSendChatMessage}>发送分镜指令</Button>
+                {/* Chat Message Lists for Storyboard */}
+                <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10, paddingRight: 4 }}>
+                  <div style={{ fontSize: 11, color: '#818cf8', marginBottom: 12, padding: '6px 10px', background: 'rgba(99,102,241,0.08)', borderRadius: 6 }}>
+                    💬 <b>分镜导演 Agent</b>：我可以帮您批量重写分镜描述、修改转场、微调台词旁白或调整时长。可以直接和我说：“把所有镜头的色彩改为冷色调”
+                  </div>
+                  {chatHistory.slice(1).map((msg, index) => (
+                    <div key={index} style={{
+                      display: 'flex',
+                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      marginBottom: 10
+                    }}>
+                      <div style={{
+                        maxWidth: '90%',
+                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#27272a',
+                        color: '#fff',
+                        padding: '6px 10px',
+                        borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
+                        fontSize: 12,
+                        lineHeight: 1.4
+                      }}>
+                        <Paragraph style={{ color: '#fff', margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{msg.content}</Paragraph>
+                      </div>
+                    </div>
+                  ))}
+                  {isChatting && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
+                      <div style={{ background: '#27272a', padding: '6px 10px', borderRadius: '10px 10px 10px 2px', fontSize: 12 }}>
+                        <span style={{ color: '#818cf8' }}><LoadingOutlined /> 导演正在修改分镜配置...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #27272a', paddingTop: 8, flexShrink: 0 }}>
+                  <TextArea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendChatMessage();
+                      }
+                    }}
+                    placeholder="输入修改指令..."
+                    autoSize={{ minRows: 2, maxRows: 2 }}
+                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 12 }}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    disabled={isChatting || !chatInput.trim()}
+                    onClick={handleSendChatMessage}
+                    style={{ height: 'auto', background: '#4f46e5', border: 'none' }}
+                  />
+                </div>
               </Card>
             </Col>
 
@@ -1067,7 +1442,7 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景生图与生视频）</span>
+                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 🎬 分镜视觉首帧编辑面板 (支持 AI 生图及手动上传图片)</span>
                     <Space size="middle">
                       {injectingMaterial && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1075,15 +1450,6 @@ const WorkbenchPage: React.FC = () => {
                           <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: '#a1a1aa' }}>同时生成配音:</span>
-                        <Switch
-                          checked={settings.enableTTS}
-                          onChange={(val) => updateSettings({ ...settings, enableTTS: val })}
-                          checkedChildren="开启"
-                          unCheckedChildren="关闭"
-                        />
-                      </div>
                       <Button
                         type="default"
                         icon={<PictureOutlined />}
@@ -1092,16 +1458,6 @@ const WorkbenchPage: React.FC = () => {
                         style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6 }}
                       >
                         一键生成所有图片
-                      </Button>
-                      <Button
-                        type="primary"
-                        icon={<RocketOutlined />}
-                        loading={isRenderingAllScenes}
-                        onClick={handleRenderAllScenes}
-                        disabled={!script || !script.scenes || script.scenes.length === 0}
-                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: 6 }}
-                      >
-                        一键生视频 (配音同步)
                       </Button>
                     </Space>
                   </div>
@@ -1133,16 +1489,13 @@ const WorkbenchPage: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Space>
                                 <span style={{ color: '#fff', fontWeight: 600 }}>分镜 {index + 1}</span>
-                                {scene.videoUrl ? (
-                                  <Tag color="success">视频就绪</Tag>
-                                ) : scene.imageUrl ? (
-                                  <Tag color="blue">首帧就绪</Tag>
+                                {scene.imageUrl ? (
+                                  <Tag color="blue">首帧已就绪</Tag>
                                 ) : (
-                                  <Tag color="default">待生图</Tag>
+                                  <Tag color="default">待生图/待上传</Tag>
                                 )}
-                                {scene.audioUrl && <Tag color="cyan">配音就绪</Tag>}
                                 {(scene.rendering || scene.status === 'generating') && (
-                                  <Tag color="processing" icon={<LoadingOutlined />}>生成中</Tag>
+                                  <Tag color="processing" icon={<LoadingOutlined />}>生图中</Tag>
                                 )}
                                 {scene.status === 'error' && <Tag color="error">失败</Tag>}
                               </Space>
@@ -1182,96 +1535,149 @@ const WorkbenchPage: React.FC = () => {
                                   </div>
                                 )}
 
-                                {scene.videoUrl ? (
-                                  <video src={scene.videoUrl} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                ) : (scene.rendering || scene.status === 'generating') ? (
+                                {(scene.rendering || scene.status === 'generating') ? (
                                   <div style={{ textAlign: 'center', padding: 8 }}>
-                                    <LoadingOutlined style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
-                                    <div style={{ fontSize: 11, color: '#888' }}>生成中... ({scene.progress || 10}%)</div>
+                                    <LoadingOutlined style={{ fontSize: 24, color: '#6366f1', marginBottom: 8 }} />
+                                    <div style={{ fontSize: 11, color: '#888' }}>正在生图...</div>
                                   </div>
                                 ) : scene.imageUrl ? (
                                   <img src={scene.imageUrl} alt="首帧图片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (
                                   <div style={{ textAlign: 'center', color: '#52525b', padding: 8 }}>
                                     <PictureOutlined style={{ fontSize: 24, marginBottom: 8 }} />
-                                    <div style={{ fontSize: 10 }}>暂无生成画面</div>
+                                    <div style={{ fontSize: 10 }}>暂无首帧画面</div>
                                   </div>
                                 )}
                               </div>
 
                               {/* CONDITIONAL PREVIEW ACTIONS BASED ON WORKFLOW STATE */}
-                              {!scene.videoUrl && !scene.rendering && (
+                              {!scene.rendering && (
                                 <div style={{ marginTop: 8 }}>
                                   {!scene.imageUrl ? (
-                                    <Button
-                                      type="primary"
-                                      size="small"
-                                      icon={<PictureOutlined />}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        generateSingleSceneImage(index);
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                                        border: 'none',
-                                        borderRadius: 4,
-                                        fontSize: 12
-                                      }}
-                                    >
-                                      🎨 AI生图
-                                    </Button>
-                                  ) : (
                                     <>
                                       <Button
                                         type="primary"
                                         size="small"
-                                        icon={<PlayCircleOutlined />}
+                                        icon={<PictureOutlined />}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          generateSingleSceneVideo(index);
+                                          generateSingleSceneImage(index);
                                         }}
                                         style={{
                                           width: '100%',
-                                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                                           border: 'none',
                                           borderRadius: 4,
                                           fontSize: 12
                                         }}
                                       >
-                                        🎥 AI生视频
+                                        🎨 AI生图
                                       </Button>
-                                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+                                      <div style={{ marginTop: 6 }}>
                                         <Button
-                                          type="link"
                                           size="small"
+                                          icon={<PlusOutlined />}
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            generateSingleSceneImage(index);
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.accept = 'image/*';
+                                            input.onchange = async (e: any) => {
+                                              const file = e.target.files?.[0];
+                                              if (file) {
+                                                const formData = new FormData();
+                                                formData.append('file', file);
+                                                message.loading(`正在上传 "${file.name}"...`, 0);
+                                                try {
+                                                  const res = await fetch(`${API_BASE}/api/upload`, {
+                                                    method: 'POST',
+                                                    body: formData
+                                                  });
+                                                  const uploadData = await res.json();
+                                                  message.destroy();
+                                                  if (uploadData.success && uploadData.url) {
+                                                    message.success('分镜首帧上传成功！');
+                                                    updateSceneField(index, 'imageUrl', uploadData.url);
+                                                    updateSceneField(index, 'status', 'image_completed');
+                                                    // Sync completed status to steps
+                                                    setWorkflowNodes(prev => prev.map(n => n.id === 'storyboard' ? { ...n, status: 'completed' } : n));
+                                                  } else {
+                                                    throw new Error(uploadData.error || '上传失败');
+                                                  }
+                                                } catch (err: any) {
+                                                  message.error('上传失败: ' + err.message);
+                                                }
+                                              }
+                                            };
+                                            input.click();
                                           }}
-                                          style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
+                                          style={{
+                                            width: '100%',
+                                            background: '#27272a',
+                                            border: '1px solid #3f3f46',
+                                            color: '#fff',
+                                            borderRadius: 4,
+                                            fontSize: 12
+                                          }}
                                         >
-                                          🎨 重新生图
+                                          📤 上传图片
                                         </Button>
                                       </div>
                                     </>
+                                  ) : (
+                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 8 }}>
+                                      <Button
+                                        type="link"
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          generateSingleSceneImage(index);
+                                        }}
+                                        style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
+                                      >
+                                        🎨 重新生图
+                                      </Button>
+                                      <Button
+                                        type="link"
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const input = document.createElement('input');
+                                          input.type = 'file';
+                                          input.accept = 'image/*';
+                                          input.onchange = async (e: any) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              const formData = new FormData();
+                                              formData.append('file', file);
+                                              message.loading(`正在上传 "${file.name}"...`, 0);
+                                              try {
+                                                const res = await fetch(`${API_BASE}/api/upload`, {
+                                                  method: 'POST',
+                                                  body: formData
+                                                });
+                                                const uploadData = await res.json();
+                                                message.destroy();
+                                                if (uploadData.success && uploadData.url) {
+                                                  message.success('分镜图片替换成功！');
+                                                  updateSceneField(index, 'imageUrl', uploadData.url);
+                                                  updateSceneField(index, 'status', 'image_completed');
+                                                } else {
+                                                  throw new Error(uploadData.error || '上传失败');
+                                                }
+                                              } catch (err: any) {
+                                                message.error('上传失败: ' + err.message);
+                                              }
+                                            }
+                                          };
+                                          input.click();
+                                        }}
+                                        style={{ fontSize: 11, padding: 0, height: 'auto', color: '#818cf8' }}
+                                      >
+                                        📤 重新上传
+                                      </Button>
+                                    </div>
                                   )}
-                                </div>
-                              )}
-
-                              {scene.videoUrl && !scene.rendering && (
-                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      generateSingleSceneVideo(index);
-                                    }}
-                                    style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
-                                  >
-                                    🎥 重新生视频
-                                  </Button>
                                 </div>
                               )}
 
@@ -1348,169 +1754,179 @@ const WorkbenchPage: React.FC = () => {
         )}
 
         {/* ============================================================== */}
-        {/* TAB 3: AUDIO & TTS CONFIGURATION */}
+        {/* TAB 3: VIDEO RENDERING DASHBOARD */}
         {/* ============================================================== */}
-        {activeTab === 'audio' && (
+        {activeTab === 'video' && (
           <Row gutter={24} style={{ height: '100%' }}>
-            {/* Left: Speaker Selection and Parameters */}
-            <Col span={10}>
+            <Col span={24} style={{ height: '100%', overflowY: 'auto' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><CustomerServiceOutlined /> 智能语音与 TTS 旁白参数</span>}
-                bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
-              >
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>1. 启用带货语音旁白</Text></div>
-                    <Switch
-                      checked={settings.enableTTS}
-                      onChange={(val) => updateSettings({ ...settings, enableTTS: val })}
-                    />
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <span style={{ color: '#fff' }}><PlayCircleOutlined /> 🎬 分镜视频渲染仪表盘</span>
+                    <Space size="large">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: '#a1a1aa' }}>同时生成并同步旁白配音:</span>
+                        <Switch
+                          checked={settings.enableTTS}
+                          onChange={(val) => updateSettings({ ...settings, enableTTS: val })}
+                          checkedChildren="开启"
+                          unCheckedChildren="关闭"
+                        />
+                      </div>
+                      <Button
+                        type="primary"
+                        icon={<RocketOutlined />}
+                        loading={isRenderingAllScenes}
+                        onClick={handleRenderAllScenes}
+                        disabled={!script || !script.scenes || script.scenes.length === 0}
+                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: 6, height: 38 }}
+                      >
+                        ⚡ 一键渲染所有分镜
+                      </Button>
+                    </Space>
                   </div>
-
-                  {settings.enableTTS && (
-                    <>
-                      <div>
-                        <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>2. 选择专业发音人角色</Text></div>
-                        <Select
-                          value={settings.voice}
-                          onChange={(val) => updateSettings({ ...settings, voice: val })}
-                          style={{ width: '100%' }}
+                }
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12 }}
+              >
+                {script && script.scenes && script.scenes.length > 0 ? (
+                  <Row gutter={[16, 16]}>
+                    {script.scenes.map((scene: Scene, index: number) => (
+                      <Col span={8} key={index}>
+                        <Card
+                          style={{
+                            background: '#202023',
+                            border: '1px solid #2e2e33',
+                            borderRadius: 8
+                          }}
+                          bodyStyle={{ padding: 12 }}
+                          title={
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>分镜 {index + 1} ({scene.duration}秒)</span>
+                              <Space>
+                                {scene.videoUrl ? (
+                                  <Tag color="success">视频就绪</Tag>
+                                ) : (scene.rendering || scene.status === 'generating') ? (
+                                  <Tag color="processing" icon={<LoadingOutlined />}>正在生成</Tag>
+                                ) : (
+                                  <Tag color="default">等待渲染</Tag>
+                                )}
+                                {scene.audioUrl && <Tag color="cyan">配音同步</Tag>}
+                              </Space>
+                            </div>
+                          }
                         >
-                          <Option value="zh_female_story">知性温柔带货主播（推荐）</Option>
-                          <Option value="zh_male_narrator">激情热烈好物解说员</Option>
-                          <Option value="zh_male_technology">专业科技电子产品专家</Option>
-                          <Option value="zh_female_chitchat">轻快甜美生活好物推介</Option>
-                        </Select>
-                      </div>
+                          {/* Visual Player Center */}
+                          <div style={{
+                            position: 'relative',
+                            width: '100%',
+                            height: 180,
+                            background: '#09090b',
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid #27272a',
+                            marginBottom: 12
+                          }}>
+                            {scene.videoUrl ? (
+                              <video src={scene.videoUrl} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (scene.rendering || scene.status === 'generating') ? (
+                              <div style={{ textAlign: 'center', padding: 8 }}>
+                                <LoadingOutlined style={{ fontSize: 32, color: '#10b981', marginBottom: 12 }} />
+                                <div style={{ fontSize: 12, color: '#a1a1aa' }}>后台渲染中 ({scene.progress || 10}%)</div>
+                              </div>
+                            ) : scene.imageUrl ? (
+                              <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                                <img src={scene.imageUrl} alt="首帧" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} />
+                                <div style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  background: 'rgba(0,0,0,0.4)'
+                                }}>
+                                  <span style={{ color: '#fff', fontSize: 11, background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 4 }}>
+                                    首帧就绪，待生成视频
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ textAlign: 'center', color: '#52525b' }}>
+                                <PictureOutlined style={{ fontSize: 32, marginBottom: 8 }} />
+                                <div style={{ fontSize: 11 }}>请先在分镜编辑中准备首帧</div>
+                              </div>
+                            )}
+                          </div>
 
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <Text strong style={{ color: '#fff' }}>3. 配音语速调节</Text>
-                          <Text style={{ color: '#a1a1aa' }}>{settings.speed}x</Text>
-                        </div>
-                        <Slider
-                          min={0.8}
-                          max={1.5}
-                          step={0.1}
-                          value={settings.speed}
-                          onChange={(val) => updateSettings({ ...settings, speed: val })}
-                        />
-                      </div>
-
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <Text strong style={{ color: '#fff' }}>4. 旁白音量大小</Text>
-                          <Text style={{ color: '#a1a1aa' }}>{settings.volume}%</Text>
-                        </div>
-                        <Slider
-                          min={0}
-                          max={100}
-                          value={settings.volume}
-                          onChange={(val) => updateSettings({ ...settings, volume: val })}
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>5. 带货背景音乐 (BGM)</Text></div>
-                    <Select
-                      value={settings.bgm}
-                      onChange={(val) => updateSettings({ ...settings, bgm: val })}
-                      style={{ width: '100%' }}
-                    >
-                      <Option value="cheerful.mp3">轻快乐活好物推介 (Cheerful BGM)</Option>
-                      <Option value="energetic.mp3">激情劲爆带货抢购 (Energetic EDM)</Option>
-                      <Option value="smooth_jazz.mp3">优雅高级精致小资 (Smooth Jazz)</Option>
-                      <Option value="none">不配背景乐 (None)</Option>
-                    </Select>
-                  </div>
-                </Space>
-              </Card>
-            </Col>
-
-            {/* Right: Audio Visual Timeline Preview */}
-            <Col span={14}>
-              <Card
-                title={<span style={{ color: '#fff' }}><AudioOutlined /> 音轨多轨时间线示意图</span>}
-                bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
-              >
-                {script && script.scenes ? (
-                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                    <div style={{ background: '#202023', padding: 20, borderRadius: 8 }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        系统将自动根据每个分镜的时长 and 语速，精确对齐画面与旁白。以下为音画对齐甘特图：
-                      </Text>
-
-                      {/* Video Frame timeline block */}
-                      <div style={{ marginTop: 24 }}>
-                        <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginBottom: 6 }}>🎥 视频画面轨道 (Video Track)</div>
-                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#09090b', borderRadius: 4, padding: 2 }}>
-                          {script.scenes.map((s: Scene, i: number) => (
-                            <div key={i} style={{
-                              flex: s.duration || 5,
-                              background: 'linear-gradient(90deg, #6366f1 0%, #4338ca 100%)',
-                              borderRadius: 2,
-                              color: '#fff',
-                              fontSize: 10,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 500
-                            }}>
-                              镜 {i + 1} ({s.duration}秒)
+                          {/* Scene Script Reference Details */}
+                          <div style={{ background: '#18181b', padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: '#a1a1aa', marginBottom: 2 }}>分镜视觉 Prompt:</div>
+                            <div style={{ fontSize: 11, color: '#e4e4e7', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, height: 30, marginBottom: 6 }}>
+                              {scene.description}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* TTS audio timeline block */}
-                      <div style={{ marginTop: 20 }}>
-                        <div style={{ fontSize: 11, color: '#34d399', fontWeight: 600, marginBottom: 6 }}>🎙️ AI 旁白配音轨道 (TTS Narration)</div>
-                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#09090b', borderRadius: 4, padding: 2 }}>
-                          {script.scenes.map((s: Scene, i: number) => (
-                            <div key={i} style={{
-                              flex: s.duration || 5,
-                              background: settings.enableTTS ? 'linear-gradient(90deg, #10b981 0%, #047857 100%)' : '#27272a',
-                              borderRadius: 2,
-                              color: '#fff',
-                              fontSize: 10,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 500,
-                              opacity: settings.enableTTS ? 1 : 0.2
-                            }}>
-                              {settings.enableTTS ? `旁白 ${i + 1}` : '已禁用'}
+                            <div style={{ fontSize: 10, color: '#a1a1aa', marginBottom: 2 }}>旁白台词:</div>
+                            <div style={{ fontSize: 11, color: '#818cf8', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+                              {scene.voiceover || '无'}
                             </div>
-                          ))}
-                        </div>
-                      </div>
+                          </div>
 
-                      {/* BGM background music timeline block */}
-                      <div style={{ marginTop: 20 }}>
-                        <div style={{ fontSize: 11, color: '#f59e0b', fontWeight: 600, marginBottom: 6 }}>🎵 背景音乐轨道 (BGM Loop Track)</div>
-                        <div style={{
-                          height: 24,
-                          background: settings.bgm !== 'none' ? 'linear-gradient(90deg, #d97706 0%, #b45309 100%)' : '#27272a',
-                          borderRadius: 4,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 10,
-                          color: '#fff',
-                          fontWeight: 500,
-                          opacity: settings.bgm !== 'none' ? 0.9 : 0.2
-                        }}>
-                          {settings.bgm !== 'none' ? `单循环 - ${settings.bgm}` : '已静音'}
-                        </div>
-                      </div>
-                    </div>
-                  </Space>
+                          {/* Narration Player Wave */}
+                          {scene.audioUrl && (
+                            <div style={{ padding: '6px 10px', background: '#18181b', borderRadius: 6, border: '1px solid #2e2e33', marginBottom: 10 }}>
+                              <div style={{ fontSize: 10, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span>🎙️ 旁白配音预听</span>
+                                {scene.ttsEstDuration && <span style={{ opacity: 0.6 }}>({scene.ttsEstDuration}s)</span>}
+                              </div>
+                              <audio src={scene.audioUrl} controls style={{ width: '100%', height: 20 }} />
+                            </div>
+                          )}
+
+                          {/* Render Actions */}
+                          {!scene.rendering && (
+                            <div>
+                              {!scene.videoUrl ? (
+                                <Button
+                                  type="primary"
+                                  block
+                                  icon={<PlayCircleOutlined />}
+                                  onClick={() => generateSingleSceneVideo(index)}
+                                  disabled={!scene.imageUrl}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    height: 32
+                                  }}
+                                >
+                                  🎥 渲染分镜视频
+                                </Button>
+                              ) : (
+                                <Button
+                                  type="default"
+                                  block
+                                  onClick={() => generateSingleSceneVideo(index)}
+                                  style={{
+                                    background: 'transparent',
+                                    border: '1px dashed #3f3f46',
+                                    color: '#a1a1aa',
+                                    borderRadius: 6,
+                                    height: 32
+                                  }}
+                                >
+                                  🔄 重新渲染分镜
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
                 ) : (
-                  <Empty description={<span style={{ color: '#888' }}>暂无剧本数据，无法进行音画对齐展示</span>} />
+                  <Empty description={<span style={{ color: '#888' }}>暂无分镜场景数据，请先生成剧本分镜</span>} />
                 )}
               </Card>
             </Col>
@@ -1568,6 +1984,47 @@ const WorkbenchPage: React.FC = () => {
                       <Option value="cut">⚡ 极速硬切镜头转场 (Direct Cut)</Option>
                       <Option value="flash">✨ 闪白转场效果 (White Flash)</Option>
                     </Select>
+                  </div>
+
+                  <div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>4. 配音发音人角色 (Speaker Role)</Text></div>
+                    <Select
+                      value={settings.voice}
+                      onChange={(val) => updateSettings({ ...settings, voice: val })}
+                      style={{ width: '100%' }}
+                    >
+                      <Option value="zh_female_story">知性温柔带货主播（推荐）</Option>
+                      <Option value="zh_male_narrator">激情热烈好物解说员</Option>
+                      <Option value="zh_male_technology">专业科技电子产品专家</Option>
+                      <Option value="zh_female_chitchat">轻快甜美生活好物推介</Option>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>5. 带货背景音乐 (BGM Soundtrack)</Text></div>
+                    <Select
+                      value={settings.bgm}
+                      onChange={(val) => updateSettings({ ...settings, bgm: val })}
+                      style={{ width: '100%' }}
+                    >
+                      <Option value="cheerful.mp3">轻快乐活好物推介 (Cheerful BGM)</Option>
+                      <Option value="energetic.mp3">激情劲爆带货抢购 (Energetic EDM)</Option>
+                      <Option value="smooth_jazz.mp3">优雅高级精致小资 (Smooth Jazz)</Option>
+                      <Option value="none">不配背景乐 (None)</Option>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text strong style={{ color: '#fff' }}>6. 背景音乐音量混音比例</Text>
+                      <Text style={{ color: '#a1a1aa' }}>{settings.volume}%</Text>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={settings.volume}
+                      onChange={(val) => updateSettings({ ...settings, volume: val })}
+                    />
                   </div>
 
                   <Divider style={{ margin: '12px 0', borderTopColor: '#27272a' }} />

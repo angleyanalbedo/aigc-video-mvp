@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, Tooltip, message as antdMessage, Spin } from 'antd';
+import { Tooltip, message as antdMessage, Spin } from 'antd';
 import {
   PlusOutlined,
   PictureOutlined,
