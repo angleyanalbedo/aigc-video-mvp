@@ -50,7 +50,7 @@ interface Message {
   timestamp: Date;
 }
 
-type SceneStatus = 'idle' | 'generating' | 'completed' | 'error';
+type SceneStatus = 'idle' | 'generating' | 'completed' | 'error' | 'image_completed';
 
 interface Scene {
   id?: number;
@@ -62,6 +62,7 @@ interface Scene {
   transition: string;
   // 状态机
   status: SceneStatus;
+  imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
   ttsEstDuration?: number;
@@ -133,6 +134,7 @@ const WorkbenchPage: React.FC = () => {
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
     { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
     { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending' },
+    { id: 'image',  name: '视觉生图', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
     { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
     { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
   ]);
@@ -163,6 +165,7 @@ const WorkbenchPage: React.FC = () => {
           setWorkflowNodes([
             { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
             { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'completed' },
+            { id: 'image',  name: '视觉生图', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
             { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
             { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
           ]);
@@ -431,6 +434,72 @@ const WorkbenchPage: React.FC = () => {
 
 
 
+  // Scene level Image Generation & Calling Agent API
+  const generateSingleSceneImage = async (index: number) => {
+    if (!script || !script.scenes) return;
+    const scene = script.scenes[index];
+    
+    updateSceneField(index, 'status', 'generating');
+    updateSceneField(index, 'rendering', true);
+
+    setWorkflowStarted(true);
+    setWorkflowNodes(prev => prev.map(n => n.id === 'image' ? { ...n, status: 'running' } : n));
+
+    try {
+      const res = await fetch(`${API_BASE}/api/image/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: scene.description,
+          referenceImageUrl: scene.referenceImageUrl || null,
+          sceneIndex: index
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.imageUrl) {
+        updateSceneField(index, 'rendering', false);
+        updateSceneField(index, 'imageUrl', data.imageUrl);
+        updateSceneField(index, 'status', 'image_completed');
+        message.success(`分镜 ${index + 1} 视觉生图成功！`);
+        
+        setWorkflowNodes(prev => prev.map(n => {
+          if (n.id === 'image') {
+            const allDone = script.scenes.every((s: any, idx: number) => idx === index ? true : (s.imageUrl || s.status === 'image_completed' || s.status === 'completed' || s.videoUrl));
+            return { ...n, status: allDone ? 'completed' : 'running' };
+          }
+          return n;
+        }));
+      } else {
+        throw new Error(data.error || '生图失败');
+      }
+    } catch (e) {
+      console.error(e);
+      updateSceneField(index, 'rendering', false);
+      updateSceneField(index, 'status', 'error');
+      message.error(`分镜 ${index + 1} 图片生成失败`);
+      setWorkflowNodes(prev => prev.map(n => n.id === 'image' ? { ...n, status: 'failed' } : n));
+    }
+  };
+
+  // 一键生成所有图片
+  const handleRenderAllImages = async () => {
+    if (!script || !script.scenes || script.scenes.length === 0) {
+      message.warning('暂无分镜场景数据！');
+      return;
+    }
+    message.loading('正在批量发起所有分镜的图片生成任务...', 2);
+    try {
+      script.scenes.forEach((s: any, idx: number) => {
+        if (!s.imageUrl && !s.rendering) {
+          generateSingleSceneImage(idx);
+        }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   // Scene level Video Generation & Polling Mock/API
   const generateSingleSceneVideo = async (index: number) => {
     if (!script || !script.scenes) return;
@@ -443,15 +512,44 @@ const WorkbenchPage: React.FC = () => {
     setWorkflowStarted(true);
     setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'running' } : n));
 
+    // Parallel high-quality voiceover generation if TTS is enabled and voiceover is present
+    if (settings.enableTTS && scene.voiceover) {
+      try {
+        console.log(`🎙️ 正在为分镜 ${index + 1} 并发生成配音...`);
+        const ttsRes = await fetch(`${API_BASE}/api/tts/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: scene.voiceover,
+            options: {
+              voice: settings.voice,
+              speed: settings.speed,
+              volume: settings.volume
+            }
+          })
+        });
+        const ttsData = await ttsRes.json();
+        if (ttsData.success) {
+          updateSceneField(index, 'audioUrl', ttsData.audioUrl);
+          updateSceneField(index, 'ttsEstDuration', ttsData.duration);
+          console.log(`✅ 分镜 ${index + 1} 配音生成成功:`, ttsData.audioUrl);
+        }
+      } catch (err) {
+        console.error(`❌ 分镜 ${index + 1} 配音生成失败:`, err);
+      }
+    }
+
     try {
-      // Direct post to single render endpoint
+      // Direct post to single render endpoint (passing the visual image URL for Image-to-Video synthesis)
       const res = await fetch(`${API_BASE}/api/video/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: scene.description,
+          imageUrl: scene.imageUrl || scene.referenceImageUrl || null,
           duration: scene.duration || 5,
-          sceneIndex: index
+          sceneIndex: index,
+          options: settings
         })
       });
 
@@ -461,17 +559,16 @@ const WorkbenchPage: React.FC = () => {
         // Start polling task
         const pollInterval = setInterval(async () => {
           try {
-            const taskRes = await fetch(`${API_BASE}/api/tasks/${taskId}`);
+            const taskRes = await fetch(`${API_BASE}/api/video/status/${taskId}`);
             const taskData = await taskRes.json();
-            if (taskData.success && taskData.data) {
-              const task = taskData.data;
-              updateSceneField(index, 'progress', task.progress || 30);
+            if (taskData) {
+              updateSceneField(index, 'progress', taskData.progress || 30);
 
-              if (task.status === 'completed') {
+              if (taskData.status === 'succeeded') {
                 clearInterval(pollInterval);
                 updateSceneField(index, 'rendering', false);
                 updateSceneField(index, 'status', 'completed');
-                updateSceneField(index, 'videoUrl', task.result);
+                updateSceneField(index, 'videoUrl', taskData.videoUrl);
                 message.success(`分镜 ${index + 1} 画面渲染成功！`);
                 setWorkflowNodes(prev => prev.map(n => {
                   if (n.id === 'video') {
@@ -480,7 +577,7 @@ const WorkbenchPage: React.FC = () => {
                   }
                   return n;
                 }));
-              } else if (task.status === 'failed') {
+              } else if (taskData.status === 'failed') {
                 clearInterval(pollInterval);
                 updateSceneField(index, 'rendering', false);
                 updateSceneField(index, 'status', 'error');
@@ -689,7 +786,7 @@ const WorkbenchPage: React.FC = () => {
           }}>
             {workflowNodes.map((node, idx) => {
               const tabMap: Record<string, string> = {
-                script: 'script', review: 'script', video: 'storyboard', clip: 'render'
+                script: 'script', review: 'script', image: 'storyboard', video: 'storyboard', clip: 'render'
               };
               const statusColor: Record<string, string> = {
                 pending: '#3f3f46',
@@ -914,7 +1011,7 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景画幅生成）</span>
+                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景生图与生视频）</span>
                     <Space size="middle">
                       {injectingMaterial && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -922,6 +1019,24 @@ const WorkbenchPage: React.FC = () => {
                           <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
                         </div>
                       )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: '#a1a1aa' }}>同时生成配音:</span>
+                        <Switch
+                          checked={settings.enableTTS}
+                          onChange={(val) => updateSettings({ ...settings, enableTTS: val })}
+                          checkedChildren="开启"
+                          unCheckedChildren="关闭"
+                        />
+                      </div>
+                      <Button
+                        type="default"
+                        icon={<PictureOutlined />}
+                        onClick={handleRenderAllImages}
+                        disabled={!script || !script.scenes || script.scenes.length === 0}
+                        style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6 }}
+                      >
+                        一键生成所有图片
+                      </Button>
                       <Button
                         type="primary"
                         icon={<RocketOutlined />}
@@ -930,7 +1045,7 @@ const WorkbenchPage: React.FC = () => {
                         disabled={!script || !script.scenes || script.scenes.length === 0}
                         style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: 6 }}
                       >
-                        一键渲染所有分镜
+                        一键生视频 (配音同步)
                       </Button>
                     </Space>
                   </div>
@@ -962,24 +1077,19 @@ const WorkbenchPage: React.FC = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Space>
                                 <span style={{ color: '#fff', fontWeight: 600 }}>分镜 {index + 1}</span>
-                                {scene.status === 'completed' && <Tag color="success">已完成</Tag>}
-                                {(scene.rendering || scene.status === 'generating') && <Tag color="processing" icon={<LoadingOutlined />}>渲染中</Tag>}
+                                {scene.videoUrl ? (
+                                  <Tag color="success">视频就绪</Tag>
+                                ) : scene.imageUrl ? (
+                                  <Tag color="blue">首帧就绪</Tag>
+                                ) : (
+                                  <Tag color="default">待生图</Tag>
+                                )}
+                                {scene.audioUrl && <Tag color="cyan">配音就绪</Tag>}
+                                {(scene.rendering || scene.status === 'generating') && (
+                                  <Tag color="processing" icon={<LoadingOutlined />}>生成中</Tag>
+                                )}
                                 {scene.status === 'error' && <Tag color="error">失败</Tag>}
-                                {(!scene.status || scene.status === 'idle') && <Tag color="default">待生成</Tag>}
                               </Space>
-                              <Button
-                                type="primary"
-                                size="small"
-                                icon={scene.rendering || scene.status === 'generating' ? <LoadingOutlined /> : <PlayCircleOutlined />}
-                                loading={scene.rendering || scene.status === 'generating'}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  generateSingleSceneVideo(index);
-                                }}
-                                style={{ borderRadius: 4, background: '#10b981', border: 'none' }}
-                              >
-                                {scene.rendering || scene.status === 'generating' ? `渲染中 ${scene.progress || 10}%` : '生成当前画面'}
-                              </Button>
                             </div>
                           }
                         >
@@ -1021,8 +1131,10 @@ const WorkbenchPage: React.FC = () => {
                                 ) : (scene.rendering || scene.status === 'generating') ? (
                                   <div style={{ textAlign: 'center', padding: 8 }}>
                                     <LoadingOutlined style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
-                                    <div style={{ fontSize: 11, color: '#888' }}>高精渲染中...</div>
+                                    <div style={{ fontSize: 11, color: '#888' }}>生成中... ({scene.progress || 10}%)</div>
                                   </div>
+                                ) : scene.imageUrl ? (
+                                  <img src={scene.imageUrl} alt="首帧图片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                 ) : (
                                   <div style={{ textAlign: 'center', color: '#52525b', padding: 8 }}>
                                     <PictureOutlined style={{ fontSize: 24, marginBottom: 8 }} />
@@ -1030,6 +1142,93 @@ const WorkbenchPage: React.FC = () => {
                                   </div>
                                 )}
                               </div>
+
+                              {/* CONDITIONAL PREVIEW ACTIONS BASED ON WORKFLOW STATE */}
+                              {!scene.videoUrl && !scene.rendering && (
+                                <div style={{ marginTop: 8 }}>
+                                  {!scene.imageUrl ? (
+                                    <Button
+                                      type="primary"
+                                      size="small"
+                                      icon={<PictureOutlined />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        generateSingleSceneImage(index);
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                        border: 'none',
+                                        borderRadius: 4,
+                                        fontSize: 12
+                                      }}
+                                    >
+                                      🎨 AI生图
+                                    </Button>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        type="primary"
+                                        size="small"
+                                        icon={<PlayCircleOutlined />}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          generateSingleSceneVideo(index);
+                                        }}
+                                        style={{
+                                          width: '100%',
+                                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                          border: 'none',
+                                          borderRadius: 4,
+                                          fontSize: 12
+                                        }}
+                                      >
+                                        🎥 AI生视频
+                                      </Button>
+                                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+                                        <Button
+                                          type="link"
+                                          size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            generateSingleSceneImage(index);
+                                          }}
+                                          style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
+                                        >
+                                          🎨 重新生图
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+
+                              {scene.videoUrl && !scene.rendering && (
+                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      generateSingleSceneVideo(index);
+                                    }}
+                                    style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
+                                  >
+                                    🎥 重新生视频
+                                  </Button>
+                                </div>
+                              )}
+
+                              {/* SLEEK TTS AUDIO PLAYBACK BAR */}
+                              {scene.audioUrl && (
+                                <div style={{ marginTop: 8, padding: '4px 8px', background: '#202023', borderRadius: 4, border: '1px solid #2e2e33' }}>
+                                  <div style={{ fontSize: 10, color: '#34d399', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <span>🎙️ 旁白配音就绪</span>
+                                    {scene.ttsEstDuration && <span style={{ opacity: 0.6 }}>({scene.ttsEstDuration}s)</span>}
+                                  </div>
+                                  <audio src={scene.audioUrl} controls style={{ width: '100%', height: 18 }} />
+                                </div>
+                              )}
                             </Col>
 
                             {/* Right part of card: Editable input forms */}

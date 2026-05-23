@@ -7,7 +7,7 @@ class MockVideoProvider extends BaseVideoProvider {
     this.taskIdCounter = 1;
   }
 
-  async createTask({ prompt, resolution = '720p', ratio = '9:16', duration = 5 }) {
+  async createTask({ prompt, resolution = '720p', ratio = '9:16', duration = 5, imageUrl = null }) {
     const taskId = `mock_video_${Date.now()}_${this.taskIdCounter++}`;
     const task = {
       id: taskId,
@@ -17,6 +17,7 @@ class MockVideoProvider extends BaseVideoProvider {
       resolution,
       ratio,
       duration,
+      imageUrl,
       createdAt: Date.now()
     };
     
