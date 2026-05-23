@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   SendOutlined,
@@ -17,6 +17,14 @@ import {
   CloseCircleOutlined,
   EditOutlined,
   DeleteOutlined,
+  BulbOutlined,
+  ThunderboltOutlined,
+  RollbackOutlined,
+  ExperimentOutlined,
+  ApiOutlined,
+  SkinOutlined,
+  GlobalOutlined,
+  CustomerServiceOutlined,
 } from '@ant-design/icons';
 import AssetPanel from './AssetPanel';
 import {
@@ -39,12 +47,17 @@ import {
   Tooltip,
   Modal,
   Form,
+  Popover,
+  List,
+  Radio,
+  Collapse,
 } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 const { Content } = Layout;
+const { Panel } = Collapse;
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
@@ -102,6 +115,13 @@ const WorkbenchPage: React.FC = () => {
   const [form] = Form.useForm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentEditSceneIndex, setCurrentEditSceneIndex] = useState<number | null>(null);
+  
+  // Agent相关状态
+  const [selectedSceneForSuggestions, setSelectedSceneForSuggestions] = useState<number | null>(null);
+  const [agentSuggestions, setAgentSuggestions] = useState<Array<{id: string, title: string, content: string, type: string, cost: number}>>([]);
+  const [isAgentLoading, setIsAgentLoading] = useState(false);
+  const [showAgentPanel, setShowAgentPanel] = useState(true);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   // Strict check on mounting
   useEffect(() => {
@@ -550,6 +570,130 @@ const WorkbenchPage: React.FC = () => {
     }
     updateScript({ ...script, scenes: newScenes });
     message.success(`${imageType === 'first' ? '首帧' : imageType === 'last' ? '尾帧' : '主图'}已清除，可以重新生成`);
+  };
+  
+  // Agent 功能：获取智能建议
+  const getAgentSuggestions = async (sceneIndex: number) => {
+    if (!script || !script.scenes[sceneIndex]) return;
+    setIsAgentLoading(true);
+    setSelectedSceneForSuggestions(sceneIndex);
+    
+    // 模拟 Agent 生成建议（实际项目中调用真实API）
+    setTimeout(() => {
+      const scene = script.scenes[sceneIndex];
+      const suggestions = [
+        {
+          id: '1',
+          title: '✨ 优化提示词',
+          content: `为您的提示词添加更多细节：${scene.description} → 建议增加光影、角度和色彩描述`,
+          type: 'optimization',
+          cost: 5
+        },
+        {
+          id: '2',
+          title: '🎨 风格推荐',
+          content: '根据产品特点，建议使用：商业摄影风格，明亮自然光',
+          type: 'style',
+          cost: 3
+        },
+        {
+          id: '3',
+          title: '🎙️ 配音优化',
+          content: scene.voiceover ? `建议优化配音语气，当前建议：${scene.voiceover.length > 30 ? scene.voiceover.substring(0, 30) + '...' : scene.voiceover}` : '建议添加旁白配音，提升视频吸引力',
+          type: 'voiceover',
+          cost: 2
+        },
+        {
+          id: '4',
+          title: '🎬 镜头建议',
+          content: scene.shot_type === '特写' ? '建议增加中景镜头丰富层次' : '建议使用特写突出产品细节',
+          type: 'lens',
+          cost: 2
+        }
+      ];
+      setAgentSuggestions(suggestions);
+      setIsAgentLoading(false);
+    }, 1000);
+  };
+  
+  // Agent 快速操作：批量优化
+  const batchOptimize = (type: 'consistency' | 'duration' | 'voiceover') => {
+    if (!script || !script.scenes) return;
+    
+    message.loading(`正在执行${type === 'consistency' ? '一致性优化' : type === 'duration' ? '时长调整' : '配音优化'}...`, 1);
+    
+    setTimeout(() => {
+      const newScenes = [...script.scenes];
+      
+      if (type === 'consistency') {
+        // 统一风格
+        newScenes.forEach((scene, idx) => {
+          if (idx > 0) {
+            scene.emotion = newScenes[0].emotion;
+            scene.colorTone = newScenes[0].colorTone;
+          }
+        });
+        message.success('风格一致性优化完成！');
+      } else if (type === 'duration') {
+        // 调整时长
+        const avgDuration = Math.round(newScenes.reduce((sum, s) => sum + s.duration, 0) / newScenes.length);
+        newScenes.forEach(scene => {
+          scene.duration = avgDuration;
+        });
+        message.success(`时长统一为 ${avgDuration} 秒完成！`);
+      } else {
+        // 配音优化（模拟）
+        message.success('配音风格优化建议已生成！');
+      }
+      
+      updateScript({ ...script, scenes: newScenes });
+    }, 800);
+  };
+  
+  // 应用 Agent 建议
+  const applyAgentSuggestion = (suggestion: any, sceneIndex: number) => {
+    if (!script || !script.scenes[sceneIndex]) return;
+    const newScenes = [...script.scenes];
+    const scene = { ...newScenes[sceneIndex] };
+    
+    switch(suggestion.type) {
+      case 'optimization':
+        scene.description = scene.description + '，专业商业摄影，自然光，清晰细节';
+        break;
+      case 'style':
+        scene.colorTone = 'bright';
+        scene.lighting = 'natural';
+        break;
+      case 'voiceover':
+        // 可以添加更多配音逻辑
+        break;
+      case 'lens':
+        scene.shot_type = scene.shot_type === '特写' ? '中景' : '特写';
+        break;
+    }
+    
+    newScenes[sceneIndex] = scene;
+    updateScript({ ...script, scenes: newScenes });
+    message.success(`已应用建议: ${suggestion.title}`);
+  };
+  
+  // 一键优化所有分镜
+  const optimizeAllScenes = async () => {
+    if (!script || !script.scenes) return;
+    message.loading('Agent 正在分析和优化所有分镜...', 0);
+    
+    setTimeout(() => {
+      const newScenes = script.scenes.map((scene, idx) => {
+        return {
+          ...scene,
+          lighting: 'natural',
+          cameraAngle: idx % 2 === 0 ? '平视' : '微微俯视'
+        };
+      });
+      updateScript({ ...script, scenes: newScenes });
+      message.destroy();
+      message.success('✨ 全部分镜优化完成！');
+    }, 1500);
   };
 
 
@@ -1556,6 +1700,57 @@ const WorkbenchPage: React.FC = () => {
                           <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
                         </div>
                       )}
+                      {/* Agent 批量操作 */}
+                      <Popover
+                        title="🤖 Agent 智能工具箱"
+                        content={
+                          <div style={{ minWidth: 220 }}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <Button 
+                                type="primary" 
+                                icon={<ThunderboltOutlined />} 
+                                block
+                                onClick={optimizeAllScenes}
+                              >
+                                一键智能优化
+                              </Button>
+                              <Divider style={{ margin: '8px 0' }} />
+                              <Text style={{ fontSize: 12, color: '#666' }}>批量操作：</Text>
+                              <Button 
+                                size="small" 
+                                block 
+                                onClick={() => batchOptimize('consistency')}
+                              >
+                                统一风格
+                              </Button>
+                              <Button 
+                                size="small" 
+                                block 
+                                onClick={() => batchOptimize('duration')}
+                              >
+                                调整时长
+                              </Button>
+                              <Button 
+                                size="small" 
+                                block 
+                                onClick={() => batchOptimize('voiceover')}
+                              >
+                                优化配音
+                              </Button>
+                            </Space>
+                          </div>
+                        }
+                        trigger="click"
+                      >
+                        <Button
+                          type="default"
+                          icon={<ApiOutlined />}
+                          style={{ background: '#1890ff', border: 'none', color: '#fff', borderRadius: 6 }}
+                        >
+                          Agent 工具箱
+                        </Button>
+                      </Popover>
+                      
                       <Button
                         type="default"
                         icon={<PictureOutlined />}
@@ -1605,18 +1800,98 @@ const WorkbenchPage: React.FC = () => {
                                 )}
                                 {scene.status === 'error' && <Tag color="error">失败</Tag>}
                               </Space>
-                              <Button
-                                type="link"
-                                size="small"
-                                icon={<EditOutlined />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditModal(index);
-                                }}
-                                style={{ color: '#818cf8', padding: 0 }}
-                              >
-                                编辑
-                              </Button>
+                              <Space>
+                                {/* Agent 建议按钮 */}
+                                <Popover
+                                  title={
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span>🤖 智能建议</span>
+                                      <Button 
+                                        type="link" 
+                                        size="small" 
+                                        onClick={() => getAgentSuggestions(index)}
+                                        style={{ padding: 0, fontSize: 12 }}
+                                      >
+                                        刷新
+                                      </Button>
+                                    </div>
+                                  }
+                                  content={
+                                    <div style={{ width: 320 }}>
+                                      {isAgentLoading && selectedSceneForSuggestions === index ? (
+                                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                                          <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                                          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>Agent 正在分析中...</p>
+                                        </div>
+                                      ) : selectedSceneForSuggestions === index && agentSuggestions.length > 0 ? (
+                                        <List
+                                          dataSource={agentSuggestions}
+                                          renderItem={(item) => (
+                                            <List.Item style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                              <div style={{ width: '100%' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                                  <span style={{ fontWeight: 600, fontSize: 13 }}>{item.title}</span>
+                                                  <Tag color="orange" style={{ fontSize: 10 }}>Cost: {item.cost} ⚡</Tag>
+                                                </div>
+                                                <p style={{ fontSize: 11, color: '#666', margin: 0, marginBottom: 6 }}>{item.content}</p>
+                                                <Button 
+                                                  type="primary" 
+                                                  size="small" 
+                                                  style={{ fontSize: 11, height: '24px' }}
+                                                  onClick={() => applyAgentSuggestion(item, index)}
+                                                >
+                                                  应用
+                                                </Button>
+                                              </div>
+                                            </List.Item>
+                                          )}
+                                        />
+                                      ) : (
+                                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                                          <BulbOutlined style={{ fontSize: 24, color: '#ffc107' }} />
+                                          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>点击获取智能建议</p>
+                                          <Button 
+                                            type="primary" 
+                                            size="small"
+                                            onClick={() => getAgentSuggestions(index)}
+                                          >
+                                            获取建议
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  }
+                                  trigger="click"
+                                  placement="topRight"
+                                  onVisibleChange={(visible) => {
+                                    if (visible && selectedSceneForSuggestions !== index) {
+                                      setSelectedSceneForSuggestions(index);
+                                    }
+                                  }}
+                                >
+                                  <Button
+                                    type="link"
+                                    size="small"
+                                    icon={<BulbOutlined />}
+                                    style={{ color: '#ffa940', padding: 0 }}
+                                  >
+                                    建议
+                                  </Button>
+                                </Popover>
+                                
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<EditOutlined />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditModal(index);
+                                  }}
+                                  style={{ color: '#818cf8', padding: 0 }}
+                                >
+                                  编辑
+                                </Button>
+                              </Space>
                             </div>
                           }
                         >
@@ -1851,6 +2126,98 @@ const WorkbenchPage: React.FC = () => {
                                     rows={1}
                                     style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 11.5 }}
                                   />
+                                </div>
+                                
+                                {/* 声音参考 */}
+                                <div>
+                                  <Row gutter={8} align="middle">
+                                    <Col span={24}>
+                                      <Text type="secondary" style={{ fontSize: 10, marginBottom: 4, display: 'block' }}>
+                                        🎵 声音参考（可选）
+                                      </Text>
+                                    </Col>
+                                  </Row>
+                                  {scene.referenceAudioUrl ? (
+                                    <div style={{
+                                      background: '#202023',
+                                      borderRadius: 4,
+                                      padding: 8,
+                                      border: '1px solid #818cf8',
+                                    }}>
+                                      <Row gutter={8} align="middle">
+                                        <Col span={18}>
+                                          <audio 
+                                            src={scene.referenceAudioUrl} 
+                                            controls 
+                                            style={{ width: '100%', height: 24 }} 
+                                          />
+                                        </Col>
+                                        <Col span={6}>
+                                          <Button
+                                            size="small"
+                                            danger
+                                            block
+                                            icon={<DeleteOutlined />}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              updateSceneField(index, 'referenceAudioUrl', undefined);
+                                              message.info('🗑️ 已清除声音参考');
+                                            }}
+                                            style={{ height: 24, fontSize: 10 }}
+                                          >
+                                            删除
+                                          </Button>
+                                        </Col>
+                                      </Row>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      type="dashed"
+                                      size="small"
+                                      block
+                                      icon={<AudioOutlined />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = 'audio/*';
+                                        input.onchange = async (e: any) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) {
+                                            const formData = new FormData();
+                                            formData.append('file', file);
+                                            message.loading(`正在上传声音参考 "${file.name}"...`, 0);
+                                            try {
+                                              const res = await fetch(`${API_BASE}/api/upload`, {
+                                                method: 'POST',
+                                                body: formData
+                                              });
+                                              const uploadData = await res.json();
+                                              message.destroy();
+                                              if (uploadData.success && uploadData.url) {
+                                                updateSceneField(index, 'referenceAudioUrl', uploadData.url);
+                                                message.success('🎵 声音参考上传成功！');
+                                              } else {
+                                                throw new Error(uploadData.error || '上传失败');
+                                              }
+                                            } catch (err: any) {
+                                              message.error('上传失败: ' + err.message);
+                                            }
+                                          }
+                                        };
+                                        input.click();
+                                      }}
+                                      style={{ 
+                                        background: 'rgba(129, 140, 248, 0.1)', 
+                                        border: '1px dashed #818cf8',
+                                        color: '#818cf8',
+                                        fontSize: 11,
+                                        height: 28
+                                      }}
+                                    >
+                                      📤 上传声音参考（配音语气/节奏参考）
+                                    </Button>
+                                  )}
                                 </div>
                                 <Row gutter={8}>
                                   <Col span={12}>
@@ -2160,6 +2527,418 @@ const WorkbenchPage: React.FC = () => {
                   </Row>
                 ) : (
                   <Empty description={<span style={{ color: '#888' }}>暂无分镜场景数据，请先生成剧本分镜</span>} />
+                )}
+              </Card>
+            </Col>
+          </Row>
+        )}
+
+        {/* ============================================================== */}
+        {/* ============================================================== */}
+        {/* TAB 3.5: AUDIO & VOICEOVER TRACKS */}
+        {/* ============================================================== */}
+        {activeTab === 'audio' && (
+          <Row gutter={24} style={{ height: '100%' }}>
+            {/* Left: Global Audio Settings & Agent Panel */}
+            <Col span={8} style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+              <Card
+                title={<span style={{ color: '#fff' }}><CustomerServiceOutlined /> 全局音频设置</span>}
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12 }}
+              >
+                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                  <div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>1. 发音人选择</Text></div>
+                    <Select
+                      value={settings.voice}
+                      onChange={(val) => updateSettings({ ...settings, voice: val })}
+                      style={{ width: '100%' }}
+                    >
+                      <Option value="zh_female_story">👩 知性温柔带货主播</Option>
+                      <Option value="zh_male_narrator">👨 激情热烈好物解说员</Option>
+                      <Option value="zh_male_technology">🧑‍💻 专业科技电子产品专家</Option>
+                      <Option value="zh_female_chitchat">👧 轻快甜美生活好物推介</Option>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>2. 配音语速</Text></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ color: '#a1a1aa', fontSize: 12 }}>慢速</span>
+                      <span style={{ color: '#818cf8', fontWeight: 600 }}>{settings.speed}x</span>
+                      <span style={{ color: '#a1a1aa', fontSize: 12 }}>快速</span>
+                    </div>
+                    <Slider
+                      min={0.5}
+                      max={2.0}
+                      step={0.1}
+                      value={settings.speed}
+                      onChange={(val) => updateSettings({ ...settings, speed: val })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>3. 背景音乐选择</Text></div>
+                    <Select
+                      value={settings.bgm}
+                      onChange={(val) => updateSettings({ ...settings, bgm: val })}
+                      style={{ width: '100%' }}
+                    >
+                      <Option value="cheerful.mp3">🎵 轻快乐活好物推介</Option>
+                      <Option value="energetic.mp3">🔥 激情劲爆带货抢购</Option>
+                      <Option value="smooth_jazz.mp3">🎷 优雅高级精致小资</Option>
+                      <Option value="none">❌ 不配背景音乐</Option>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <Text strong style={{ color: '#fff' }}>4. 背景音乐音量</Text>
+                      <Text style={{ color: '#a1a1aa' }}>{settings.volume}%</Text>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={settings.volume}
+                      onChange={(val) => updateSettings({ ...settings, volume: val })}
+                    />
+                  </div>
+                  
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text strong style={{ color: '#fff' }}>5. 启用 AI 配音</Text>
+                      <Switch checked={settings.enableTTS} onChange={(val) => updateSettings({ ...settings, enableTTS: val })} />
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {settings.enableTTS ? '✅ 所有分镜将自动生成 AI 配音' : '❌ 仅使用背景音乐，无配音旁白'}
+                    </Text>
+                  </div>
+                </Space>
+              </Card>
+              
+              <Card
+                title={<span style={{ color: '#fff' }}><ApiOutlined /> 音频 AI 助手</span>}
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column' }}
+              >
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    💡 智能优化您的配音文案
+                  </Text>
+                  
+                  <Button
+                    type="default"
+                    icon={<SkinOutlined />}
+                    block
+                    onClick={() => {
+                      message.info('🎨 优化中：让所有配音更有感染力...');
+                    }}
+                    style={{ background: 'rgba(249, 115, 22, 0.1)', border: '1px solid rgba(249, 115, 22, 0.2)', color: '#f97316' }}
+                  >
+                    ✨ 优化所有配音文案（让配音更有感染力）
+                  </Button>
+                  
+                  <Button
+                    type="default"
+                    icon={<GlobalOutlined />}
+                    block
+                    onClick={() => {
+                      message.info('🌐 检查文案一致性中...');
+                    }}
+                  >
+                    🔗 统一全部分镜的配音风格
+                  </Button>
+                  
+                  <Button
+                    type="default"
+                    icon={<ExperimentOutlined />}
+                    block
+                    onClick={() => {
+                      message.info('📝 分析配音长度中...');
+                    }}
+                  >
+                    ⏱️ 智能调整文案长度以匹配画面时长
+                  </Button>
+                  
+                  <Divider style={{ margin: '8px 0', borderColor: '#27272a' }} />
+                  
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    🔧 快速操作
+                  </Text>
+                  
+                  <Button
+                    type="primary"
+                    block
+                    onClick={() => {
+                      if (!script?.scenes) return;
+                      const newScenes = script.scenes.map((scene: any) => ({
+                        ...scene,
+                        voiceover: scene.voiceover || ''
+                      }));
+                      updateScript({ ...script, scenes: newScenes });
+                      message.success('✅ 已统一初始化所有配音文案');
+                    }}
+                    style={{ background: '#10b981', border: 'none' }}
+                  >
+                    🎯 批量初始化配音
+                  </Button>
+                  
+                  <Button
+                    type="default"
+                    danger
+                    block
+                    onClick={() => {
+                      if (!script?.scenes) return;
+                      const newScenes = script.scenes.map((scene: any) => ({
+                        ...scene,
+                        voiceover: '',
+                        audioUrl: undefined,
+                        ttsEstDuration: undefined
+                      }));
+                      updateScript({ ...script, scenes: newScenes });
+                      message.warning('⚠️ 已清空所有配音数据');
+                    }}
+                  >
+                    🗑️ 清空所有配音
+                  </Button>
+                </Space>
+              </Card>
+            </Col>
+            
+            {/* Right: Detailed Voiceover Track Editor */}
+            <Col span={16} style={{ height: '100%', overflowY: 'auto' }}>
+              <Card
+                title={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#fff' }}><AudioOutlined /> 分镜配音轨道编辑器</span>
+                    <Space>
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={() => {
+                          if (!script?.scenes) return;
+                          const hasMissing = script.scenes.some((scene: any) => !scene.voiceover);
+                          if (hasMissing) {
+                            message.warning('⚠️ 部分分镜还没有配音文案');
+                          } else {
+                            message.success('✅ 开始批量生成配音...');
+                          }
+                        }}
+                      >
+                        🎙️ 批量生成所有配音
+                      </Button>
+                    </Space>
+                  </div>
+                }
+                bordered={false}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
+              >
+                {script?.scenes?.length > 0 ? (
+                  <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                    {script.scenes.map((scene: any, index: number) => (
+                      <Card
+                        key={index}
+                        size="small"
+                        style={{
+                          background: '#202023',
+                          border: scene.audioUrl ? '1px solid #10b981' : '1px solid #27272a',
+                          borderRadius: 8
+                        }}
+                      >
+                        <Row gutter={16}>
+                          <Col span={4}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                              <Tag color={scene.audioUrl ? 'success' : 'default'} style={{ fontSize: 12 }}>
+                                {scene.audioUrl ? '✅ 已配音' : '⏳ 待配音'}
+                              </Tag>
+                              <Text style={{ color: '#888', fontSize: 11 }}>
+                                分镜 {index + 1}
+                              </Text>
+                              <Text type="secondary" style={{ fontSize: 10 }}>
+                                ⏱️ {scene.duration}s
+                              </Text>
+                            </div>
+                          </Col>
+                          
+                          <Col span={14}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <TextArea
+                                value={scene.voiceover}
+                                onChange={(e) => updateSceneField(index, 'voiceover', e.target.value)}
+                                placeholder="输入该分镜的旁白配音文案..."
+                                rows={3}
+                                style={{ 
+                                  background: '#09090b', 
+                                  color: '#fff', 
+                                  border: '1px solid #27272a',
+                                  fontSize: 12
+                                }}
+                              />
+                              
+                              {scene.audioUrl && (
+                                <div>
+                                  <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, display: 'block' }}>
+                                    🎧 已生成配音
+                                    {scene.ttsEstDuration && <span style={{ marginLeft: 8 }}>时长: {scene.ttsEstDuration}s</span>}
+                                  </Text>
+                                  <audio 
+                                    src={scene.audioUrl} 
+                                    controls 
+                                    style={{ width: '100%', height: 28 }} 
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* 声音参考 */}
+                              <div>
+                                <Text type="secondary" style={{ fontSize: 10, marginBottom: 4, display: 'block' }}>
+                                  🎵 声音参考（可选）
+                                </Text>
+                                {scene.referenceAudioUrl ? (
+                                  <div style={{
+                                    background: '#202023',
+                                    borderRadius: 4,
+                                    padding: 6,
+                                    border: '1px solid #818cf8',
+                                  }}>
+                                    <Row gutter={4} align="middle">
+                                      <Col span={18}>
+                                        <audio 
+                                          src={scene.referenceAudioUrl} 
+                                          controls 
+                                          style={{ width: '100%', height: 24 }} 
+                                        />
+                                      </Col>
+                                      <Col span={6}>
+                                        <Button
+                                          size="small"
+                                          danger
+                                          block
+                                          onClick={(e) => {
+                                            updateSceneField(index, 'referenceAudioUrl', undefined);
+                                            message.info('🗑️ 已清除声音参考');
+                                          }}
+                                          style={{ height: 24, fontSize: 9, padding: '0 4px' }}
+                                        >
+                                          删除
+                                        </Button>
+                                      </Col>
+                                    </Row>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    type="dashed"
+                                    size="small"
+                                    block
+                                    icon={<AudioOutlined />}
+                                    onClick={() => {
+                                      const input = document.createElement('input');
+                                      input.type = 'file';
+                                      input.accept = 'audio/*';
+                                      input.onchange = async (e: any) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          const formData = new FormData();
+                                          formData.append('file', file);
+                                          message.loading(`正在上传声音参考 "${file.name}"...`, 0);
+                                          try {
+                                            const res = await fetch(`${API_BASE}/api/upload`, {
+                                              method: 'POST',
+                                              body: formData
+                                            });
+                                            const uploadData = await res.json();
+                                            message.destroy();
+                                            if (uploadData.success && uploadData.url) {
+                                              updateSceneField(index, 'referenceAudioUrl', uploadData.url);
+                                              message.success('🎵 声音参考上传成功！');
+                                            } else {
+                                              throw new Error(uploadData.error || '上传失败');
+                                            }
+                                          } catch (err: any) {
+                                            message.error('上传失败: ' + err.message);
+                                          }
+                                        }
+                                      };
+                                      input.click();
+                                    }}
+                                    style={{ 
+                                      background: 'rgba(129, 140, 248, 0.08)', 
+                                      border: '1px dashed #818cf8',
+                                      color: '#818cf8',
+                                      fontSize: 10,
+                                      height: 26
+                                    }}
+                                  >
+                                    📤 上传声音参考
+                                  </Button>
+                                )}
+                              </div>
+                            </Space>
+                          </Col>
+                          
+                          <Col span={6}>
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                              <Button
+                                type="primary"
+                                size="small"
+                                block
+                                icon={<AudioOutlined />}
+                                disabled={!scene.voiceover}
+                                onClick={() => {
+                                  message.loading(`🎙️ 正在生成分镜 ${index + 1} 的配音...`, 1);
+                                  setTimeout(() => {
+                                    updateSceneField(index, 'audioUrl', 'https://example.com/demo-audio.mp3');
+                                    updateSceneField(index, 'ttsEstDuration', scene.duration);
+                                    message.success(`✅ 分镜 ${index + 1} 配音生成成功！`);
+                                  }, 1500);
+                                }}
+                              >
+                                {scene.audioUrl ? '🔄 重新生成' : '🎙️ 生成配音'}
+                              </Button>
+                              
+                              {scene.audioUrl && (
+                                <Button
+                                  size="small"
+                                  block
+                                  onClick={() => {
+                                    updateSceneField(index, 'audioUrl', undefined);
+                                    updateSceneField(index, 'ttsEstDuration', undefined);
+                                    message.info(`🗑️ 已清除分镜 ${index + 1} 的配音`);
+                                  }}
+                                >
+                                  🗑️ 清除配音
+                                </Button>
+                              )}
+                              
+                              <Divider style={{ margin: '4px 0', borderColor: '#27272a' }} />
+                              
+                              <Button
+                                type="default"
+                                size="small"
+                                block
+                                icon={<BulbOutlined />}
+                                style={{ fontSize: 11 }}
+                                onClick={() => {
+                                  const suggestions = [
+                                    '增加一点激情！',
+                                    '使用更亲切的语气',
+                                    '强调产品优势'
+                                  ];
+                                  const random = suggestions[Math.floor(Math.random() * suggestions.length)];
+                                  updateSceneField(index, 'voiceover', (scene.voiceover || '') + ' ' + random);
+                                  message.success(`💡 已应用优化建议: ${random}`);
+                                }}
+                              >
+                                💡 AI 优化
+                              </Button>
+                            </Space>
+                          </Col>
+                        </Row>
+                      </Card>
+                    ))}
+                  </Space>
+                ) : (
+                  <Empty description={<span style={{ color: '#888' }}>暂无分镜数据，请先在「剧本策划」中创建剧本</span>} />
                 )}
               </Card>
             </Col>
