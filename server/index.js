@@ -79,20 +79,28 @@ app.use((req, res, next) => {
   req.logger = logger.childWithTrace(traceId);
   req.startTime = Date.now();
 
+  const originalPath = req.originalUrl ? req.originalUrl.split('?')[0] : req.path;
+
   req.logger.info('Incoming request', {
+    traceId,
+    service: 'aigc-video-server',
+    version: '1.0.0',
     method: req.method,
-    path: req.path,
+    path: originalPath,
     ip: req.ip,
     userAgent: req.get('user-agent')
   });
 
   res.on('finish', () => {
     const duration = Date.now() - req.startTime;
-    observabilityService.trackRequest(req.method, req.path, res.statusCode, duration);
+    observabilityService.trackRequest(req.method, originalPath, res.statusCode, duration);
     
     req.logger.info('Request completed', {
+      traceId,
+      service: 'aigc-video-server',
+      version: '1.0.0',
       method: req.method,
-      path: req.path,
+      path: originalPath,
       statusCode: res.statusCode,
       duration: `${duration}ms`
     });
@@ -102,8 +110,11 @@ app.use((req, res, next) => {
     if (!res.writableEnded) {
       const duration = Date.now() - req.startTime;
       req.logger.warn('Request closed', {
+        traceId,
+        service: 'aigc-video-server',
+        version: '1.0.0',
         method: req.method,
-        path: req.path,
+        path: originalPath,
         duration: `${duration}ms`
       });
     }

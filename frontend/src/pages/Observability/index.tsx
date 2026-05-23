@@ -32,10 +32,12 @@ const ObservabilityPage = () => {
         alertsRes.json(),
       ]);
 
-      if (healthData.success) setHealth(healthData);
-      if (systemData.success) setSystemMetrics(systemData);
-      if (requestData.success) setRequestMetrics(requestData);
-      if (alertsData.success) setAlerts(alertsData.alerts);
+      if (healthData.success && healthData.data) setHealth(healthData.data);
+      if (systemData.success && systemData.data) setSystemMetrics(systemData.data);
+      if (requestData.success && requestData.data) setRequestMetrics(requestData.data);
+      if (alertsData.success && alertsData.data) {
+        setAlerts(alertsData.data.history || alertsData.data || []);
+      }
     } catch (error) {
       console.error('加载数据失败:', error);
       message.error('加载数据失败');
@@ -44,9 +46,9 @@ const ObservabilityPage = () => {
     }
   };
 
-  const handleResolveAlert = async (index) => {
+  const handleResolveAlert = async (id) => {
     try {
-      const response = await fetch(`${API_BASE}/api/observability/alerts/${index}/resolve`, { method: 'POST' });
+      const response = await fetch(`${API_BASE}/api/observability/alerts/${id}/resolve`, { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         message.success('告警已处理');
@@ -77,11 +79,14 @@ const ObservabilityPage = () => {
     { title: '状态', dataIndex: 'resolved', key: 'resolved', render: (resolved) => (
       resolved ? <Tag color="success">已处理</Tag> : <Tag color="warning">未处理</Tag>
     )},
-    { title: '操作', key: 'actions', render: (_, __, index) => (
-      !alerts[index].resolved && (
-        <Button type="text" size="small" onClick={() => handleResolveAlert(index)}>处理</Button>
-      )
-    )},
+    { title: '操作', key: 'actions', render: (_, record, index) => {
+      const alertId = record.id !== undefined ? record.id : index;
+      return (
+        !record.resolved && (
+          <Button type="text" size="small" onClick={() => handleResolveAlert(alertId)}>处理</Button>
+        )
+      );
+    }},
   ];
 
   const endpointColumns = [
