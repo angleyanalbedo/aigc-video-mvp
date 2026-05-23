@@ -160,4 +160,30 @@ router.post('/generate-embedding', (req, res) => {
   }
 });
 
+router.put('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tags, filename, content } = req.body;
+    
+    const material = materialService.updateMaterial(id, { tags, filename, content });
+    if (!material) {
+      return res.status(404).json({
+        success: false,
+        error: '素材不存在'
+      });
+    }
+    
+    res.json({
+      success: true,
+      material
+    });
+  } catch (error) {
+    console.error('更新素材失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '更新素材失败: ' + error.message
+    });
+  }
+});
+
 module.exports = router;

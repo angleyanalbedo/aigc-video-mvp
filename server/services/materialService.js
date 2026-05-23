@@ -188,6 +188,32 @@ class MaterialService {
   deleteMaterial(id) {
     return this.materials.delete(id);
   }
+
+  updateMaterial(id, data) {
+    const material = this.materials.get(id);
+    if (!material) return null;
+
+    const updated = {
+      ...material,
+      ...data,
+      updatedAt: Date.now()
+    };
+
+    this.materials.set(id, updated);
+
+    // 同步更新 SQLite 数据库中的对应记录
+    try {
+      const materialModel = require('../models/material');
+      if (materialModel.getById(id)) {
+        materialModel.update(id, data);
+        console.log(`✅ 同步更新 SQLite 中的素材 ${id}`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ 同步 SQLite 素材失败:`, err.message);
+    }
+
+    return updated;
+  }
 }
 
 module.exports = new MaterialService();
