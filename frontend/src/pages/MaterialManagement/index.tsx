@@ -194,7 +194,7 @@ const MaterialManagementPage = () => {
               <List.Item>
                 <Card
                   hoverable
-                  style={{ height: '100%' }}
+                  style={{ height: '100%', borderRadius: 12, overflow: 'hidden' }}
                   cover={
                     item.type && item.type.startsWith('image') ? (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
@@ -252,11 +252,11 @@ const MaterialManagementPage = () => {
           </Descriptions>
           <div style={{ marginTop: 16 }}>
             {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
-              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%' }} />
+              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
             ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
-              <video src={selectedMaterial.url} controls style={{ maxWidth: '100%' }} />
+              <video src={selectedMaterial.url} controls style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
             ) : (
-              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%' }} />
+              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
             )}
           </div>
         </Card>
