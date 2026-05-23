@@ -127,6 +127,7 @@ const WorkbenchPage: React.FC = () => {
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderStatus, setRenderStatus] = useState('');
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [isRenderingAllScenes, setIsRenderingAllScenes] = useState(false);
 
   // Agent Workflow 节点状态（供 Header 步骤条消费）
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
@@ -517,6 +518,29 @@ const WorkbenchPage: React.FC = () => {
     }
   };
 
+  // 一键渲染所有分镜
+  const handleRenderAllScenes = async () => {
+    if (!script || !script.scenes || script.scenes.length === 0) {
+      message.warning('暂无分镜场景数据！');
+      return;
+    }
+    setIsRenderingAllScenes(true);
+    try {
+      // 批量启动所有非 completed / 非渲染中 的分镜渲染任务
+      script.scenes.forEach((s: any, idx: number) => {
+        if (s.status !== 'completed' && !s.rendering) {
+          generateSingleSceneVideo(idx);
+        }
+      });
+      message.success('已成功一键启动所有未渲染分镜的生成任务！');
+    } catch (e) {
+      console.error(e);
+      message.error('一键启动失败，请检查网络');
+    } finally {
+      setIsRenderingAllScenes(false);
+    }
+  };
+
   // Batch compilation and render trigger
   const handleCompileFinalVideo = async () => {
     if (!script) {
@@ -735,7 +759,7 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><AudioOutlined /> AI 创意导演 Copilot</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
                 bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '12px 16px' }}
               >
                 {/* Chat Message Lists */}
@@ -748,7 +772,7 @@ const WorkbenchPage: React.FC = () => {
                     }}>
                       <div style={{
                         maxWidth: '85%',
-                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#1e1e2f',
+                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#27272a',
                         color: '#fff',
                         padding: '10px 14px',
                         borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
@@ -770,7 +794,7 @@ const WorkbenchPage: React.FC = () => {
                   ))}
                   {isChatting && (
                     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
-                      <div style={{ background: '#1e1e2f', padding: '10px 14px', borderRadius: '12px 12px 12px 2px' }}>
+                      <div style={{ background: '#27272a', padding: '10px 14px', borderRadius: '12px 12px 12px 2px' }}>
                         <span style={{ color: '#818cf8' }}><LoadingOutlined /> AI 导演正在深入构思中...</span>
                       </div>
                     </div>
@@ -779,7 +803,7 @@ const WorkbenchPage: React.FC = () => {
                 </div>
 
                 {/* Input Controls */}
-                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #1f1f2e', paddingTop: 12 }}>
+                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #27272a', paddingTop: 12 }}>
                   <TextArea
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -791,7 +815,7 @@ const WorkbenchPage: React.FC = () => {
                     }}
                     placeholder="输入剧本创作想法...例如：'帮我制作一个破壁机的带货剧本，突出超静音特色'"
                     autoSize={{ minRows: 2, maxRows: 3 }}
-                    style={{ background: '#1a1a2e', border: '1px solid #2a2a3e', color: '#fff', borderRadius: 8 }}
+                    style={{ background: '#202023', border: '1px solid #2e2e33', color: '#fff', borderRadius: 8 }}
                   />
                   <Button
                     type="primary"
@@ -809,11 +833,11 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><SaveOutlined /> 剧本画布预览</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%', overflowY: 'auto' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%', overflowY: 'auto' }}
               >
                 {script ? (
                   <div>
-                    <div style={{ background: '#1a1a2e', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                    <div style={{ background: '#202023', padding: 16, borderRadius: 8, marginBottom: 20 }}>
                       <Title level={4} style={{ color: '#fff', margin: '0 0 8px 0' }}>📄 {script.title}</Title>
                       <Paragraph style={{ color: '#a1a1aa', margin: 0, fontSize: 13 }}>
                         <strong>核心创意创意:</strong> {script.description}
@@ -824,7 +848,7 @@ const WorkbenchPage: React.FC = () => {
                     {script.scenes?.map((scene: any, index: number) => (
                       <div key={index} style={{
                         display: 'flex',
-                        background: '#161625',
+                        background: '#27272a',
                         borderRadius: 8,
                         padding: 16,
                         marginBottom: 12,
@@ -889,14 +913,26 @@ const WorkbenchPage: React.FC = () => {
             <Col span={18} style={{ height: '100%', overflowY: 'auto' }}>
               <Card
                 title={
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                     <span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景画幅生成）</span>
-                    {injectingMaterial && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: '#818cf8' }}>点击分镜卡片注入参考图 →</span>
-                        <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
-                      </div>
-                    )}
+                    <Space size="middle">
+                      {injectingMaterial && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 12, color: '#818cf8' }}>点击分镜卡片注入参考图 →</span>
+                          <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
+                        </div>
+                      )}
+                      <Button
+                        type="primary"
+                        icon={<RocketOutlined />}
+                        loading={isRenderingAllScenes}
+                        onClick={handleRenderAllScenes}
+                        disabled={!script || !script.scenes || script.scenes.length === 0}
+                        style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: 6 }}
+                      >
+                        一键渲染所有分镜
+                      </Button>
+                    </Space>
                   </div>
                 }
                 bordered={false}
@@ -1308,7 +1344,7 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><ScissorOutlined /> AI 剪辑师 Copilot</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, flexShrink: 0 }}
+                style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
                 bodyStyle={{ padding: 16 }}
               >
                 {!clipPlan ? (
@@ -1328,7 +1364,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                 ) : (
                   <div>
-                    <div style={{ background: '#1a1a2e', padding: 12, borderRadius: 8, marginBottom: 12, borderLeft: '4px solid #6366f1' }}>
+                    <div style={{ background: '#202023', padding: 12, borderRadius: 8, marginBottom: 12, borderLeft: '4px solid #6366f1' }}>
                       <div style={{ fontWeight: 600, color: '#fff', fontSize: 13.5, marginBottom: 4 }}>🎉 智能剪辑编排方案已应用：</div>
                       <div style={{ color: '#34d399', fontSize: 12, marginBottom: 4 }}>
                         🎵 推荐背景乐: <strong>{clipPlan.audio?.bgm || '欢快乐活'}</strong> | 音量: <strong>{Math.round((clipPlan.audio?.volume || 0.2) * 100)}%</strong>

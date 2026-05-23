@@ -78,8 +78,9 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           width: 40,
-          background: '#0f0f18',
-          borderRight: '1px solid #1f1f2e',
+          background: '#18181b',
+          borderRadius: 12,
+          border: '1px solid #27272a',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -99,7 +100,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
               style={{
                 width: 28,
                 height: 28,
-                borderRadius: 4,
+                borderRadius: 6,
                 overflow: 'hidden',
                 border: '1px solid #27272a',
                 flexShrink: 0,
@@ -121,11 +122,13 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       style={{
         width: 192,
         flexShrink: 0,
-        background: '#0f0f18',
-        borderRight: '1px solid #1f1f2e',
+        background: '#18181b',
+        borderRadius: 12,
+        border: '1px solid #27272a',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        overflow: 'hidden',
         transition: 'width 0.2s ease',
       }}
       onDrop={handleDrop}
@@ -135,7 +138,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           padding: '10px 12px',
-          borderBottom: '1px solid #1f1f2e',
+          borderBottom: '1px solid #27272a',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -169,7 +172,8 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
           style={{
             background: 'rgba(99, 102, 241, 0.15)',
             border: '1px solid #6366f1',
-            borderRadius: 0,
+            borderRadius: 8,
+            margin: '8px 8px 0',
             padding: '6px 12px',
             fontSize: 11,
             color: '#818cf8',
@@ -213,7 +217,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                   key={m.id}
                   style={{
                     position: 'relative',
-                    borderRadius: 6,
+                    borderRadius: 8,
                     overflow: 'hidden',
                     border: isInjecting
                       ? '2px solid #6366f1'
@@ -253,7 +257,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                             color: '#fff',
                             background: '#6366f1',
                             padding: '3px 8px',
-                            borderRadius: 4,
+                            borderRadius: 6,
                             fontWeight: 600,
                           }}
                         >
@@ -273,7 +277,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           padding: '8px 10px',
-          borderTop: '1px solid #1f1f2e',
+          borderTop: '1px solid #27272a',
           flexShrink: 0,
         }}
       >
@@ -294,9 +298,9 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
           style={{
             width: '100%',
             height: 36,
-            background: uploading ? '#1a1a2e' : 'rgba(99,102,241,0.12)',
+            background: uploading ? '#18181b' : 'rgba(99,102,241,0.12)',
             border: '1px dashed #4f46e5',
-            borderRadius: 6,
+            borderRadius: 8,
             color: uploading ? '#52525b' : '#818cf8',
             cursor: uploading ? 'not-allowed' : 'pointer',
             fontSize: 12,
