@@ -44,12 +44,16 @@ const projectModel = {
     const { total } = db.prepare(countQuery).all(...params.slice(0, -2))[0];
 
     return {
-      list: list.map(item => ({
-        ...item,
-        product_info: parseJSON(item.product_info),
-        script: parseJSON(item.script),
-        settings: parseJSON(item.settings)
-      })),
+      list: list.map(item => {
+        const materials = db.prepare('SELECT * FROM materials WHERE project_id = ?').all(item.id);
+        return {
+          ...item,
+          product_info: parseJSON(item.product_info),
+          script: parseJSON(item.script),
+          settings: parseJSON(item.settings),
+          materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags) }))
+        };
+      }),
       total,
       page: Number(page),
       pageSize: Number(pageSize),
@@ -60,11 +64,13 @@ const projectModel = {
   getById(id) {
     const item = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
     if (!item) return null;
+    const materials = db.prepare('SELECT * FROM materials WHERE project_id = ?').all(id);
     return {
       ...item,
       product_info: parseJSON(item.product_info),
       script: parseJSON(item.script),
-      settings: parseJSON(item.settings)
+      settings: parseJSON(item.settings),
+      materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags) }))
     };
   },
 
@@ -85,6 +91,14 @@ const projectModel = {
       now,
       now
     );
+
+    if (data.materialIds && Array.isArray(data.materialIds)) {
+      const updateStmt = db.prepare('UPDATE materials SET project_id = ? WHERE id = ?');
+      for (const matId of data.materialIds) {
+        updateStmt.run(id, matId);
+      }
+    }
+
     return projectModel.getById(id);
   },
 
@@ -106,6 +120,15 @@ const projectModel = {
       now,
       id
     );
+
+    if (data.materialIds !== undefined && Array.isArray(data.materialIds)) {
+      db.prepare('UPDATE materials SET project_id = NULL WHERE project_id = ?').run(id);
+      const updateStmt = db.prepare('UPDATE materials SET project_id = ? WHERE id = ?');
+      for (const matId of data.materialIds) {
+        updateStmt.run(id, matId);
+      }
+    }
+
     return projectModel.getById(id);
   },
 

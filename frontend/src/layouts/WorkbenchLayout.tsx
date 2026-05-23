@@ -41,12 +41,6 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
       tooltip: '项目管理',
     },
     {
-      key: 'workbench',
-      path: '/workbench/1',
-      icon: <EditOutlined />,
-      tooltip: '工作台',
-    },
-    {
       key: 'video-creation',
       path: '/video-creation',
       icon: <VideoCameraAddOutlined />,

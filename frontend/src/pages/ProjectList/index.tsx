@@ -36,6 +36,7 @@ const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 const ProjectListPage: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
@@ -61,9 +62,28 @@ const ProjectListPage: React.FC = () => {
     }
   };
 
+  // 加载素材列表（用于项目绑定）
+  const loadMaterials = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/materials`);
+      const data = await res.json();
+      if (data.success) {
+        setMaterials(data.data || []);
+      }
+    } catch (e) {
+      console.error('加载素材失败', e);
+    }
+  };
+
   useEffect(() => {
     loadProjects();
   }, []);
+
+  useEffect(() => {
+    if (showCreateModal) {
+      loadMaterials();
+    }
+  }, [showCreateModal]);
 
   useEffect(() => {
     const timer = setTimeout(() => loadProjects(), 300);
@@ -282,7 +302,34 @@ const ProjectListPage: React.FC = () => {
             <Input placeholder="输入项目名称" />
           </Form.Item>
           <Form.Item name="description" label="项目描述">
-            <Input.TextArea placeholder="简单描述这个项目" rows={3} />
+            <Input.TextArea placeholder="简单描述这个项目" rows={2} />
+          </Form.Item>
+          <Form.Item name="materialIds" label="关联商品素材 (可多选)">
+            <Select
+              mode="multiple"
+              placeholder="选择已分析的商品图片/视频素材"
+              allowClear
+              optionLabelProp="label"
+              style={{ width: '100%' }}
+            >
+              {materials.map((m) => (
+                <Option key={m.id} value={m.id} label={m.filename}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                    {m.type && m.type.startsWith('image') ? (
+                      <img src={m.url} alt={m.filename} style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />
+                    ) : (
+                      <div style={{ width: 32, height: 32, backgroundColor: '#eaeaea', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4 }}>🎥</div>
+                    )}
+                    <div style={{ lineHeight: '1.2' }}>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>{m.filename}</div>
+                      <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2 }}>
+                        {m.tags && Array.isArray(m.tags) ? m.tags.slice(0, 3).join(', ') : (m.tags || '暂无标签')}
+                      </div>
+                    </div>
+                  </div>
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>
