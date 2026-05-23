@@ -92,4 +92,21 @@ router.get('/steps', async (req, res) => {
   });
 });
 
+// Expose Video Editing Agent (ClipAgent) Smart planning endpoint
+router.post('/clip-plan', async (req, res) => {
+  const { script, materials, options } = req.body;
+
+  if (!script) {
+    return res.status(400).json({ success: false, error: 'Script is required' });
+  }
+
+  try {
+    const plan = await clipAgent.createClipPlan(script, materials || [], options || {});
+    res.json({ success: true, plan });
+  } catch (error) {
+    console.error('Clip plan generation failed:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;
