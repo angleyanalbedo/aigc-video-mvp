@@ -1,5 +1,5 @@
 // 调试 Mock 服务
-const { mockChatCompletion, mockCreateVideoTask, mockGetVideoTask, mockTasks } = require('./services/mockArkService');
+const { mockChatCompletion, mockCreateVideoTask, mockGetVideoTask, mockTasks } = require('../services/mockArkService');
 
 console.log('=== 调试 Mock 服务 ===');
 console.log('当前 mockTasks:', Array.from(mockTasks.keys()));
@@ -10,7 +10,7 @@ mockCreateVideoTask([{ type: 'text', text: 'test' }], {})
   .then(task => {
     console.log('创建任务:', task);
     console.log('任务ID:', task.id);
-    
+
     // 等一会儿查询
     setTimeout(() => {
       console.log('\n--- 查询任务状态 ---');
