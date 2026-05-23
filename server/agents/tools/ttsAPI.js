@@ -10,9 +10,19 @@ async function generateTTS({ text, voice = 'zh-CN-XiaoxiaoNeural', rate = '+0%' 
   const outputFile = path.join(TASKS_DIR, `tts_${Date.now()}.mp3`);
   const subtitleFile = outputFile.replace('.mp3', '.srt');
 
+  if (!fs.existsSync(TASKS_DIR)) {
+    fs.mkdirSync(TASKS_DIR, { recursive: true });
+  }
+
   try {
     const cmd = `edge-tts --voice "${voice}" --rate "${rate}" --text "${text}" --write-media "${outputFile}" --write-subtitles "${subtitleFile}"`;
     await execAsync(cmd);
+
+    // 检查文件是否有效
+    const stats = fs.statSync(outputFile);
+    if (stats.size === 0) {
+      throw new Error('TTS 生成的音频文件为空');
+    }
 
     return {
       audioFile: outputFile,
@@ -20,46 +30,9 @@ async function generateTTS({ text, voice = 'zh-CN-XiaoxiaoNeural', rate = '+0%' 
       duration: await getAudioDuration(outputFile)
     };
   } catch (error) {
-    console.warn('TTS 生成失败，使用 Mock:', error.message);
-    return generateMockTTS({ text, outputFile, subtitleFile });
+    console.error('TTS 生成失败:', error.message);
+    throw new Error(`TTS 生成失败: ${error.message}`);
   }
-}
-
-async function generateMockTTS({ text, outputFile, subtitleFile }) {
-  if (!fs.existsSync(TASKS_DIR)) {
-    fs.mkdirSync(TASKS_DIR, { recursive: true });
-  }
-
-  fs.writeFileSync(outputFile, Buffer.from([]));
-
-  const sentences = text.split(/[。！？!?\n]+/).filter(s => s.trim());
-  const durationPerSentence = 3;
-
-  let srtContent = '';
-  let currentTime = 0;
-
-  sentences.forEach((sentence, index) => {
-    if (!sentence.trim()) return;
-
-    const startTime = formatSRTTime(currentTime);
-    const endTime = formatSRTTime(currentTime + durationPerSentence);
-
-    srtContent += `${index + 1}\n`;
-    srtContent += `${startTime} --> ${endTime}\n`;
-    srtContent += `${sentence.trim()}\n\n`;
-
-    currentTime += durationPerSentence;
-  });
-
-  fs.writeFileSync(subtitleFile, srtContent, 'utf-8');
-
-  const estimatedDuration = Math.max(3, Math.ceil(text.length / 8));
-
-  return {
-    audioFile: outputFile,
-    subtitleFile: subtitleFile,
-    duration: estimatedDuration
-  };
 }
 
 function formatSRTTime(seconds) {
@@ -81,6 +54,5 @@ async function getAudioDuration(file) {
 }
 
 module.exports = {
-  generateTTS,
-  generateMockTTS
+  generateTTS
 };

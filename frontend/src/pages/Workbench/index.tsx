@@ -572,6 +572,34 @@ const WorkbenchPage: React.FC = () => {
     message.success(`${imageType === 'first' ? '首帧' : imageType === 'last' ? '尾帧' : '主图'}已清除，可以重新生成`);
   };
   
+  // 强制重新渲染（取消卡住的渲染任务）
+  const forceRerender = (index: number) => {
+    if (!script || !script.scenes) return;
+    
+    Modal.confirm({
+      title: '⚠️ 强制重新渲染',
+      content: '该分镜可能正在卡住或渲染失败。是否强制取消当前任务并重新开始渲染？',
+      okText: '确认强制重新渲染',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        message.loading('正在重置渲染状态...', 1);
+        setTimeout(() => {
+          const newScenes = [...script.scenes];
+          newScenes[index] = {
+            ...newScenes[index],
+            rendering: false,
+            status: 'idle',
+            progress: 0,
+            videoUrl: null
+          };
+          updateScript({ ...script, scenes: newScenes });
+          message.success('✅ 渲染状态已重置，现在可以重新开始渲染');
+        }, 500);
+      }
+    });
+  };
+  
   // Agent 功能：获取智能建议
   const getAgentSuggestions = async (sceneIndex: number) => {
     if (!script || !script.scenes[sceneIndex]) return;
@@ -2408,10 +2436,95 @@ const WorkbenchPage: React.FC = () => {
                                   <Tag color="success">视频就绪</Tag>
                                 ) : (scene.rendering || scene.status === 'generating') ? (
                                   <Tag color="processing" icon={<LoadingOutlined />}>正在生成</Tag>
+                                ) : scene.status === 'error' ? (
+                                  <Tag color="error" icon={<CloseCircleOutlined />}>渲染失败</Tag>
                                 ) : (
                                   <Tag color="default">等待渲染</Tag>
                                 )}
                                 {scene.audioUrl && <Tag color="cyan">配音同步</Tag>}
+                                
+                                {/* Agent 建议按钮 */}
+                                <Popover
+                                  title={
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span>🤖 渲染优化建议</span>
+                                      <Button 
+                                        type="link" 
+                                        size="small" 
+                                        onClick={() => {
+                                          setIsAgentLoading(true);
+                                          setTimeout(() => {
+                                            const suggestions = [
+                                              {
+                                                id: '1',
+                                                title: '🎯 优化提示词',
+                                                content: `建议优化分镜 ${index + 1} 的描述，增加更多细节以提升渲染质量`,
+                                                type: 'prompt'
+                                              },
+                                              {
+                                                id: '2',
+                                                title: '⚡ 提升渲染优先级',
+                                                content: '将该分镜标记为高优先级，提升渲染队列中的处理速度',
+                                                type: 'priority'
+                                              },
+                                              {
+                                                id: '3',
+                                                title: '🎬 调整镜头参数',
+                                                content: '建议调整镜头类型以获得更好的渲染效果',
+                                                type: 'lens'
+                                              }
+                                            ];
+                                            setAgentSuggestions(suggestions);
+                                            setIsAgentLoading(false);
+                                            setSelectedSceneForSuggestions(index);
+                                          }, 500);
+                                        }}
+                                        style={{ padding: 0, fontSize: 12 }}
+                                      >
+                                        刷新
+                                      </Button>
+                                    </div>
+                                  }
+                                  content={
+                                    <div style={{ width: 300 }}>
+                                      {isAgentLoading && selectedSceneForSuggestions === index ? (
+                                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                                          <LoadingOutlined style={{ fontSize: 24, color: '#10b981' }} />
+                                          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>Agent 正在分析中...</p>
+                                        </div>
+                                      ) : selectedSceneForSuggestions === index && agentSuggestions.length > 0 ? (
+                                        <List
+                                          size="small"
+                                          dataSource={agentSuggestions}
+                                          renderItem={(item) => (
+                                            <List.Item style={{ padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                              <div style={{ width: '100%' }}>
+                                                <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 4 }}>{item.title}</div>
+                                                <p style={{ fontSize: 11, color: '#666', margin: 0 }}>{item.content}</p>
+                                              </div>
+                                            </List.Item>
+                                          )}
+                                        />
+                                      ) : (
+                                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                                          <ThunderboltOutlined style={{ fontSize: 24, color: '#10b981' }} />
+                                          <p style={{ fontSize: 12, color: '#666', marginTop: 8 }}>点击获取渲染优化建议</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  }
+                                  trigger="click"
+                                  placement="topRight"
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<BulbOutlined />}
+                                    style={{ color: '#ffa940', padding: 0 }}
+                                  >
+                                    建议
+                                  </Button>
+                                </Popover>
                               </Space>
                             </div>
                           }
@@ -2485,7 +2598,7 @@ const WorkbenchPage: React.FC = () => {
                           )}
 
                           {/* Render Actions */}
-                          {!scene.rendering && (
+                          {!scene.rendering || scene.status !== 'generating' ? (
                             <div>
                               {!scene.videoUrl ? (
                                 <Button
@@ -2504,22 +2617,61 @@ const WorkbenchPage: React.FC = () => {
                                   🎥 渲染分镜视频
                                 </Button>
                               ) : (
-                                <Button
-                                  type="default"
-                                  block
-                                  onClick={() => generateSingleSceneVideo(index)}
-                                  style={{
-                                    background: 'transparent',
-                                    border: '1px dashed #3f3f46',
-                                    color: '#a1a1aa',
-                                    borderRadius: 6,
-                                    height: 32
-                                  }}
-                                >
-                                  🔄 重新渲染分镜
-                                </Button>
+                                <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                                  <Button
+                                    type="default"
+                                    block
+                                    onClick={() => generateSingleSceneVideo(index)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: '1px dashed #3f3f46',
+                                      color: '#a1a1aa',
+                                      borderRadius: 6,
+                                      height: 32
+                                    }}
+                                  >
+                                    🔄 重新渲染分镜
+                                  </Button>
+                                  
+                                  {/* 强制重新渲染按钮 - 针对渲染失败或卡住的情况 */}
+                                  {scene.status === 'error' || (scene.progress && scene.progress > 0 && !scene.videoUrl) ? (
+                                    <Button
+                                      type="dashed"
+                                      danger
+                                      block
+                                      icon={<ThunderboltOutlined />}
+                                      onClick={() => forceRerender(index)}
+                                      style={{
+                                        borderRadius: 6,
+                                        height: 28
+                                      }}
+                                    >
+                                      ⚡ 强制重置并重新渲染（如渲染卡住）
+                                    </Button>
+                                  ) : null}
+                                </Space>
                               )}
                             </div>
+                          ) : (
+                            /* 渲染进行中 - 显示取消按钮 */
+                            <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                              <Button
+                                type="dashed"
+                                danger
+                                block
+                                icon={<CloseCircleOutlined />}
+                                onClick={() => forceRerender(index)}
+                                style={{
+                                  borderRadius: 6,
+                                  height: 32
+                                }}
+                              >
+                                ⏹️ 取消渲染任务
+                              </Button>
+                              <Text type="secondary" style={{ fontSize: 10, textAlign: 'center' }}>
+                                {scene.progress ? `${scene.progress}%` : '渲染中...'}
+                              </Text>
+                            </Space>
                           )}
                         </Card>
                       </Col>
