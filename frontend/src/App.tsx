@@ -14,26 +14,32 @@ import StatusPage from './pages/Status';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
+// Dashboard wrapper for global pages sharing the sidebar layout
+const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return <WorkbenchLayout>{children}</WorkbenchLayout>;
+};
+
 function App() {
   return (
     <ErrorBoundary>
       <Router>
-        <WorkbenchLayout>
-          <Routes>
-            <Route path="/status" element={<StatusPage />} />
-            <Route path="/" element={<ProjectListPage />} />
-            <Route path="/projects" element={<ProjectListPage />} />
-            <Route path="/workbench/:projectId" element={<WorkbenchPage />} />
-            <Route path="/video-creation" element={<VideoCreationPage />} />
-            <Route path="/task-center" element={<TaskCenterPage />} />
-            <Route path="/materials" element={<MaterialManagementPage />} />
-            <Route path="/attribution" element={<AttributionAnalysisPage />} />
-            <Route path="/abtest" element={<ABTestPage />} />
-            <Route path="/observability" element={<ObservabilityPage />} />
-            <Route path="/compliance" element={<CompliancePage />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-          </Routes>
-        </WorkbenchLayout>
+        <Routes>
+          {/* Dynamic, Focused Workbench Studio (Sidebar adapts to project context) */}
+          <Route path="/workbench/:projectId" element={<DashboardWrapper><WorkbenchPage /></DashboardWrapper>} />
+
+          {/* Global Management Portal (With Left Sidebar Navigation) */}
+          <Route path="/" element={<DashboardWrapper><ProjectListPage /></DashboardWrapper>} />
+          <Route path="/projects" element={<DashboardWrapper><ProjectListPage /></DashboardWrapper>} />
+          <Route path="/video-creation" element={<DashboardWrapper><VideoCreationPage /></DashboardWrapper>} />
+          <Route path="/task-center" element={<DashboardWrapper><TaskCenterPage /></DashboardWrapper>} />
+          <Route path="/materials" element={<DashboardWrapper><MaterialManagementPage /></DashboardWrapper>} />
+          <Route path="/attribution" element={<DashboardWrapper><AttributionAnalysisPage /></DashboardWrapper>} />
+          <Route path="/abtest" element={<DashboardWrapper><ABTestPage /></DashboardWrapper>} />
+          <Route path="/observability" element={<DashboardWrapper><ObservabilityPage /></DashboardWrapper>} />
+          <Route path="/compliance" element={<DashboardWrapper><CompliancePage /></DashboardWrapper>} />
+          <Route path="/status" element={<DashboardWrapper><StatusPage /></DashboardWrapper>} />
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Routes>
       </Router>
     </ErrorBoundary>
   );

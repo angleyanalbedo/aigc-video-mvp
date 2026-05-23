@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   SendOutlined,
   SaveOutlined,
@@ -11,7 +11,6 @@ import {
   PictureOutlined,
   AudioOutlined,
   RocketOutlined,
-  DeleteOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
 import {
@@ -30,7 +29,6 @@ import {
   Col,
   Slider,
   message,
-  Tabs,
   Empty,
   Tooltip
 } from 'antd';
@@ -75,7 +73,9 @@ const WorkbenchPage: React.FC = () => {
   // Unified State
   const [project, setProject] = useState<any>(null);
   const [script, setScript] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState('script');
+  
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'script';
   
   // Chat Co-pilot State
   const [chatHistory, setChatHistory] = useState<Message[]>([]);
@@ -411,12 +411,12 @@ const WorkbenchPage: React.FC = () => {
   };
 
   return (
-    <Layout style={{ minHeight: 'calc(100vh - 64px)', background: '#0a0a0f', color: '#e4e4e7' }}>
+    <Layout style={{ height: '100%', minHeight: '100%', background: '#09090b', color: '#e4e4e7' }}>
       {/* Premium Dark Navigation Header */}
       <div style={{
         padding: '16px 24px',
-        background: '#12121e',
-        borderBottom: '1px solid #1f1f2e',
+        background: '#121214',
+        borderBottom: '1px solid #1f1f23',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
@@ -452,58 +452,14 @@ const WorkbenchPage: React.FC = () => {
         </Space>
       </div>
 
-      {/* Steps/Tabs Guided Navigation bar */}
-      <div style={{ background: '#12121e', padding: '0 24px', borderBottom: '1px solid #1f1f2e' }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          style={{ marginBottom: 0 }}
-          tabBarStyle={{ borderBottom: 'none' }}
-          items={[
-            {
-              key: 'script',
-              label: (
-                <span style={{ fontSize: 15, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <SendOutlined /> 1. 剧本协同
-                </span>
-              ),
-            },
-            {
-              key: 'storyboard',
-              label: (
-                <span style={{ fontSize: 15, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <VideoCameraOutlined /> 2. 分镜设计
-                </span>
-              ),
-            },
-            {
-              key: 'audio',
-              label: (
-                <span style={{ fontSize: 15, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <CustomerServiceOutlined /> 3. 音轨配音
-                </span>
-              ),
-            },
-            {
-              key: 'render',
-              label: (
-                <span style={{ fontSize: 15, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <RocketOutlined /> 4. 合成输出
-                </span>
-              ),
-            },
-          ]}
-        />
-      </div>
-
       {/* Main Dual-Column Content Panels */}
-      <Content style={{ padding: 24, overflow: 'auto' }}>
+      <Content style={{ padding: 24, flex: 1, overflow: 'hidden' }}>
         
         {/* ============================================================== */}
         {/* TAB 1: SCRIPT COORDINATION PANEL */}
         {/* ============================================================== */}
         {activeTab === 'script' && (
-          <Row gutter={24} style={{ height: 'calc(100vh - 220px)', minHeight: 500 }}>
+          <Row gutter={24} style={{ height: '100%' }}>
             {/* Left: Chat Copilot */}
             <Col span={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Card
@@ -638,14 +594,14 @@ const WorkbenchPage: React.FC = () => {
         {/* TAB 2: STORYBOARD EDITOR (INLINE FORM + SCENE LEVEL RENDER) */}
         {/* ============================================================== */}
         {activeTab === 'storyboard' && (
-          <Row gutter={24} style={{ height: 'calc(100vh - 220px)', minHeight: 500 }}>
+          <Row gutter={24} style={{ height: '100%' }}>
             {/* Left: Chat scene adjustments & project base asset palette */}
             <Col span={6} style={{ height: '100%' }}>
               <Space direction="vertical" size="middle" style={{ width: '100%', height: '100%' }}>
                 <Card
                   title={<span style={{ color: '#fff' }}><PictureOutlined /> 项目绑定商品素材</span>}
                   bordered={false}
-                  style={{ background: '#12121e', borderRadius: 12, flexShrink: 0 }}
+                  style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
                   bodyStyle={{ padding: 12 }}
                 >
                   <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 12 }}>
@@ -656,7 +612,7 @@ const WorkbenchPage: React.FC = () => {
                       {project.materials.map((m: any) => (
                         <Tooltip key={m.id} title={m.filename}>
                           <div style={{
-                            border: '1px solid #2a2a3e',
+                            border: '1px solid #27272a',
                             borderRadius: 6,
                             overflow: 'hidden',
                             position: 'relative',
@@ -666,7 +622,7 @@ const WorkbenchPage: React.FC = () => {
                             {m.type?.startsWith('image') ? (
                               <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             ) : (
-                              <div style={{ width: '100%', height: '100%', background: '#1e1e2f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>🎥</div>
+                              <div style={{ width: '100%', height: '100%', background: '#27272a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>🎥</div>
                             )}
                           </div>
                         </Tooltip>
@@ -680,7 +636,7 @@ const WorkbenchPage: React.FC = () => {
                 <Card
                   title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜精细指令</span>}
                   bordered={false}
-                  style={{ background: '#12121e', borderRadius: 12, flex: 1, overflowY: 'auto' }}
+                  style={{ background: '#18181b', borderRadius: 12, flex: 1, overflowY: 'auto' }}
                   bodyStyle={{ padding: 12 }}
                 >
                   <Paragraph style={{ color: '#a1a1aa', fontSize: 12 }}>
@@ -691,7 +647,7 @@ const WorkbenchPage: React.FC = () => {
                     onChange={(e) => setChatInput(e.target.value)}
                     placeholder="输入微调分镜指令..."
                     rows={3}
-                    style={{ background: '#1a1a2e', color: '#fff', border: '1px solid #2a2a3e', marginBottom: 10 }}
+                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', marginBottom: 10 }}
                   />
                   <Button type="primary" block onClick={handleSendChatMessage}>发送分镜指令</Button>
                 </Card>
@@ -703,14 +659,14 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><VideoCameraOutlined /> 独立分镜场景卡片（支持单场景画幅生成）</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12 }}
+                style={{ background: '#18181b', borderRadius: 12 }}
               >
                 {script && script.scenes && script.scenes.length > 0 ? (
                   <Row gutter={[16, 16]}>
                     {script.scenes.map((scene: Scene, index: number) => (
                       <Col span={12} key={index}>
                         <Card
-                          style={{ background: '#161625', border: '1px solid #252538', borderRadius: 8 }}
+                          style={{ background: '#18181c', border: '1px solid #27272a', borderRadius: 8 }}
                           bodyStyle={{ padding: 16 }}
                           title={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -734,8 +690,8 @@ const WorkbenchPage: React.FC = () => {
                               <div style={{
                                 width: '100%',
                                 height: 160,
-                                background: '#0a0a0f',
-                                border: '1px dashed #3f3f46',
+                                background: '#09090b',
+                                border: '1px dashed #27272a',
                                 borderRadius: 6,
                                 display: 'flex',
                                 alignItems: 'center',
@@ -767,7 +723,7 @@ const WorkbenchPage: React.FC = () => {
                                     value={scene.description}
                                     onChange={(e) => updateSceneField(index, 'description', e.target.value)}
                                     rows={2}
-                                    style={{ background: '#1a1a2e', color: '#fff', border: '1px solid #2a2a3e', fontSize: 11.5 }}
+                                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 11.5 }}
                                   />
                                 </div>
                                 <div>
@@ -776,7 +732,7 @@ const WorkbenchPage: React.FC = () => {
                                     value={scene.voiceover}
                                     onChange={(e) => updateSceneField(index, 'voiceover', e.target.value)}
                                     rows={1}
-                                    style={{ background: '#1a1a2e', color: '#fff', border: '1px solid #2a2a3e', fontSize: 11.5 }}
+                                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 11.5 }}
                                   />
                                 </div>
                                 <Row gutter={8}>
@@ -786,7 +742,7 @@ const WorkbenchPage: React.FC = () => {
                                       type="number"
                                       value={scene.duration}
                                       onChange={(e) => updateSceneField(index, 'duration', parseInt(e.target.value) || 3)}
-                                      style={{ background: '#1a1a2e', color: '#fff', border: '1px solid #2a2a3e', height: 26, fontSize: 11 }}
+                                      style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', height: 26, fontSize: 11 }}
                                     />
                                   </Col>
                                   <Col span={12}>
@@ -822,13 +778,13 @@ const WorkbenchPage: React.FC = () => {
         {/* TAB 3: AUDIO & TTS CONFIGURATION */}
         {/* ============================================================== */}
         {activeTab === 'audio' && (
-          <Row gutter={24} style={{ height: 'calc(100vh - 220px)', minHeight: 500 }}>
+          <Row gutter={24} style={{ height: '100%' }}>
             {/* Left: Speaker Selection and Parameters */}
             <Col span={10}>
               <Card
                 title={<span style={{ color: '#fff' }}><CustomerServiceOutlined /> 智能语音与 TTS 旁白参数</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
@@ -906,19 +862,19 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><AudioOutlined /> 音轨多轨时间线示意图</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
               >
                 {script && script.scenes ? (
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                    <div style={{ background: '#18182b', padding: 20, borderRadius: 8 }}>
+                    <div style={{ background: '#202023', padding: 20, borderRadius: 8 }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>
-                        系统将自动根据每个分镜的时长和语速，精确对齐画面与旁白。以下为音画对齐甘特图：
+                        系统将自动根据每个分镜的时长 and 语速，精确对齐画面与旁白。以下为音画对齐甘特图：
                       </Text>
 
                       {/* Video Frame timeline block */}
                       <div style={{ marginTop: 24 }}>
                         <div style={{ fontSize: 11, color: '#818cf8', fontWeight: 600, marginBottom: 6 }}>🎥 视频画面轨道 (Video Track)</div>
-                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#0a0a0f', borderRadius: 4, padding: 2 }}>
+                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#09090b', borderRadius: 4, padding: 2 }}>
                           {script.scenes.map((s: Scene, i: number) => (
                             <div key={i} style={{
                               flex: s.duration || 5,
@@ -940,7 +896,7 @@ const WorkbenchPage: React.FC = () => {
                       {/* TTS audio timeline block */}
                       <div style={{ marginTop: 20 }}>
                         <div style={{ fontSize: 11, color: '#34d399', fontWeight: 600, marginBottom: 6 }}>🎙️ AI 旁白配音轨道 (TTS Narration)</div>
-                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#0a0a0f', borderRadius: 4, padding: 2 }}>
+                        <div style={{ display: 'flex', gap: 4, height: 32, background: '#09090b', borderRadius: 4, padding: 2 }}>
                           {script.scenes.map((s: Scene, i: number) => (
                             <div key={i} style={{
                               flex: s.duration || 5,
@@ -992,13 +948,13 @@ const WorkbenchPage: React.FC = () => {
         {/* TAB 4: COMPILATION & OUTPUT */}
         {/* ============================================================== */}
         {activeTab === 'render' && (
-          <Row gutter={24} style={{ height: 'calc(100vh - 220px)', minHeight: 500 }}>
+          <Row gutter={24} style={{ height: '100%' }}>
             {/* Left: Resolution, Ratio and transition configs & trigger */}
             <Col span={10}>
               <Card
                 title={<span style={{ color: '#fff' }}><RocketOutlined /> 视频最终渲染编译设置</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
@@ -1040,7 +996,7 @@ const WorkbenchPage: React.FC = () => {
                     </Select>
                   </div>
 
-                  <Divider style={{ margin: '12px 0', borderTopColor: '#1f1f2e' }} />
+                  <Divider style={{ margin: '12px 0', borderTopColor: '#27272a' }} />
 
                   <Button
                     type="primary"
@@ -1071,11 +1027,11 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={<span style={{ color: '#fff' }}><VideoCameraOutlined /> 渲染终端 & 最终预览大盘</span>}
                 bordered={false}
-                style={{ background: '#12121e', borderRadius: 12, height: '100%', overflowY: 'auto' }}
+                style={{ background: '#18181b', borderRadius: 12, height: '100%', overflowY: 'auto' }}
               >
                 {/* When rendering is active */}
                 {isRenderingAll && (
-                  <div style={{ background: '#18182b', padding: 24, borderRadius: 8, textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ background: '#202023', padding: 24, borderRadius: 8, textAlign: 'center', marginBottom: 20 }}>
                     <Progress type="circle" percent={renderProgress} strokeColor={{ '0%': '#10b981', '100%': '#6366f1' }} width={120} />
                     <div style={{ marginTop: 20, fontWeight: 500, color: '#fff' }}>{renderStatus}</div>
                     <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
@@ -1087,7 +1043,7 @@ const WorkbenchPage: React.FC = () => {
                 {/* Final Rendered Video Player */}
                 {finalVideoUrl ? (
                   <div>
-                    <div style={{ background: '#18182b', padding: 12, borderRadius: 8, marginBottom: 16, borderLeft: '4px solid #10b981' }}>
+                    <div style={{ background: '#202023', padding: 12, borderRadius: 8, marginBottom: 16, borderLeft: '4px solid #10b981' }}>
                       <span style={{ color: '#10b981', fontWeight: 600 }}>🎉 合成完毕：</span>
                       <Text style={{ color: '#a1a1aa', fontSize: 13 }}>最终高精度带货视频已妥善渲染在本地临时存储。</Text>
                     </div>
@@ -1097,7 +1053,7 @@ const WorkbenchPage: React.FC = () => {
                       background: '#000',
                       borderRadius: 8,
                       overflow: 'hidden',
-                      border: '1px solid #2a2a3e',
+                      border: '1px solid #27272a',
                       boxShadow: '0 12px 24px -8px rgba(0,0,0,0.5)',
                       display: 'flex',
                       alignItems: 'center',
@@ -1122,7 +1078,7 @@ const WorkbenchPage: React.FC = () => {
                         <Button
                           block
                           onClick={() => message.success('已模拟提交至短视频排期发布队列！')}
-                          style={{ height: 40, borderRadius: 6, background: '#1f1f2e', color: '#fff', border: '1px solid #3a3a4e' }}
+                          style={{ height: 40, borderRadius: 6, background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
                         >
                           🚀 一键分发至社交媒体
                         </Button>
