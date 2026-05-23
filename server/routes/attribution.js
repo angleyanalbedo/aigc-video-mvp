@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const AttributionService = require('../services/attributionService');
-
-const attributionService = new AttributionService();
+const attributionService = require('../services/attributionService');
 
 router.get('/factors', (req, res) => {
   try {
-    const factors = attributionService.getFactors();
+    const factors = attributionService.getFactorsArray();
     res.json({
       success: true,
       factors: factors
@@ -27,7 +25,8 @@ router.post('/analyze', (req, res) => {
     
     res.json({
       success: true,
-      data: analysis
+      data: analysis,
+      analysis: analysis // Provide both to prevent frontend key mismatches
     });
   } catch (error) {
     console.error('归因分析失败:', error);

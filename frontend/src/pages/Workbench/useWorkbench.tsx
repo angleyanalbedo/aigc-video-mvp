@@ -1158,7 +1158,35 @@ export const useWorkbench = () => {
     }
   };
 
+  // 一键分发/发布带货视频并同步Mock大盘数据
+  const handlePublishVideo = async () => {
+    if (!projectId) {
+      message.warning('无效的项目 ID，无法发布');
+      return;
+    }
+
+    const key = 'publishing';
+    message.loading({ content: '🚀 正在一键分发及同步社交媒体大盘...', key, duration: 1.5 });
+    try {
+      const res = await fetch(`${API_BASE}/api/projects/${projectId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTimeout(() => {
+          message.success({ content: '🎉 视频已成功发布至短视频排期发布队列！业务数据已实时同步至多因子归因与A/B测试大盘！', key, duration: 4 });
+        }, 1500);
+      } else {
+        throw new Error(data.error || '发布失败');
+      }
+    } catch (err: any) {
+      message.error({ content: '发布失败: ' + err.message, key, duration: 3 });
+    }
+  };
+
   return {
+
     // States
     projectId,
     navigate,
@@ -1258,5 +1286,7 @@ export const useWorkbench = () => {
     generateSingleSceneVideo,
     handleRenderAllScenes,
     handleCompileFinalVideo,
+    handlePublishVideo,
   };
 };
+

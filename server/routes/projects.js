@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const db = require('../db');
 const projectModel = require('../models/project');
+const attributionService = require('../services/attributionService');
+
 
 // 上传目录配置（与主 index.js 保持一致）
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -227,6 +229,117 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
     });
   } catch (error) {
     console.error('工作台添加素材失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/projects/:id/publish
+ * 一键发布/分发带货视频，生成随机mock数据并注册到多因子归因
+ */
+router.post('/:id/publish', (req, res) => {
+  try {
+    const { id } = req.params;
+    const project = projectModel.getById(id);
+    if (!project) {
+      return res.status(404).json({ success: false, error: '项目不存在' });
+    }
+
+    // 1. 更新项目状态为已发布
+    projectModel.update(id, { status: 'published' });
+
+    // 2. 提取生成因子 (Factors)
+    const script = project.script || {};
+    const settings = project.settings || {};
+    const scenes = script.scenes || [];
+    const sceneCount = scenes.length || 4;
+
+    // 视频长度: 累加所有分镜时长或使用 settings 中的时长
+    let videoLength = scenes.reduce((sum, s) => sum + (s.duration || 5), 0);
+    if (videoLength === 0) videoLength = settings.duration || 15;
+
+    // BGM风格映射
+    let bgmStyle = '轻快';
+    if (settings.bgm) {
+      if (settings.bgm.includes('energetic')) bgmStyle = '激情';
+      else if (settings.bgm.includes('jazz')) bgmStyle = '温馨';
+      else if (settings.bgm.includes('tech')) bgmStyle = '科技';
+      else if (settings.bgm === 'none') bgmStyle = '无BGM';
+    }
+
+    // 画幅比例映射
+    const aspectRatio = settings.ratio || '9:16';
+
+    // 配音类型映射
+    let voiceType = 'AI合成';
+    if (settings.voice) {
+      if (settings.voice.includes('female')) voiceType = '女声';
+      else if (settings.voice.includes('male')) voiceType = '男声';
+      else if (settings.voice.includes('child')) voiceType = '童声';
+    }
+    if (settings.enableTTS === false) {
+      voiceType = '无配音';
+    }
+
+    // 字幕风格映射
+    const subtitleStyle = settings.enableTTS !== false ? '简洁' : '无字幕';
+
+    // 开场方式与引导方式从剧本分镜中提取或使用默认
+    let openingStyle = '产品展示';
+    if (scenes.length > 0) {
+      const firstSceneDesc = scenes[0].description || '';
+      if (firstSceneDesc.includes('痛') || firstSceneDesc.includes('难') || firstSceneDesc.includes('烦')) openingStyle = '直击痛点';
+      else if (firstSceneDesc.includes('问') || firstSceneDesc.includes('？') || firstSceneDesc.includes('吗')) openingStyle = '问题引入';
+      else if (firstSceneDesc.includes('场景') || firstSceneDesc.includes('生活')) openingStyle = '场景引入';
+      else if (firstSceneDesc.includes('直接') || firstSceneDesc.includes('介绍')) openingStyle = '直接介绍';
+    }
+
+    let callToAction = '立即购买';
+    if (scenes.length > 0) {
+      const lastSceneDesc = scenes[scenes.length - 1].description || '';
+      if (lastSceneDesc.includes('链接') || lastSceneDesc.includes('点击')) callToAction = '点击链接';
+      else if (lastSceneDesc.includes('店铺') || lastSceneDesc.includes('关注')) callToAction = '关注店铺';
+      else if (lastSceneDesc.includes('车') || lastSceneDesc.includes('加')) callToAction = '加入购物车';
+      else if (lastSceneDesc.includes('收藏')) callToAction = '收藏商品';
+      else if (lastSceneDesc.includes('不') || lastSceneDesc.includes('无')) callToAction = '无引导';
+    }
+
+    // 3. 生成随机 Mock 业务指标
+    const views = Math.floor(8000 + Math.random() * 65000);
+    const completionRate = 0.35 + Math.random() * 0.45; // 35% - 80%
+    const clickThroughRate = 0.02 + Math.random() * 0.08; // 2% - 10%
+    const conversionRate = 0.01 + Math.random() * 0.045; // 1% - 5.5%
+
+    const publishedVideo = {
+      id: `video_pub_${Date.now().toString().slice(-6)}`,
+      productName: project.name || '智能好物',
+      videoLength: Math.round(videoLength),
+      bgmStyle,
+      sceneCount,
+      aspectRatio,
+      voiceType,
+      subtitleStyle,
+      openingStyle,
+      callToAction,
+      views,
+      completionRate: Math.round(completionRate * 1000) / 1000,
+      clickThroughRate: Math.round(clickThroughRate * 1000) / 1000,
+      conversionRate: Math.round(conversionRate * 1000) / 1000,
+      createdAt: new Date().toISOString()
+    };
+
+    // 4. 将视频注册到归因分析服务
+    attributionService.mockVideoData.unshift(publishedVideo);
+
+    console.log(`🚀 [Publish] 项目 ${id} 已成功发布并同步至归因大盘:`, JSON.stringify(publishedVideo));
+
+    res.json({
+      success: true,
+      message: '视频已成功发布至短视频排期发布队列！业务数据已实时同步至多因子归因与A/B测试大盘！',
+      video: publishedVideo
+    });
+  } catch (error) {
+    console.error('❌ 视频发布失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

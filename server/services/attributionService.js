@@ -1,3 +1,5 @@
+// server/services/attributionService.js
+
 class AttributionService {
   constructor() {
     this.factors = this.initializeFactors();
@@ -62,10 +64,23 @@ class AttributionService {
     };
   }
 
+  getFactorsArray() {
+    return [
+      { name: 'videoLength', displayName: '视频长度', type: 'range' },
+      { name: 'bgmStyle', displayName: 'BGM风格', type: 'category' },
+      { name: 'sceneCount', displayName: '分镜数量', type: 'range' },
+      { name: 'aspectRatio', displayName: '画幅比例', type: 'category' },
+      { name: 'voiceType', displayName: '配音类型', type: 'category' },
+      { name: 'subtitleStyle', displayName: '字幕风格', type: 'category' },
+      { name: 'openingStyle', displayName: '开场方式', type: 'category' },
+      { name: 'callToAction', displayName: '引导方式', type: 'category' }
+    ];
+  }
+
   generateMockVideoData() {
     const videos = [];
     const productNames = ['轻薄羽绒服', '运动鞋', '智能手表', '护肤套装', '蓝牙耳机', 
-                         '保温杯', '电动牙刷', '充电宝', '键盘', '鼠标'];
+                          '保温杯', '电动牙刷', '充电宝', '键盘', '鼠标'];
     const bgmStyles = this.factors.bgmStyle.options;
     const aspectRatios = this.factors.aspectRatio.options;
     const voiceTypes = this.factors.voiceType.options;
@@ -77,9 +92,9 @@ class AttributionService {
       const videoLength = 5 + Math.random() * 55;
       const sceneCount = 1 + Math.floor(Math.random() * 19);
       const views = Math.floor(1000 + Math.random() * 50000);
-      const completionRate = 20 + Math.random() * 60;
-      const clickThroughRate = 1 + Math.random() * 8;
-      const conversionRate = 0.5 + Math.random() * 5;
+      const completionRate = 0.2 + Math.random() * 0.6; // fractional: 0.2 to 0.8
+      const clickThroughRate = 0.01 + Math.random() * 0.08; // fractional
+      const conversionRate = 0.005 + Math.random() * 0.05; // fractional
 
       videos.push({
         id: `video_${String(i + 1).padStart(3, '0')}`,
@@ -93,9 +108,9 @@ class AttributionService {
         openingStyle: openingStyles[Math.floor(Math.random() * openingStyles.length)],
         callToAction: callToActions[Math.floor(Math.random() * callToActions.length)],
         views: views,
-        completionRate: Math.round(completionRate * 10) / 10,
-        clickThroughRate: Math.round(clickThroughRate * 10) / 10,
-        conversionRate: Math.round(conversionRate * 10) / 10,
+        completionRate: Math.round(completionRate * 1000) / 1000,
+        clickThroughRate: Math.round(clickThroughRate * 1000) / 1000,
+        conversionRate: Math.round(conversionRate * 1000) / 1000,
         createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString()
       });
     }
@@ -121,17 +136,53 @@ class AttributionService {
     }
 
     const factorAnalysis = {};
+    let topViewsVal = 0, topViewsFactor = '开场方式: 产品展示';
+    let topCompletionVal = 0, topCompletionFactor = 'BGM风格: 轻快';
+    let topConversionVal = 0, topConversionFactor = '引导方式: 立即购买';
 
     for (const [factorKey, factorInfo] of Object.entries(this.factors)) {
-      factorAnalysis[factorKey] = this.analyzeSingleFactor(data, factorKey, factorInfo);
+      const resultData = this.analyzeSingleFactor(data, factorKey, factorInfo);
+      factorAnalysis[factorKey] = resultData;
+
+      // Find top performers
+      if (resultData && resultData.length > 0) {
+        // views
+        const bestViews = [...resultData].sort((a, b) => b.avgViews - a.avgViews)[0];
+        if (bestViews && bestViews.avgViews > topViewsVal) {
+          topViewsVal = bestViews.avgViews;
+          topViewsFactor = `${factorInfo.name}: ${bestViews.value}`;
+        }
+        // completion
+        const bestCompletion = [...resultData].sort((a, b) => b.avgCompletionRate - a.avgCompletionRate)[0];
+        if (bestCompletion && bestCompletion.avgCompletionRate > topCompletionVal) {
+          topCompletionVal = bestCompletion.avgCompletionRate;
+          topCompletionFactor = `${factorInfo.name}: ${bestCompletion.value}`;
+        }
+        // conversion
+        const bestConversion = [...resultData].sort((a, b) => b.avgConversionRate - a.avgConversionRate)[0];
+        if (bestConversion && bestConversion.avgConversionRate > topConversionVal) {
+          topConversionVal = bestConversion.avgConversionRate;
+          topConversionFactor = `${factorInfo.name}: ${bestConversion.value}`;
+        }
+      }
     }
 
     const overallStats = this.calculateOverallStats(data);
 
+    const optimizationSuggestions = {
+      views: `针对播放量，最佳因子为「${topViewsFactor}」。建议优先使用此因子来编排视频开场，可显著提升前三秒停留率和播放表现。`,
+      completion: `针对完播率，表现最突出的组合是「${topCompletionFactor}」。这种元素编排能在视频中段保持强烈的节奏感，减少用户流失。`,
+      conversion: `针对销售转化率，建议全量配置「${topConversionFactor}」。在视频尾帧突出该引导，能更有效地驱使用户做出消费决策。`
+    };
+
     return {
       overall: overallStats,
-      factors: factorAnalysis,
+      factorAnalysis: factorAnalysis, // frontend matches factorAnalysis
       sampleSize: data.length,
+      topViewsFactor,
+      topCompletionFactor,
+      topConversionFactor,
+      optimizationSuggestions,
       analyzedAt: new Date().toISOString()
     };
   }
@@ -175,23 +226,20 @@ class AttributionService {
       const avgConversionRate = videos.reduce((sum, v) => sum + v.conversionRate, 0) / count;
 
       results.push({
-        group: groupKey,
+        factorName: factorInfo.name,
+        value: groupKey, // frontend uses 'value'
         count: count,
         totalViews: groupData.totalViews,
         avgViews: Math.round(groupData.totalViews / count),
-        avgCompletionRate: Math.round(avgCompletionRate * 10) / 10,
-        avgClickThroughRate: Math.round(avgClickThroughRate * 10) / 10,
-        avgConversionRate: Math.round(avgConversionRate * 10) / 10
+        avgCompletionRate: Math.round(avgCompletionRate * 1000) / 1000, // fractional e.g. 0.685
+        avgClickThroughRate: Math.round(avgClickThroughRate * 1000) / 1000,
+        avgConversionRate: Math.round(avgConversionRate * 1000) / 1000 // fractional e.g. 0.023
       });
     }
 
     results.sort((a, b) => b.avgConversionRate - a.avgConversionRate);
 
-    return {
-      factorName: factorInfo.name,
-      factorType: factorInfo.type,
-      results: results
-    };
+    return results;
   }
 
   getRangeLabel(value, ranges) {
@@ -223,9 +271,9 @@ class AttributionService {
       totalVideos: data.length,
       totalViews: totalViews,
       avgViews: Math.round(totalViews / data.length),
-      avgCompletionRate: Math.round(avgCompletionRate * 10) / 10,
-      avgClickThroughRate: Math.round(avgClickThroughRate * 10) / 10,
-      avgConversionRate: Math.round(avgConversionRate * 10) / 10
+      avgCompletionRate: Math.round(avgCompletionRate * 1000) / 1000,
+      avgClickThroughRate: Math.round(avgClickThroughRate * 1000) / 1000,
+      avgConversionRate: Math.round(avgConversionRate * 1000) / 1000
     };
   }
 
@@ -246,7 +294,7 @@ class AttributionService {
       generatedAt: new Date().toISOString(),
       overview: analysis.overall,
       sampleSize: analysis.sampleSize,
-      factorBreakdown: analysis.factors,
+      factorBreakdown: analysis.factorAnalysis,
       recommendations: recommendations
     };
   }
@@ -262,9 +310,8 @@ class AttributionService {
     summaryLines.push('【总体数据】');
     summaryLines.push(`总播放量: ${analysis.overall.totalViews.toLocaleString()}`);
     summaryLines.push(`平均播放量: ${analysis.overall.avgViews.toLocaleString()}`);
-    summaryLines.push(`平均完播率: ${analysis.overall.avgCompletionRate}%`);
-    summaryLines.push(`平均点击率: ${analysis.overall.avgClickThroughRate}%`);
-    summaryLines.push(`平均转化率: ${analysis.overall.avgConversionRate}%`);
+    summaryLines.push(`平均完播率: ${(analysis.overall.avgCompletionRate * 100).toFixed(1)}%`);
+    summaryLines.push(`平均转化率: ${(analysis.overall.avgConversionRate * 100).toFixed(1)}%`);
     summaryLines.push('');
     summaryLines.push('【优化建议】');
     recommendations.forEach((rec, i) => {
@@ -277,15 +324,15 @@ class AttributionService {
   generateRecommendations(analysis) {
     const recommendations = [];
 
-    for (const [factorKey, factorData] of Object.entries(analysis.factors)) {
-      if (factorData.results.length > 1) {
-        const topResult = factorData.results[0];
-        const bottomResult = factorData.results[factorData.results.length - 1];
-        const diff = topResult.avgConversionRate - bottomResult.avgConversionRate;
+    for (const [factorKey, results] of Object.entries(analysis.factorAnalysis)) {
+      if (results.length > 1) {
+        const topResult = results[0];
+        const bottomResult = results[results.length - 1];
+        const diff = (topResult.avgConversionRate - bottomResult.avgConversionRate) * 100;
 
-        if (diff > 1) {
+        if (diff > 0.5) {
           recommendations.push(
-            `「${factorData.factorName}」建议选择「${topResult.group}」，转化率比「${bottomResult.group}」高 ${diff.toFixed(1)}%`
+            `「${topResult.factorName}」建议选择「${topResult.value}」，转化率比「${bottomResult.value}」高 ${diff.toFixed(1)}%`
           );
         }
       }
@@ -331,4 +378,6 @@ class AttributionService {
   }
 }
 
-module.exports = AttributionService;
+// Export singleton instance
+const attributionService = new AttributionService();
+module.exports = attributionService;
