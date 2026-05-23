@@ -4,15 +4,15 @@ const cors = require('cors');
 console.log('Step 2: Basic modules loaded');
 
 console.log('Step 3: Loading database...');
-const db = require('./db');
+const db = require('../db');
 console.log('Step 4: Database loaded');
 
 console.log('Step 5: Loading models...');
-const projectModel = require('./models/project');
+const projectModel = require('../models/project');
 console.log('Step 6: Models loaded');
 
 console.log('Step 7: Loading routes...');
-const projectRoutes = require('./routes/projects');
+const projectRoutes = require('../routes/projects');
 console.log('Step 8: Routes loaded');
 
 console.log('Step 9: Creating app...');

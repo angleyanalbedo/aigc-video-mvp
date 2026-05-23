@@ -1,5 +1,5 @@
 
-const { ComplianceService } = require('./services/complianceService');
+const { ComplianceService } = require('../services/complianceService');
 
 async function testComplianceService() {
   console.log('🚀 开始测试合规审核服务...\n');
