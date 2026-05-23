@@ -152,7 +152,7 @@ class VideoComposer {
     } catch (error) {
       console.warn(`  ⚠️ FFmpeg 不可用，使用第一个分镜作为 fallback:`, error.message);
       // FFmpeg 不可用时，直接复制第一个分镜作为 fallback
-      fs.copyFileSync(sceneVideos[0].file, outputFile);
+      await fs.copyFile(sceneVideos[0].file, outputFile);
     }
     
     return outputFile;
@@ -185,7 +185,7 @@ class VideoComposer {
       lastA = `[a${i}]`;
     }
     
-    filter += `${lastV}[outv];${lastA}[outa]`;
+    filter += `${lastV}null[outv];${lastA}anull[outa]`;
     return filter;
   }
 
@@ -203,7 +203,7 @@ class VideoComposer {
     } catch (error) {
       console.warn(`  ⚠️ FFmpeg 不可用，直接复制视频:`, error.message);
       // FFmpeg 不可用时，直接复制视频作为 fallback
-      fs.copyFileSync(videoFile, outputFile);
+      await fs.copyFile(videoFile, outputFile);
     }
     
     return outputFile;

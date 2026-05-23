@@ -32,7 +32,7 @@ router.get('/', (req, res) => {
     const materials = materialService.getAllMaterials();
     res.json({
       success: true,
-      materials
+      data: materials
     });
   } catch (error) {
     console.error('获取素材列表失败:', error);

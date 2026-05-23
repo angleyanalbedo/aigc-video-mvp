@@ -314,17 +314,23 @@ const WorkbenchPage: React.FC = () => {
   };
 
   // 上传素材
-  const handleUpload = async (info: any) => {
+  const handleUpload = (info: any) => {
+    let fileList = [...info.fileList];
+
+    // 为已成功上传的文件提取并设置正确的 url 字段
+    fileList = fileList.map(file => {
+      if (file.response) {
+        file.url = file.response.url || file.response.data?.url;
+      }
+      return file;
+    });
+
+    setMaterials(fileList);
+
     if (info.file.status === 'done') {
-      const fileUrl = info.file.response.url || info.file.response.data?.url;
-      const newMaterial: UploadFile<any> = {
-        uid: info.file.uid,
-        name: info.file.name,
-        status: 'done',
-        url: fileUrl
-      };
-      setMaterials([...materials, newMaterial]);
-      message.success('上传成功');
+      message.success(`${info.file.name} 上传成功`);
+    } else if (info.file.status === 'error') {
+      message.error(`${info.file.name} 上传失败`);
     }
   };
 
@@ -432,15 +438,23 @@ const WorkbenchPage: React.FC = () => {
                     listType="picture"
                     fileList={materials}
                     onChange={handleUpload}
-                    customRequest={async ({ file, onSuccess }) => {
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      const res = await fetch(`${API_BASE}/api/upload`, {
-                        method: 'POST',
-                        body: formData
-                      });
-                      const data = await res.json();
-                      if (onSuccess) onSuccess(data);
+                    customRequest={async ({ file, onSuccess, onError }) => {
+                      try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const res = await fetch(`${API_BASE}/api/upload`, {
+                          method: 'POST',
+                          body: formData
+                        });
+                        if (!res.ok) {
+                          throw new Error(`HTTP 错误: ${res.status}`);
+                        }
+                        const data = await res.json();
+                        if (onSuccess) onSuccess(data, file as any);
+                      } catch (err: any) {
+                        console.error('上传失败:', err);
+                        if (onError) onError(err);
+                      }
                     }}
                   >
                     <p className="ant-upload-drag-icon">
