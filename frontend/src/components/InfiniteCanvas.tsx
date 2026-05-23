@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button, Slider, Tooltip } from 'antd';
-import { ZoomInOutlined, ZoomOutOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { ZoomInOutlined, ZoomOutOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
 import {
   getNodes,
   getConnections,
@@ -46,6 +46,7 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 
     loadCanvas();
 
+    // WebSocket 连接
     wsRef.current = connectWebSocket(projectId, {
       onCanvasEvent: (event) => {
         if (event.type === 'node_created' && event.node) {
@@ -332,6 +333,17 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       </div>
 
       <div className="canvas-toolbar">
+        <Tooltip title="刷新画布">
+          <Button
+            icon={<SyncOutlined spin={false} />}
+            onClick={() => {
+              getNodes(projectId).then(r => r.success && setNodes(r.nodes));
+              getConnections(projectId).then(r => r.success && setConnections(r.connections));
+            }}
+          >
+            刷新
+          </Button>
+        </Tooltip>
         <Tooltip title="重置视图">
           <Button
             icon={<ReloadOutlined />}
