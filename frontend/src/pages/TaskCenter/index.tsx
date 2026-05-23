@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Row, Col, Table, Progress, Tag, Spin, Empty, Button } from 'antd'
+import { Row, Col, Table, Progress, Tag, Spin, Empty, Button, Popconfirm, message } from 'antd'
 import { 
   VideoCameraOutlined, 
   EyeOutlined, 
@@ -9,7 +9,9 @@ import {
   PlayCircleOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DeleteOutlined,
+  ClearOutlined
 } from '@ant-design/icons'
 import axios from 'axios'
 
@@ -71,6 +73,36 @@ const TaskCenterPage: React.FC = () => {
       setLoading(false)
     }
   }
+
+  const handleDeleteTask = async (id: string) => {
+    try {
+      const res = await axios.delete(`${API_BASE}/api/tasks/${id}`);
+      if (res.data.success) {
+        message.success('任务删除成功');
+        fetchDashboard();
+      } else {
+        message.error(res.data.error || '删除失败');
+      }
+    } catch (error: any) {
+      console.error('删除任务失败:', error);
+      message.error('删除失败: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleClearTasks = async () => {
+    try {
+      const res = await axios.post(`${API_BASE}/api/tasks/clear-finished`);
+      if (res.data.success) {
+        message.success(res.data.message || '清理完成');
+        fetchDashboard();
+      } else {
+        message.error(res.data.error || '清空失败');
+      }
+    } catch (error: any) {
+      console.error('清空已结束任务失败:', error);
+      message.error('清空失败: ' + (error.response?.data?.error || error.message));
+    }
+  };
 
   if (loading) {
     return (
@@ -137,14 +169,51 @@ const TaskCenterPage: React.FC = () => {
       key: 'createdAt',
       render: (v: number) => new Date(v).toLocaleString('zh-CN')
     },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_: any, record: any) => {
+        const deletable = ['completed', 'failed', 'succeeded'].includes(record.status);
+        return (
+          <Popconfirm
+            title="确认要将该任务从任务中心移除吗？"
+            onConfirm={() => handleDeleteTask(record.id)}
+            okText="确认"
+            cancelText="取消"
+            disabled={!deletable}
+          >
+            <Button 
+              type="text" 
+              danger 
+              icon={<DeleteOutlined />} 
+              disabled={!deletable}
+              size="small"
+            >
+              删除
+            </Button>
+          </Popconfirm>
+        );
+      }
+    }
   ]
 
   return (
     <>
       <div className="topbar">
         <div className="topbar__title">📊 任务中心</div>
-        <div className="topbar__actions">
-          <Button icon={<ReloadOutlined />} onClick={fetchDashboard}>
+        <div className="topbar__actions" style={{ display: 'flex', gap: 8 }}>
+          <Popconfirm
+            title="确认要清空所有已完成和失败的渲染任务吗？"
+            onConfirm={handleClearTasks}
+            okText="清空"
+            cancelText="取消"
+          >
+            <Button icon={<ClearOutlined />} danger>
+              清空已完成和失败任务
+            </Button>
+          </Popconfirm>
+          <Button icon={<ReloadOutlined />} type="primary" onClick={fetchDashboard}>
             刷新数据
           </Button>
         </div>
