@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions } from 'antd';
+import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
 import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
@@ -15,6 +15,7 @@ const MaterialManagementPage = () => {
   const [searchTags, setSearchTags] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [editingTags, setEditingTags] = useState<string[]>([]);
 
   useEffect(() => {
     loadMaterials();
@@ -131,6 +132,32 @@ const MaterialManagementPage = () => {
     }
   };
 
+  const handleSaveTags = async (id: string, updatedTags: string[]) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/materials/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: updatedTags }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        message.success('标签更新成功');
+        // 更新本地状态中的素材列表和当前选中素材
+        setMaterials(prev => prev.map(m => m.id === id ? { ...m, tags: updatedTags } : m));
+        setSelectedMaterial(prev => prev && prev.id === id ? { ...prev, tags: updatedTags } : prev);
+        // 动态更新可选的全量标签列表
+        const newAllTags = new Set(allTags);
+        updatedTags.forEach(t => newAllTags.add(t));
+        setAllTags([...newAllTags]);
+      } else {
+        message.error('标签更新失败: ' + (data.error || '未知错误'));
+      }
+    } catch (error) {
+      console.error('更新标签失败:', error);
+      message.error('更新标签失败');
+    }
+  };
+
   const getIcon = (type) => {
     if (type && type.startsWith('image')) return <PictureOutlined />;
     if (type && type.startsWith('video')) return <VideoCameraOutlined />;
@@ -207,9 +234,12 @@ const MaterialManagementPage = () => {
                     )
                   }
                   actions={[
-                    <Button type="text" danger size="small" onClick={() => handleDelete(item.id)}>删除</Button>
+                    <Button type="text" danger size="small" onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}>删除</Button>
                   ]}
-                  onClick={() => setSelectedMaterial(item)}
+                  onClick={() => {
+                    setSelectedMaterial(item);
+                    setEditingTags(item.tags || []);
+                  }}
                 >
                   <Card.Meta
                     avatar={getIcon(item.type)}
@@ -235,31 +265,98 @@ const MaterialManagementPage = () => {
       </Card>
 
       {selectedMaterial && (
-        <Card
-          title="📋 素材详情"
-          style={{ marginTop: 16 }}
-          extra={<Button type="text" onClick={() => setSelectedMaterial(null)}>关闭</Button>}
+        <Modal
+          title={
+            <div style={{ fontSize: 18, color: '#e4e4e7', fontWeight: 600 }}>
+              {getIcon(selectedMaterial.type)} 素材预览与编辑
+            </div>
+          }
+          open={!!selectedMaterial}
+          onCancel={() => setSelectedMaterial(null)}
+          footer={[
+            <Button key="close" type="primary" onClick={() => setSelectedMaterial(null)}>
+              关闭
+            </Button>
+          ]}
+          width={800}
+          bodyStyle={{ background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }}
+          style={{ top: 40 }}
         >
-          <Descriptions column={1}>
-            <Descriptions.Item label="文件名">{selectedMaterial.filename}</Descriptions.Item>
-            <Descriptions.Item label="类型">{selectedMaterial.type || '未知'}</Descriptions.Item>
-            <Descriptions.Item label="标签">
-              {selectedMaterial.tags && selectedMaterial.tags.map(tag => <Tag key={tag} color="blue">{tag}</Tag>)}
-            </Descriptions.Item>
-            <Descriptions.Item label="上传时间">
-              {selectedMaterial.createdAt ? new Date(selectedMaterial.createdAt).toLocaleString() : ''}
-            </Descriptions.Item>
-          </Descriptions>
-          <div style={{ marginTop: 16 }}>
-            {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
-              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-            ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
-              <video src={selectedMaterial.url} controls style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-            ) : (
-              <img src={selectedMaterial.url} alt={selectedMaterial.filename} style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Media Preview Window */}
+            <div style={{
+              background: '#09090b',
+              borderRadius: 12,
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 320,
+              maxHeight: 480,
+              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
+              border: '1px solid #1f1f23'
+            }}>
+              {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
+                <img
+                  src={selectedMaterial.url}
+                  alt={selectedMaterial.filename}
+                  style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
+                />
+              ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
+                <video
+                  src={selectedMaterial.url}
+                  controls
+                  autoPlay
+                  style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
+                />
+              ) : (
+                <img
+                  src={selectedMaterial.url}
+                  alt={selectedMaterial.filename}
+                  style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
+                />
+              )}
+            </div>
+
+            {/* Metadata and Edit Tags Panel */}
+            <Card style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8 }}>
+              <Descriptions column={2} labelStyle={{ color: '#a1a1aa' }} contentStyle={{ color: '#f4f4f5' }}>
+                <Descriptions.Item label="文件名" span={2}>
+                  <div style={{ wordBreak: 'break-all', fontWeight: 500 }}>{selectedMaterial.filename}</div>
+                </Descriptions.Item>
+                <Descriptions.Item label="类型">
+                  <Tag color="cyan">{selectedMaterial.type || '未知'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="上传时间">
+                  {selectedMaterial.createdAt ? new Date(selectedMaterial.createdAt).toLocaleString() : ''}
+                </Descriptions.Item>
+              </Descriptions>
+
+              {/* Tag Editing Section */}
+              <div style={{ marginTop: 20, borderTop: '1px solid #27272a', paddingTop: 16 }}>
+                <div style={{ color: '#e4e4e7', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
+                  🏷️ 标签管理（输入新标签后按回车键即可创建）
+                </div>
+                <Select
+                  mode="tags"
+                  style={{ width: '100%' }}
+                  placeholder="选择或输入添加新标签"
+                  value={editingTags}
+                  onChange={(newTags) => {
+                    setEditingTags(newTags);
+                    handleSaveTags(selectedMaterial.id, newTags);
+                  }}
+                  tokenSeparators={[',', ' ']}
+                  dropdownStyle={{ background: '#1f1f23', border: '1px solid #27272a' }}
+                >
+                  {allTags.map(tag => (
+                    <Option key={tag} value={tag}>{tag}</Option>
+                  ))}
+                </Select>
+              </div>
+            </Card>
           </div>
-        </Card>
+        </Modal>
       )}
     </div>
   );

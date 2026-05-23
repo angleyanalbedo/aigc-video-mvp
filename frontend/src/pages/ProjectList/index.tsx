@@ -238,8 +238,9 @@ const ProjectListPage: React.FC = () => {
                       <Popconfirm
                         title="确定删除这个项目?"
                         onConfirm={() => handleDelete(project.id)}
+                        onCancel={(e) => e?.stopPropagation()}
                       >
-                        <DeleteOutlined key="delete" />
+                        <DeleteOutlined key="delete" onClick={(e) => e.stopPropagation()} />
                       </Popconfirm>
                     ]}
                   >
