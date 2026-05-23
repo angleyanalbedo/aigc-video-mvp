@@ -33,6 +33,7 @@ console.log('[DEBUG] 7. retry loaded');
 // 引入 Mock 服务
 const { mockCreateVideoTask, mockGetVideoTask, generatePlaceholderVideo } = require('./services/mockArkService');
 console.log('[DEBUG] 8. mockArkService loaded');
+const materialService = require('./services/materialService');
 
 // 引入可观测性模块
 const { logger, generateTraceId } = require('./utils/logger');
@@ -226,7 +227,12 @@ app.post('/api/video/generate', async (req, res) => {
       imageUrl
     });
 
-    taskStore.set(task.id, { status: task.status, createdAt: Date.now(), isMock: !hasRealAPI });
+    taskStore.set(task.id, {
+      status: task.status,
+      createdAt: Date.now(),
+      isMock: !hasRealAPI,
+      prompt: prompt
+    });
 
     // 立即返回taskId，前端轮询获取结果
     res.json({
@@ -275,14 +281,44 @@ app.get('/api/video/status/:taskId', async (req, res) => {
         console.log(`🎬 生成占位视频 (Mock 模式)`);
         try {
           const mockVideoPath = path.join(outputDir, `mock_${taskId}.mp4`);
-          await generatePlaceholderVideo(mockVideoPath, {
-            duration: 15,
-            text: 'Mock Video ' + taskId.substring(0, 8),
-            color: 'blue'
-          });
+          if (!fs.existsSync(mockVideoPath)) {
+            await generatePlaceholderVideo(mockVideoPath, {
+              duration: 15,
+              text: 'Mock Video ' + taskId.substring(0, 8),
+              color: 'blue'
+            });
+          }
           finalVideoUrl = `http://localhost:${PORT}/outputs/mock_${taskId}.mp4`;
         } catch (videoErr) {
           console.warn(`⚠️ 生成占位视频失败:`, videoErr);
+        }
+      } else if (finalVideoUrl && finalVideoUrl.startsWith('http')) {
+        // 真实任务成功！我们将生成的视频自动下载持久化保存至本地 outputs 目录！
+        try {
+          const localFilename = `real_scene_${taskId}.mp4`;
+          const localVideoPath = path.join(outputDir, localFilename);
+          
+          if (!fs.existsSync(localVideoPath)) {
+            console.log(`📥 正在下载真实生成的视频片段到本地 outputs 目录...`);
+            const response = await fetch(finalVideoUrl);
+            const buffer = await response.arrayBuffer();
+            fs.writeFileSync(localVideoPath, Buffer.from(buffer));
+            console.log(`✅ 视频片段已成功持久化保存至: ${localVideoPath}`);
+            
+            // 自动添加到素材库 (Material library)，让用户可以在素材管理中看到！
+            const promptUsed = taskInfo?.prompt || '真实大模型生成视频片段';
+            materialService.addMaterial({
+              filename: `分镜渲染片段_${taskId.substring(0, 8)}.mp4`,
+              url: `http://localhost:${PORT}/outputs/${localFilename}`,
+              content: `由提示词生成: ${promptUsed}`
+            });
+            console.log(`✅ 已自动将持久化视频片段添加至素材库！`);
+          }
+          
+          finalVideoUrl = `http://localhost:${PORT}/outputs/${localFilename}`;
+        } catch (downloadErr) {
+          console.error(`⚠️ 下载持久化真实视频失败:`, downloadErr.message);
+          // 降级使用原始远程 URL
         }
       }
       
@@ -427,7 +463,8 @@ app.post('/api/video/batch-generate', async (req, res) => {
             prompt: scene.description,
             resolution: options.resolution || '720p',
             ratio: options.ratio || '9:16',
-            duration: scene.duration || 5
+            duration: scene.duration || 5,
+            imageUrl: scene.imageUrl || scene.referenceImageUrl || null
           });
 
           // 轮询等待视频生成完成
@@ -439,6 +476,25 @@ app.post('/api/video/batch-generate', async (req, res) => {
         // 下载视频到本地
         const videoPath = path.join(tempDir, `scene_${i}_${Date.now()}.mp4`);
         await downloadFile(videoUrl, videoPath);
+
+        // 持久化一份拷贝到 outputs 目录，并自动注册添加到素材库
+        try {
+          const persistFilename = `batch_scene_${batchId}_${i}.mp4`;
+          const persistPath = path.join(outputDir, persistFilename);
+          fs.copyFileSync(videoPath, persistPath);
+          console.log(`💾 批量分镜 ${i + 1} 持久化副本已保存至: ${persistPath}`);
+
+          const promptUsed = scene.description || '批量生成分镜片段';
+          const localUrl = `http://localhost:${PORT}/outputs/${persistFilename}`;
+          materialService.addMaterial({
+            filename: `批量分镜_${i + 1}_${batchId.substring(6)}.mp4`,
+            url: localUrl,
+            content: `来自一键成片分镜 ${i + 1}: ${promptUsed}`
+          });
+          console.log(`✅ 已自动将该批量生成的视频片段作为独立素材添加至素材库: ${localUrl}`);
+        } catch (persistErr) {
+          console.warn(`⚠️ 无法持久化保存批量视频分镜片段或注册素材:`, persistErr.message);
+        }
 
         generatedScenes.push({
           ...scene,
@@ -802,6 +858,10 @@ async function pollVideoCompletion(taskId, isMock = false, maxAttempts = 40) {
 
       if (status.status === 'succeeded') {
         console.log(`✅ 任务完成: ${taskId}`);
+        if (status.videoUrl && !status.videoUrl.startsWith('mock://') && !isMock) {
+          console.log(`🔗 使用真实视频 URL: ${status.videoUrl}`);
+          return status.videoUrl;
+        }
         // 生成 Mock 视频文件
         const mockVideoPath = path.join(tempDir, `mock_scene_${Date.now()}_${i}.mp4`);
         await generatePlaceholderVideo(mockVideoPath, {

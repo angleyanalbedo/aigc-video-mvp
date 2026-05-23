@@ -13,13 +13,15 @@ class ArkVideoProvider extends BaseVideoProvider {
       // NOTE: Volcengine doubao-seedance-1.5-pro video generation engine strictly only supports 
       // 4-second duration outputs. To avoid API rejection, we force --dur to be 4.
       const content = [];
-      if (imageUrl) {
+      if (imageUrl && !imageUrl.includes('localhost') && !imageUrl.includes('127.0.0.1')) {
         content.push({
           type: 'image',
           image_url: {
             url: imageUrl
           }
         });
+      } else if (imageUrl) {
+        console.warn(`⚠️ ArkVideoProvider: 检测到本地或 localhost 格式的 imageUrl: "${imageUrl}"。为防止火山引擎 API 因无法解析本地局域网地址而报错，已自动忽略首帧图参数，降级为纯文本生成视频。`);
       }
       content.push({
         type: 'text',
