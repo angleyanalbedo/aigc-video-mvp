@@ -374,7 +374,11 @@ class CanvasSyncService {
   broadcast(projectId, event) {
     if (this.eventEmitter) {
       try {
-        this.eventEmitter.to(`canvas:${projectId}`).emit('canvasEvent', event);
+        if (typeof this.eventEmitter.to === 'function') {
+          this.eventEmitter.to(`canvas:${projectId}`).emit('canvasEvent', event);
+        } else {
+          console.log('📡 Broadcast (Socket.io not configured):', event.type, projectId);
+        }
       } catch (error) {
         console.error('Broadcast error:', error);
       }
