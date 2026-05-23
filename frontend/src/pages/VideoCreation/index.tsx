@@ -43,6 +43,12 @@ interface BatchTask {
   progress: number
   videoUrl?: string
   message?: string
+  currentPhase?: string // 当前阶段
+  completedScenes?: number // 已完成分镜数
+  totalScenes?: number // 总分镜数
+  currentScene?: number // 当前处理分镜
+  estimatedTimeRemaining?: number // 预估剩余时间(秒)
+  errors?: Array<{sceneIndex: number, message: string}> // 错误详情
 }
 
 const VideoCreationPage: React.FC = () => {
@@ -255,8 +261,16 @@ const VideoCreationPage: React.FC = () => {
       })
 
       const batchId = response.data.batchId
-      setBatchTask({ batchId, status: 'processing', progress: 0 })
-      setStatusText('🎬 正在批量生成视频分镜...')
+      setBatchTask({ 
+        batchId, 
+        status: 'processing', 
+        progress: 0, 
+        totalScenes: generatedScript.scenes.length,
+        completedScenes: 0,
+        currentPhase: '初始化中',
+        currentScene: 0
+      })
+      setStatusText('🎬 正在启动分镜生成任务...')
 
       const eventSource = new EventSource(`${API_BASE}/api/tasks/${batchId}/stream`)
       
@@ -265,8 +279,29 @@ const VideoCreationPage: React.FC = () => {
           const data = JSON.parse(event.data)
           
           setProgress(data.progress || 0)
-          setBatchTask(prev => prev ? { ...prev, ...data } : null)
-          if (data.message) setStatusText(data.message)
+          
+          // 智能更新状态文本
+          if (data.currentPhase) {
+            const phaseTexts: Record<string, string> = {
+              'initializing': '🎬 正在初始化任务...',
+              'generating_images': '🖼️ 正在生成分镜图片...',
+              'generating_videos': '🎥 正在生成视频片段...',
+              'generating_tts': '🎙️ 正在生成配音...',
+              'composing': '🎞️ 正在拼接完整视频...',
+              'finalizing': '✨ 正在完成最终处理...'
+            }
+            setStatusText(data.message || phaseTexts[data.currentPhase] || '正在处理...')
+          } else if (data.message) {
+            setStatusText(data.message)
+          }
+          
+          setBatchTask(prev => prev ? { 
+            ...prev, 
+            ...data,
+            totalScenes: prev.totalScenes,
+            completedScenes: data.completedScenes ?? prev.completedScenes,
+            currentScene: data.currentScene ?? prev.currentScene
+          } : null)
 
           if (data.status === 'completed' && data.videoUrl) {
             eventSource.close()
@@ -744,31 +779,133 @@ const VideoCreationPage: React.FC = () => {
             )}
 
             {taskStatus === 'generating_video' && (
-              <div className="progress-section">
-                <div className="progress-section__header">
-                  <div className="progress-section__title">{statusText}</div>
-                  <div className="progress-section__percentage">{progress}%</div>
+              <div className="progress-section" style={{ background: '#f8f9fa', borderRadius: 12, padding: 24 }}>
+                <div className="progress-section__header" style={{ marginBottom: 20 }}>
+                  <div className="progress-section__title" style={{ fontSize: 16, fontWeight: 600 }}>{statusText}</div>
+                  <div className="progress-section__percentage" style={{ fontSize: 20, fontWeight: 700, color: '#1890ff' }}>{progress}%</div>
                 </div>
-                <Progress percent={progress} status="active" />
+                
+                <Progress 
+                  percent={progress} 
+                  status="active" 
+                  strokeColor={{
+                    '0%': '#108ee9',
+                    '100%': '#87d068',
+                  }}
+                  style={{ marginBottom: 20 }}
+                />
                 
                 {batchTask && (
-                  <div style={{ marginTop: 16, textAlign: 'left' }}>
-                    <Tag 
-                      color={batchTask.status === 'processing' ? 'processing' : batchTask.status === 'completed' ? 'success' : 'error'}
-                    >
-                      {batchTask.status === 'processing' ? '进行中' : batchTask.status === 'completed' ? '已完成' : '失败'}
-                    </Tag>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                      <Tag 
+                        color={batchTask.status === 'processing' ? 'processing' : batchTask.status === 'completed' ? 'success' : 'error'}
+                        style={{ fontSize: 12 }}
+                      >
+                        {batchTask.status === 'processing' ? '⏳ 进行中' : batchTask.status === 'completed' ? '✅ 已完成' : '❌ 失败'}
+                      </Tag>
+                      
+                      {batchTask.currentPhase && (
+                        <Tag color="blue" style={{ fontSize: 12 }}>
+                          🎬 阶段: {batchTask.currentPhase}
+                        </Tag>
+                      )}
+                      
+                      {batchTask.totalScenes && (
+                        <Tag color="purple" style={{ fontSize: 12 }}>
+                          📹 进度: {batchTask.completedScenes || 0}/{batchTask.totalScenes} 分镜
+                        </Tag>
+                      )}
+                      
+                      {batchTask.estimatedTimeRemaining !== undefined && (
+                        <Tag color="cyan" style={{ fontSize: 12 }}>
+                          ⏱️ 预估剩余: {Math.round(batchTask.estimatedTimeRemaining)}秒
+                        </Tag>
+                      )}
+                    </div>
+                    
+                    {/* 详细进度时间线 */}
+                    {batchTask.totalScenes && batchTask.completedScenes !== undefined && (
+                      <div style={{ marginBottom: 16, padding: 12, background: '#fff', borderRadius: 8 }}>
+                        <div style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                          <strong>分镜生成进度：</strong>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {Array.from({ length: batchTask.totalScenes }, (_, i) => (
+                            <div 
+                              key={i}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                background: i < batchTask.completedScenes 
+                                  ? '#52c41a' 
+                                  : batchTask.currentScene === i 
+                                    ? '#1890ff' 
+                                    : '#e8e8e8',
+                                color: i < batchTask.completedScenes || batchTask.currentScene === i 
+                                  ? '#fff' 
+                                  : '#999',
+                                boxShadow: batchTask.currentScene === i ? '0 0 0 2px rgba(24,144,255,0.3)' : 'none'
+                              }}
+                            >
+                              {i < batchTask.completedScenes ? '✓' : i + 1}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     {batchTask.message && (
-                      <p style={{ marginTop: 8, color: '#666', fontSize: 12 }}>{batchTask.message}</p>
+                      <div style={{ marginTop: 8, padding: 12, background: '#e6f7ff', borderRadius: 8, border: '1px solid #91d5ff' }}>
+                        <p style={{ margin: 0, color: '#1890ff', fontSize: 12 }}>
+                          💡 {batchTask.message}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* 错误详情 */}
+                    {batchTask.errors && batchTask.errors.length > 0 && (
+                      <div style={{ marginTop: 12, padding: 12, background: '#fff1f0', borderRadius: 8, border: '1px solid #ffccc7' }}>
+                        <div style={{ fontSize: 12, color: '#f5222d', fontWeight: 600, marginBottom: 8 }}>
+                          ⚠️ 生成过程中的问题：
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 16 }}>
+                          {batchTask.errors.map((err, idx) => (
+                            <li key={idx} style={{ fontSize: 11, color: '#666', marginBottom: 4 }}>
+                              分镜 {err.sceneIndex + 1}: {err.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                 )}
                 
-                <p style={{ marginTop: 8, color: '#999', fontSize: 12 }}>
-                  {generationMode === 'batch' 
-                    ? '批量生成包含：分镜视频生成 → TTS 配音 → 视频拼接，预计需要 3-5 分钟' 
-                    : '视频生成通常需要 1-3 分钟，请耐心等待'}
-                </p>
+                <div style={{ marginTop: 20, padding: 16, background: '#fff', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+                  <p style={{ margin: 0, color: '#666', fontSize: 12, lineHeight: '1.6' }}>
+                    <strong>💡 小提示：</strong>
+                    {generationMode === 'batch' 
+                      ? '批量生成包含：分镜视频生成 → TTS 配音 → 视频拼接，预计需要 3-5 分钟。您可以切换到其他页面或在分镜渲染页面继续编辑，进度会自动同步。' 
+                      : '视频生成通常需要 1-3 分钟，请耐心等待。如果遇到错误，可以点击重试按钮重新生成。'}
+                  </p>
+                </div>
+                
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+                  <Button 
+                    danger 
+                    type="dashed" 
+                    onClick={() => { clearPoll(); setTaskStatus('idle'); setStatusText(''); }}
+                    disabled={taskStatus !== 'generating_video'}
+                  >
+                    ⏹️ 取消生成
+                  </Button>
+                </div>
               </div>
             )}
 
