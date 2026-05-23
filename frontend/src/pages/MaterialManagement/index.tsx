@@ -25,11 +25,15 @@ const MaterialManagementPage = () => {
     try {
       const response = await fetch(`${API_BASE}/api/materials`);
       const data = await response.json();
-      if (data.success) {
-        setMaterials(data.materials);
+      if (data.success && data.data) {
+        setMaterials(data.data);
         // 收集所有标签
         const tags = new Set();
-        data.materials.forEach(m => m.tags.forEach(t => tags.add(t)));
+        data.data.forEach(m => {
+          if (m.tags && Array.isArray(m.tags)) {
+            m.tags.forEach(t => tags.add(t));
+          }
+        });
         setAllTags([...tags]);
       }
     } catch (error) {
@@ -55,7 +59,7 @@ const MaterialManagementPage = () => {
       });
       const data = await response.json();
       if (data.success) {
-        setMaterials(data.results);
+        setMaterials(data.data || data.results || []);
       }
     } catch (error) {
       console.error('搜索失败:', error);
@@ -67,23 +71,48 @@ const MaterialManagementPage = () => {
 
   const handleUpload = async (file) => {
     try {
+      // 1. 先使用 FormData 将真实文件上传到服务器 /api/upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error(`文件上传失败，HTTP 状态: ${uploadResponse.status}`);
+      }
+      
+      const uploadData = await uploadResponse.json();
+      const serverFileUrl = uploadData.url || uploadData.data?.url;
+      
+      if (!serverFileUrl) {
+        throw new Error('未获取到服务器返回的有效素材链接');
+      }
+
+      // 2. 将服务器返回的持久化素材链接登记到 /api/materials 数据库
       const response = await fetch(`${API_BASE}/api/materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           filename: file.name,
-          url: URL.createObjectURL(file),
+          url: serverFileUrl,
+          type: file.type,
           content: file.name,
         }),
       });
+      
       const data = await response.json();
       if (data.success) {
-        message.success('素材上传成功！');
+        message.success('素材上传并分析成功！');
         loadMaterials();
+      } else {
+        throw new Error(data.error || '素材分析失败');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('上传失败:', error);
-      message.error('上传失败');
+      message.error(`上传失败: ${error.message}`);
     }
     return false;
   };
