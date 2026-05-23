@@ -559,44 +559,57 @@ app.post('/api/video/batch-generate', async (req, res) => {
         }
       }
 
-      taskStore.set(batchId, {
-        ...taskStore.get(batchId),
-        progress: 60,
-        message: '正在生成配音...'
-      });
       traceService.addStep(batchId, 'video_generation_completed', { count: generatedScenes.length });
 
       // 7.2 生成 TTS 配音（可选，失败时降级跳过，不中断整个流程）
       let audioPath = null;
       let subtitlePath = null;
-      const fullScriptText = generatedScenes.map(s => s.voiceover || s.description).join(' ');
+      
+      const shouldGenerateTTS = options.enableTTS !== false;
+      if (shouldGenerateTTS) {
+        taskStore.set(batchId, {
+          ...taskStore.get(batchId),
+          progress: 60,
+          message: '正在生成配音...'
+        });
 
-      if (fullScriptText) {
-        traceService.addStep(batchId, 'tts_generation_started', { textLength: fullScriptText.length });
-        try {
-          audioPath = await withRetry(async () => {
-            const ttsService = new TTSService();
-            const ttsResult = await ttsService.generate(fullScriptText, {
-              voice: options.voice || 'zh-CN-XiaoxiaoNeural',
-              rate: options.rate || '+0%',
-              outputDir: tempDir
+        const fullScriptText = generatedScenes.map(s => s.voiceover || s.description).join(' ');
+
+        if (fullScriptText) {
+          traceService.addStep(batchId, 'tts_generation_started', { textLength: fullScriptText.length });
+          try {
+            audioPath = await withRetry(async () => {
+              const ttsService = new TTSService();
+              const ttsResult = await ttsService.generate(fullScriptText, {
+                voice: options.voice || 'zh-CN-XiaoxiaoNeural',
+                rate: options.rate || '+0%',
+                outputDir: tempDir
+              });
+              return ttsResult.audioFile;
+            }, ttsRetryOptions);
+            traceService.addStep(batchId, 'tts_generation_completed', { audioPath });
+            console.log(`✅ 配音生成成功: ${audioPath}`);
+          } catch (ttsErr) {
+            // TTS 不可用（edge-tts 未安装等），降级为无配音模式继续合成
+            console.warn(`⚠️ TTS 配音生成失败，将跳过配音直接合成纯视频: ${ttsErr.message}`);
+            traceService.addStep(batchId, 'tts_skipped', { reason: ttsErr.message });
+            audioPath = null;
+
+            // 更新状态提示用户
+            taskStore.set(batchId, {
+              ...taskStore.get(batchId),
+              ttsWarning: 'TTS 配音不可用（edge-tts 未安装），已跳过配音，将输出无旁白视频'
             });
-            return ttsResult.audioFile;
-          }, ttsRetryOptions);
-          traceService.addStep(batchId, 'tts_generation_completed', { audioPath });
-          console.log(`✅ 配音生成成功: ${audioPath}`);
-        } catch (ttsErr) {
-          // TTS 不可用（edge-tts 未安装等），降级为无配音模式继续合成
-          console.warn(`⚠️ TTS 配音生成失败，将跳过配音直接合成纯视频: ${ttsErr.message}`);
-          traceService.addStep(batchId, 'tts_skipped', { reason: ttsErr.message });
-          audioPath = null;
-
-          // 更新状态提示用户
-          taskStore.set(batchId, {
-            ...taskStore.get(batchId),
-            ttsWarning: 'TTS 配音不可用（edge-tts 未安装），已跳过配音，将输出无旁白视频'
-          });
+          }
         }
+      } else {
+        console.log(`⚡ 用户已选择不生成配音，跳过 TTS 生成`);
+        traceService.addStep(batchId, 'tts_skipped', { reason: 'user_disabled' });
+        taskStore.set(batchId, {
+          ...taskStore.get(batchId),
+          progress: 65,
+          message: '已选择跳过配音，正在进行视频拼接...'
+        });
       }
 
       taskStore.set(batchId, {
