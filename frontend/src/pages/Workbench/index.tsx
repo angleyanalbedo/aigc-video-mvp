@@ -2687,8 +2687,18 @@ const WorkbenchPage: React.FC = () => {
                                 >
                                   ⏹️ 取消渲染任务
                                 </Button>
-                                <Text type="secondary" style={{ fontSize: 10, textAlign: 'center' }}>
-                                  {scene.progress ? `${scene.progress}%` : '渲染中...'}
+                                <Progress 
+                                  percent={scene.progress || 10} 
+                                  status="active" 
+                                  size="small"
+                                  strokeColor={{
+                                    '0%': '#10b981',
+                                    '100%': '#059669',
+                                  }}
+                                  format={(percent) => `${percent}%`}
+                                />
+                                <Text type="secondary" style={{ fontSize: 10, textAlign: 'center', display: 'block' }}>
+                                  后台渲染中，请稍候...
                                 </Text>
                               </Space>
                             ) : (
