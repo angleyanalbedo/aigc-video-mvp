@@ -439,8 +439,14 @@ const WorkbenchPage: React.FC = () => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
     
-    updateSceneField(index, 'status', 'generating');
-    updateSceneField(index, 'rendering', true);
+    // Atomic state update for starting image generation
+    const startScenes = [...script.scenes];
+    startScenes[index] = {
+      ...startScenes[index],
+      status: 'generating',
+      rendering: true
+    };
+    updateScript({ ...script, scenes: startScenes });
 
     setWorkflowStarted(true);
     setWorkflowNodes(prev => prev.map(n => n.id === 'image' ? { ...n, status: 'running' } : n));
@@ -459,9 +465,15 @@ const WorkbenchPage: React.FC = () => {
 
       const data = await res.json();
       if (data.success && data.imageUrl) {
-        updateSceneField(index, 'rendering', false);
-        updateSceneField(index, 'imageUrl', data.imageUrl);
-        updateSceneField(index, 'status', 'image_completed');
+        // Atomic state update for successful image generation
+        const doneScenes = [...script.scenes];
+        doneScenes[index] = {
+          ...doneScenes[index],
+          rendering: false,
+          imageUrl: data.imageUrl,
+          status: 'image_completed'
+        };
+        updateScript({ ...script, scenes: doneScenes });
         message.success(`分镜 ${index + 1} 视觉生图成功！`);
         
         setWorkflowNodes(prev => prev.map(n => {
@@ -476,8 +488,14 @@ const WorkbenchPage: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      updateSceneField(index, 'rendering', false);
-      updateSceneField(index, 'status', 'error');
+      // Atomic state update for failed image generation
+      const failScenes = [...script.scenes];
+      failScenes[index] = {
+        ...failScenes[index],
+        rendering: false,
+        status: 'error'
+      };
+      updateScript({ ...script, scenes: failScenes });
       message.error(`分镜 ${index + 1} 图片生成失败`);
       setWorkflowNodes(prev => prev.map(n => n.id === 'image' ? { ...n, status: 'failed' } : n));
     }
@@ -506,10 +524,16 @@ const WorkbenchPage: React.FC = () => {
     if (!script || !script.scenes) return;
     const scene = script.scenes[index];
     
-    // Set Scene Status to Rendering
-    updateSceneField(index, 'status', 'generating');
-    updateSceneField(index, 'rendering', true);
-    updateSceneField(index, 'progress', 10);
+    // Atomic state update for starting video generation
+    const startScenes = [...script.scenes];
+    startScenes[index] = {
+      ...startScenes[index],
+      status: 'generating',
+      rendering: true,
+      progress: 10
+    };
+    updateScript({ ...script, scenes: startScenes });
+
     setWorkflowStarted(true);
     setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'running' } : n));
 
@@ -531,8 +555,14 @@ const WorkbenchPage: React.FC = () => {
         });
         const ttsData = await ttsRes.json();
         if (ttsData.success) {
-          updateSceneField(index, 'audioUrl', ttsData.audioUrl);
-          updateSceneField(index, 'ttsEstDuration', ttsData.duration);
+          // Atomic state update for successful TTS generation
+          const ttsScenes = [...script.scenes];
+          ttsScenes[index] = {
+            ...ttsScenes[index],
+            audioUrl: ttsData.audioUrl,
+            ttsEstDuration: ttsData.duration
+          };
+          updateScript({ ...script, scenes: ttsScenes });
           console.log(`✅ 分镜 ${index + 1} 配音生成成功:`, ttsData.audioUrl);
         }
       } catch (err) {
@@ -567,10 +597,17 @@ const WorkbenchPage: React.FC = () => {
 
               if (taskData.status === 'succeeded') {
                 clearInterval(pollInterval);
-                updateSceneField(index, 'rendering', false);
-                updateSceneField(index, 'status', 'completed');
-                updateSceneField(index, 'videoUrl', taskData.videoUrl);
+                // Atomic state update for successful video generation
+                const doneScenes = [...script.scenes];
+                doneScenes[index] = {
+                  ...doneScenes[index],
+                  rendering: false,
+                  status: 'completed',
+                  videoUrl: taskData.videoUrl
+                };
+                updateScript({ ...script, scenes: doneScenes });
                 message.success(`分镜 ${index + 1} 画面渲染成功！`);
+                
                 setWorkflowNodes(prev => prev.map(n => {
                   if (n.id === 'video') {
                     const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
@@ -580,8 +617,14 @@ const WorkbenchPage: React.FC = () => {
                 }));
               } else if (taskData.status === 'failed') {
                 clearInterval(pollInterval);
-                updateSceneField(index, 'rendering', false);
-                updateSceneField(index, 'status', 'error');
+                // Atomic state update for failed video generation
+                const failScenes = [...script.scenes];
+                failScenes[index] = {
+                  ...failScenes[index],
+                  rendering: false,
+                  status: 'error'
+                };
+                updateScript({ ...script, scenes: failScenes });
                 message.error(`分镜 ${index + 1} 画面生成失败`);
                 setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
               }
@@ -593,11 +636,17 @@ const WorkbenchPage: React.FC = () => {
       } else {
         // Safe fallback
         setTimeout(() => {
-          updateSceneField(index, 'rendering', false);
-          updateSceneField(index, 'status', 'completed');
-          // Auto fill a mock placeholder video
-          updateSceneField(index, 'videoUrl', 'https://assets.mixkit.co/videos/preview/mixkit-kitchen-counter-with-fresh-vegetables-and-fruits-41584-large.mp4');
+          // Atomic state update for fallback video generation
+          const fallbackScenes = [...script.scenes];
+          fallbackScenes[index] = {
+            ...fallbackScenes[index],
+            rendering: false,
+            status: 'completed',
+            videoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-kitchen-counter-with-fresh-vegetables-and-fruits-41584-large.mp4'
+          };
+          updateScript({ ...script, scenes: fallbackScenes });
           message.success(`分镜 ${index + 1} 画面生成成功 (Mock 视频已注入)`);
+          
           setWorkflowNodes(prev => prev.map(n => {
             if (n.id === 'video') {
               const allDone = script?.scenes?.every((s: any, idx: number) => idx === index ? true : (s.status === 'completed' || !!s.videoUrl));
@@ -609,8 +658,14 @@ const WorkbenchPage: React.FC = () => {
       }
     } catch (e) {
       console.error('生成单个分镜失败:', e);
-      updateSceneField(index, 'rendering', false);
-      updateSceneField(index, 'status', 'error');
+      // Atomic state update for failed catch block
+      const catchScenes = [...script.scenes];
+      catchScenes[index] = {
+        ...catchScenes[index],
+        rendering: false,
+        status: 'error'
+      };
+      updateScript({ ...script, scenes: catchScenes });
       message.error('分镜渲染出错');
       setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
     }
