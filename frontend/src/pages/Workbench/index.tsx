@@ -12,6 +12,7 @@ import {
   AudioOutlined,
   RocketOutlined,
   CheckCircleOutlined,
+  CheckCircleFilled,
   ScissorOutlined,
   SyncOutlined,
   CloseCircleOutlined,
@@ -25,6 +26,9 @@ import {
   SkinOutlined,
   GlobalOutlined,
   CustomerServiceOutlined,
+  DatabaseOutlined,
+  InboxOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import AssetPanel from './AssetPanel';
 import {
@@ -181,6 +185,13 @@ const WorkbenchPage: React.FC = () => {
 
   // 项目素材列表（AssetPanel 数据源）
   const [projectMaterials, setProjectMaterials] = useState<any[]>([]);
+
+  // 素材库相关状态
+  const [libraryModalVisible, setLibraryModalVisible] = useState(false);
+  const [libraryMaterials, setLibraryMaterials] = useState<any[]>([]);
+  const [selectedLibraryMaterials, setSelectedLibraryMaterials] = useState<string[]>([]);
+  const [librarySearchKeyword, setLibrarySearchKeyword] = useState('');
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
 
   // Auto-save Status
@@ -604,12 +615,38 @@ const WorkbenchPage: React.FC = () => {
   const forceRerender = (index: number) => {
     if (!script || !script.scenes) return;
     
+    const scene = script.scenes[index];
+    const isTimeout = scene.status === 'error' && scene.errorMessage?.includes('超时');
+    const isStuck = scene.rendering || scene.status === 'generating';
+    
     Modal.confirm({
-      title: '⚠️ 强制重新渲染',
-      content: '该分镜可能正在卡住或渲染失败。是否强制取消当前任务并重新开始渲染？',
-      okText: '确认强制重新渲染',
+      title: isStuck ? '⚠️ 强制取消渲染任务' : '🔄 重新渲染分镜',
+      content: (
+        <div>
+          <p>
+            {isTimeout 
+              ? '该分镜渲染已超时（超过 3 分钟无响应）。是否强制取消并重新渲染？'
+              : isStuck
+                ? '该分镜可能正在卡住。是否强制取消当前任务并重新开始渲染？'
+                : '是否重新渲染该分镜？'}
+          </p>
+          {scene.errorMessage && (
+            <div style={{ 
+              marginTop: 12, 
+              padding: 8, 
+              background: '#fff1f0', 
+              borderRadius: 4,
+              fontSize: 12,
+              color: '#cf1322'
+            }}>
+              <strong>错误详情：</strong>{scene.errorMessage}
+            </div>
+          )}
+        </div>
+      ),
+      okText: isTimeout ? '强制重新渲染' : (isStuck ? '确认强制重新渲染' : '重新渲染'),
       cancelText: '取消',
-      okButtonProps: { danger: true },
+      okButtonProps: { danger: isTimeout || isStuck },
       onOk: () => {
         message.loading('正在重置渲染状态...', 1);
         setTimeout(() => {
@@ -852,6 +889,17 @@ const WorkbenchPage: React.FC = () => {
       return;
     }
     
+    // 先清理所有卡住的后端任务
+    try {
+      const cleanupRes = await fetch(`${API_BASE}/api/video/cleanup`, { method: 'POST' });
+      const cleanupData = await cleanupRes.json();
+      if (cleanupData.cleanedCount > 0) {
+        message.info(`🧹 已自动清理 ${cleanupData.cleanedCount} 个卡住的后端任务`);
+      }
+    } catch (err) {
+      console.warn('清理卡住任务失败，继续渲染:', err);
+    }
+    
     // Atomic state update for starting video generation
     const startScenes = [...script.scenes];
     startScenes[index] = {
@@ -917,13 +965,22 @@ const WorkbenchPage: React.FC = () => {
       const data = await res.json();
       if (data.taskId) {
         const taskId = data.taskId;
+        let pollCount = 0;
+        const maxPollCount = 60; // 最多轮询 60 次（3 分钟）
+        const pollTimeout = 10 * 60 * 1000; // 10 分钟超时
+        
         // Start polling task
         const pollInterval = setInterval(async () => {
+          pollCount++;
+          
           try {
             const taskRes = await fetch(`${API_BASE}/api/video/status/${taskId}`);
             const taskData = await taskRes.json();
+            
             if (taskData) {
-              updateSceneField(index, 'progress', taskData.progress || 30);
+              // 如果后端返回了有效进度，使用后端的进度；否则使用估算进度
+              const displayProgress = taskData.progress || Math.min(10 + (pollCount * 5), 90);
+              updateSceneField(index, 'progress', displayProgress);
 
               if (taskData.status === 'succeeded') {
                 clearInterval(pollInterval);
@@ -933,7 +990,8 @@ const WorkbenchPage: React.FC = () => {
                   ...doneScenes[index],
                   rendering: false,
                   status: 'completed',
-                  videoUrl: taskData.videoUrl
+                  videoUrl: taskData.videoUrl,
+                  progress: 100
                 };
                 updateScript({ ...script, scenes: doneScenes });
                 message.success(`分镜 ${index + 1} 画面渲染成功！`);
@@ -957,6 +1015,19 @@ const WorkbenchPage: React.FC = () => {
                 };
                 updateScript({ ...script, scenes: failScenes });
                 message.error(`分镜 ${index + 1} 画面生成失败`);
+                setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
+              } else if (pollCount >= maxPollCount) {
+                // 超时处理：达到最大轮询次数后自动停止
+                clearInterval(pollInterval);
+                const timeoutScenes = [...script.scenes];
+                timeoutScenes[index] = {
+                  ...timeoutScenes[index],
+                  rendering: false,
+                  status: 'error',
+                  errorMessage: `渲染超时（超过 ${Math.round(maxPollCount * 3 / 60)} 分钟）。可能是后端任务卡住，请尝试强制重置后重新渲染。`
+                };
+                updateScript({ ...script, scenes: timeoutScenes });
+                message.warning(`⚠️ 分镜 ${index + 1} 渲染超时，已自动停止轮询。请查看错误详情或点击"强制重置"后重新渲染。`);
                 setWorkflowNodes(prev => prev.map(n => n.id === 'video' ? { ...n, status: 'failed' } : n));
               }
             }
@@ -1008,6 +1079,17 @@ const WorkbenchPage: React.FC = () => {
     if (!script || !script.scenes || script.scenes.length === 0) {
       message.warning('暂无分镜场景数据！');
       return;
+    }
+    
+    // 先清理所有卡住的任务
+    try {
+      const cleanupRes = await fetch(`${API_BASE}/api/video/cleanup`, { method: 'POST' });
+      const cleanupData = await cleanupRes.json();
+      if (cleanupData.cleanedCount > 0) {
+        message.info(`🧹 已自动清理 ${cleanupData.cleanedCount} 个卡住的后端任务`);
+      }
+    } catch (err) {
+      console.error('清理卡住任务失败:', err);
     }
     
     // 统计需要渲染的分镜数量
@@ -1268,57 +1350,72 @@ const WorkbenchPage: React.FC = () => {
                 
                 {/* Drag-Drop and Uploader Grid */}
                 <div style={{ flex: 1, overflowY: 'auto', marginBottom: 20 }}>
-                  <Row gutter={[12, 12]}>
-                    <Col span={8}>
-                      <div
-                        onClick={() => {
-                          const input = document.createElement('input');
-                          input.type = 'file';
-                          input.accept = 'image/*';
-                          input.onchange = async (e: any) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              message.loading(`正在上传 "${file.name}"...`, 0);
-                              try {
-                                const res = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
-                                  method: 'POST',
-                                  body: formData
-                                });
-                                const uploadData = await res.json();
-                                message.destroy();
-                                if (uploadData.success && uploadData.data) {
-                                  message.success('素材上传成功！');
-                                  setProjectMaterials((prev: any[]) => [uploadData.data, ...prev]);
-                                  setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
-                                } else {
-                                  throw new Error(uploadData.error || '上传失败');
-                                }
-                              } catch (err: any) {
-                                message.error('上传失败: ' + err.message);
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <Button
+                      icon={<UploadOutlined />}
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = async (e: any) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const formData = new FormData();
+                            formData.append('file', file);
+                            message.loading(`正在上传 "${file.name}"...`, 0);
+                            try {
+                              const res = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
+                                method: 'POST',
+                                body: formData
+                              });
+                              const uploadData = await res.json();
+                              message.destroy();
+                              if (uploadData.success && uploadData.data) {
+                                message.success('素材上传成功！');
+                                setProjectMaterials((prev: any[]) => [uploadData.data, ...prev]);
+                                setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                              } else {
+                                throw new Error(uploadData.error || '上传失败');
                               }
+                            } catch (err: any) {
+                              message.error('上传失败: ' + err.message);
                             }
-                          };
-                          input.click();
-                        }}
-                        style={{
-                          height: 100,
-                          background: 'rgba(99,102,241,0.08)',
-                          border: '1.5px dashed #4f46e5',
-                          borderRadius: 8,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <PlusOutlined style={{ fontSize: 20, color: '#818cf8', marginBottom: 6 }} />
-                        <span style={{ fontSize: 11, color: '#818cf8' }}>上传新素材</span>
-                      </div>
-                    </Col>
+                          }
+                        };
+                        input.click();
+                      }}
+                      style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 36 }}
+                    >
+                      📤 上传新素材
+                    </Button>
+                    <Button
+                      icon={<DatabaseOutlined />}
+                      onClick={() => {
+                        setLibraryModalVisible(true);
+                        setIsLoadingLibrary(true);
+                        setLibrarySearchKeyword('');
+                        fetch(`${API_BASE}/api/materials/library`)
+                          .then(res => res.json())
+                          .then(data => {
+                            if (data.success) {
+                              setLibraryMaterials(data.materials || []);
+                              setIsLoadingLibrary(false);
+                            } else {
+                              message.error(data.error || '获取素材库失败');
+                              setIsLoadingLibrary(false);
+                            }
+                          })
+                          .catch(err => {
+                            message.error('加载素材库失败: ' + err.message);
+                            setIsLoadingLibrary(false);
+                          });
+                      }}
+                      style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 36 }}
+                    >
+                      📚 从素材库选择
+                    </Button>
+                  </div>
+                  <Row gutter={[12, 12]}>
                     {projectMaterials.map((m: any) => (
                       <Col span={8} key={m.id}>
                         <div style={{
@@ -1559,6 +1656,197 @@ const WorkbenchPage: React.FC = () => {
             </Col>
           </Row>
         )}
+
+      {/* ============================================================== */}
+      {/* 素材库选择 Modal */}
+      {/* ============================================================== */}
+      <Modal
+        title={
+          <div>
+            📂 从素材库选择
+            <Tag color="blue" style={{ marginLeft: 8 }}>
+              已选择 {selectedLibraryMaterials.length} 个素材
+            </Tag>
+          </div>
+        }
+        open={libraryModalVisible}
+        onCancel={() => {
+          setLibraryModalVisible(false);
+          setSelectedLibraryMaterials([]);
+        }}
+        width={900}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Button onClick={() => setLibraryModalVisible(false)}>取消</Button>
+            <Space>
+              <Button onClick={() => {
+                setSelectedLibraryMaterials([]);
+                message.info('已清空选择');
+              }}>清空选择</Button>
+              <Button
+                type="primary"
+                disabled={selectedLibraryMaterials.length === 0}
+                onClick={async () => {
+                  if (selectedLibraryMaterials.length === 0) {
+                    message.warning('请至少选择一个素材');
+                    return;
+                  }
+
+                  message.loading('正在添加选中素材到项目...', 0);
+                  try {
+                    // 为每个选中的素材添加到项目
+                    const newMaterials = [];
+                    for (const materialUrl of selectedLibraryMaterials) {
+                      const res = await fetch(`${API_BASE}/api/projects/${projectId}/materials`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: materialUrl, fromLibrary: true })
+                      });
+                      const data = await res.json();
+                      if (data.success && data.data) {
+                        newMaterials.push(data.data);
+                      }
+                    }
+
+                    message.destroy();
+                    if (newMaterials.length > 0) {
+                      setProjectMaterials((prev: any[]) => [...newMaterials, ...prev]);
+                      setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
+                      message.success(`✅ 成功添加 ${newMaterials.length} 个素材到项目！`);
+                      setLibraryModalVisible(false);
+                      setSelectedLibraryMaterials([]);
+                    } else {
+                      message.error('添加素材失败');
+                    }
+                  } catch (err: any) {
+                    message.destroy();
+                    message.error('添加素材失败: ' + err.message);
+                  }
+                }}
+              >
+                ✅ 确认添加 ({selectedLibraryMaterials.length})
+              </Button>
+            </Space>
+          </div>
+        }
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Input.Search
+            placeholder="🔍 搜索素材库..."
+            value={librarySearchKeyword}
+            onChange={(e) => setLibrarySearchKeyword(e.target.value)}
+            onSearch={() => {
+              if (!librarySearchKeyword.trim()) {
+                message.info('请输入搜索关键词');
+                return;
+              }
+              setIsLoadingLibrary(true);
+              fetch(`${API_BASE}/api/materials/library?keyword=${encodeURIComponent(librarySearchKeyword)}`)
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success) {
+                    setLibraryMaterials(data.materials || []);
+                    setIsLoadingLibrary(false);
+                  } else {
+                    message.error(data.error || '搜索失败');
+                    setIsLoadingLibrary(false);
+                  }
+                })
+                .catch(err => {
+                  message.error('搜索失败: ' + err.message);
+                  setIsLoadingLibrary(false);
+                });
+            }}
+            enterButton="搜索"
+            loading={isLoadingLibrary}
+          />
+        </div>
+
+        {isLoadingLibrary ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <LoadingOutlined style={{ fontSize: 40, color: '#818cf8' }} />
+            <p style={{ marginTop: 16, color: '#a1a1aa' }}>正在加载素材库...</p>
+          </div>
+        ) : libraryMaterials.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <InboxOutlined style={{ fontSize: 60, color: '#3f3f46' }} />
+            <p style={{ marginTop: 16, color: '#a1a1aa' }}>
+              {librarySearchKeyword ? '未找到匹配的素材' : '素材库为空，请先上传素材'}
+            </p>
+          </div>
+        ) : (
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <Row gutter={[12, 12]}>
+              {libraryMaterials.map((material: any) => {
+                const isSelected = selectedLibraryMaterials.includes(material.url);
+                return (
+                  <Col span={8} key={material.id}>
+                    <div
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedLibraryMaterials(prev => prev.filter(url => url !== material.url));
+                        } else {
+                          setSelectedLibraryMaterials(prev => [...prev, material.url]);
+                        }
+                      }}
+                      style={{
+                        height: 120,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        border: isSelected ? '3px solid #10b981' : '1px solid #27272a',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <img
+                        src={material.url}
+                        alt={material.filename || material.name}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          filter: isSelected ? 'brightness(0.7)' : 'brightness(1)'
+                        }}
+                      />
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(16, 185, 129, 0.3)'
+                        }}>
+                          <CheckCircleFilled style={{ fontSize: 40, color: '#10b981' }} />
+                        </div>
+                      )}
+                      <div style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        background: 'rgba(0,0,0,0.6)',
+                        padding: '4px 8px',
+                        fontSize: 10,
+                        color: '#fff',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {material.filename || material.name || '素材'}
+                      </div>
+                    </div>
+                  </Col>
+                );
+              })}
+            </Row>
+          </div>
+        )}
+      </Modal>
 
         {/* ============================================================== */}
         {/* TAB 1: SCRIPT COORDINATION PANEL */}
@@ -2459,6 +2747,130 @@ const WorkbenchPage: React.FC = () => {
                         style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: 6, height: 38 }}
                       >
                         ⚡ 一键渲染所有分镜
+                      </Button>
+                      <Button
+                        type="default"
+                        icon={<ApiOutlined />}
+                        onClick={() => {
+                          message.loading('正在获取后端任务状态...', 0);
+                          fetch(`${API_BASE}/api/video/tasks`)
+                            .then(res => res.json())
+                            .then(data => {
+                              message.destroy();
+                              if (data.success && data.tasks.length > 0) {
+                                Modal.info({
+                                  title: '📋 后端任务列表',
+                                  width: 800,
+                                  content: (
+                                    <div style={{ maxHeight: 400, overflow: 'auto' }}>
+                                      <p style={{ marginBottom: 12, color: '#666' }}>
+                                        当前共有 {data.total} 个后端任务：
+                                      </p>
+                                      <Table
+                                        size="small"
+                                        dataSource={data.tasks}
+                                        rowKey="taskId"
+                                        pagination={false}
+                                        columns={[
+                                          {
+                                            title: '任务ID',
+                                            dataIndex: 'taskId',
+                                            key: 'taskId',
+                                            width: 180,
+                                            render: (id: string) => (
+                                              <code style={{ 
+                                                background: '#f5f5f5', 
+                                                padding: '2px 6px', 
+                                                borderRadius: 4,
+                                                fontSize: 11
+                                              }}>
+                                                {id}
+                                              </code>
+                                            )
+                                          },
+                                          {
+                                            title: '状态',
+                                            dataIndex: 'status',
+                                            key: 'status',
+                                            width: 100,
+                                            render: (status: string) => {
+                                              const statusMap: Record<string, { color: string; text: string }> = {
+                                                'queued': { color: 'default', text: '排队中' },
+                                                'processing': { color: 'processing', text: '处理中' },
+                                                'running': { color: 'processing', text: '运行中' },
+                                                'succeeded': { color: 'success', text: '成功' },
+                                                'failed': { color: 'error', text: '失败' }
+                                              };
+                                              const config = statusMap[status] || statusMap['queued'];
+                                              return <Tag color={config.color}>{config.text}</Tag>;
+                                            }
+                                          },
+                                          {
+                                            title: '创建时间',
+                                            dataIndex: 'age',
+                                            key: 'age',
+                                            width: 80,
+                                            render: (age: string) => (
+                                              <span style={{ fontSize: 11 }}>{age}</span>
+                                            )
+                                          },
+                                          {
+                                            title: '提示词',
+                                            dataIndex: 'prompt',
+                                            key: 'prompt',
+                                            render: (prompt: string) => (
+                                              <span style={{ 
+                                                fontSize: 11, 
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                maxWidth: 200
+                                              }}>
+                                                {prompt}
+                                              </span>
+                                            )
+                                          }
+                                        ]}
+                                      />
+                                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                                        <Button
+                                          type="primary"
+                                          danger
+                                          icon={<ReloadOutlined />}
+                                          onClick={() => {
+                                            fetch(`${API_BASE}/api/video/cleanup`, { method: 'POST' })
+                                              .then(res => res.json())
+                                              .then(cleanupData => {
+                                                Modal.destroyAll();
+                                                message.success(`✅ 已清理 ${cleanupData.cleanedCount} 个卡住的任务`);
+                                              });
+                                          }}
+                                        >
+                                          清理所有卡住任务
+                                        </Button>
+                                        <Button
+                                          icon={<VideoCameraOutlined />}
+                                          onClick={() => window.open('/task-center', '_blank')}
+                                        >
+                                          打开任务中心
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ),
+                                  onOk: () => {},
+                                });
+                              } else {
+                                message.info('✅ 当前没有运行中的后端任务');
+                              }
+                            })
+                            .catch(err => {
+                              message.destroy();
+                              message.error('❌ 获取任务状态失败: ' + err.message);
+                            });
+                        }}
+                        style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 38 }}
+                      >
+                        📋 查看任务列表
                       </Button>
                     </Space>
                   </div>

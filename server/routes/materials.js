@@ -2,6 +2,36 @@ const express = require('express');
 const router = express.Router();
 const materialService = require('../services/materialService');
 
+// 获取全局素材库
+router.get('/library', (req, res) => {
+  try {
+    const { keyword } = req.query;
+    let materials = materialService.getAllMaterials();
+    
+    // 如果有关键词搜索，进行简单的模糊匹配
+    if (keyword) {
+      const lowerKeyword = keyword.toLowerCase();
+      materials = materials.filter(m => 
+        (m.filename && m.filename.toLowerCase().includes(lowerKeyword)) ||
+        (m.name && m.name.toLowerCase().includes(lowerKeyword)) ||
+        (m.tags && m.tags.some(tag => tag.toLowerCase().includes(lowerKeyword)))
+      );
+    }
+    
+    res.json({
+      success: true,
+      materials,
+      total: materials.length
+    });
+  } catch (error) {
+    console.error('获取素材库失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '获取素材库失败: ' + error.message
+    });
+  }
+});
+
 router.post('/', (req, res) => {
   try {
     const { filename, url, content } = req.body;

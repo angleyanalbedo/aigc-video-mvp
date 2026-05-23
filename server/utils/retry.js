@@ -72,12 +72,12 @@ async function withRetry(fn, options = {}) {
  * 视频生成专用重试配置
  */
 const videoRetryOptions = {
-  maxRetries: 3,
-  initialDelay: 2000,
+  maxRetries: 1,         // 外层重试 1 次即可；内层 pollVideoCompletion 已有 300 次检查
+  initialDelay: 5000,
   maxDelay: 60000,
   backoffFactor: 2,
   shouldRetry: (error) => {
-    // 网络错误、超时、服务端错误可以重试
+    // 网络错误、超时、服务端错误可以重试（兼容英文和中文错误信息）
     const retryableErrors = [
       'ECONNRESET',
       'ETIMEDOUT',
@@ -87,11 +87,19 @@ const videoRetryOptions = {
       'rate limit',
       'too many requests',
       'service unavailable',
-      'internal error'
+      'internal error',
+      '超时',        // 中文超时
+      '视频生成超时', // 中文明确超时
+      '网络',        // 中文网络错误
+      '连接'         // 中文连接错误
     ];
     
     const errorMessage = error.message?.toLowerCase() || '';
-    return retryableErrors.some(e => errorMessage.includes(e.toLowerCase()));
+    // 中文关键词单独匹配（不 toLowerCase 避免破坏中文字符）
+    const chineseKeywords = ['超时', '视频生成超时', '网络', '连接'];
+    const matchesChinese = chineseKeywords.some(k => error.message?.includes(k));
+    const matchesEnglish = retryableErrors.some(e => errorMessage.includes(e.toLowerCase()));
+    return matchesChinese || matchesEnglish;
   }
 };
 
