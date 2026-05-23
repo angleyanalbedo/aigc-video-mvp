@@ -170,9 +170,9 @@ app.post('/api/script/generate', async (req, res) => {
 
 // 3.1. 创建图片生成任务（调用 ImageAgent）
 app.post('/api/image/generate', async (req, res) => {
-  const { prompt, referenceImageUrl, sceneIndex } = req.body;
+  const { prompt, referenceImageUrl, sceneIndex, projectId } = req.body;
   try {
-    const result = await imageAgent.generateImage(prompt, referenceImageUrl);
+    const result = await imageAgent.generateImage(prompt, referenceImageUrl, projectId, sceneIndex);
     res.json({
       success: true,
       imageUrl: result.imageUrl,

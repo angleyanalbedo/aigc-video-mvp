@@ -1,7 +1,7 @@
 const { videoProvider } = require('../../services/providers');
 
-async function createVideoTask({ prompt, resolution = '720p', ratio = '9:16', duration = 5 }) {
-  return videoProvider.createTask({ prompt, resolution, ratio, duration });
+async function createVideoTask({ prompt, resolution = '720p', ratio = '9:16', duration = 5, imageUrl = null }) {
+  return videoProvider.createTask({ prompt, resolution, ratio, duration, imageUrl });
 }
 
 async function getVideoStatus(taskId) {

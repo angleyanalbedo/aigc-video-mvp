@@ -9,19 +9,31 @@ class VideoAgent {
   async generateScene(scene, options = {}) {
     console.log(`🎬 VideoAgent: 生成分镜 ${scene.id}...`);
 
-    const { resolution = '720p', ratio = '9:16' } = options;
+    const { resolution = '720p', ratio = '9:16', projectId = null, sceneIndex = null } = options;
 
     try {
       const task = await createVideoTask({
         prompt: scene.description,
         resolution,
         ratio,
-        duration: scene.duration || 5
+        duration: scene.duration || 5,
+        imageUrl: scene.imageUrl || scene.referenceImageUrl || null
       });
 
       const videoUrl = await waitForVideo(task.id);
 
       console.log(`✅ VideoAgent: 分镜 ${scene.id} 生成成功`);
+
+      // 自动调用工作台工具，将生成的 videoUrl 回写 SQLite 数据库工作台数据！
+      if (projectId !== null && sceneIndex !== null) {
+        try {
+          const { updateSceneAsset } = require('./tools/workbenchAPI');
+          await updateSceneAsset(projectId, sceneIndex, 'videoUrl', videoUrl);
+        } catch (err) {
+          console.error(`⚠️ VideoAgent Tool: 自动回写工作台错误:`, err.message);
+        }
+      }
+
       return {
         sceneId: scene.id,
         taskId: task.id,
@@ -39,10 +51,21 @@ class VideoAgent {
             prompt: scene.description,
             resolution,
             ratio,
-            duration: scene.duration || 5
+            duration: scene.duration || 5,
+            imageUrl: scene.imageUrl || scene.referenceImageUrl || null
           });
 
           const videoUrl = await waitForVideo(task.id);
+
+          // 自动调用工作台工具，回写 SQLite 数据库工作台数据
+          if (projectId !== null && sceneIndex !== null) {
+            try {
+              const { updateSceneAsset } = require('./tools/workbenchAPI');
+              await updateSceneAsset(projectId, sceneIndex, 'videoUrl', videoUrl);
+            } catch (err) {
+              console.error(`⚠️ VideoAgent Tool: 自动回写工作台错误:`, err.message);
+            }
+          }
 
           return {
             sceneId: scene.id,

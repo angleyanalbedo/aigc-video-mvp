@@ -134,7 +134,7 @@ const WorkbenchPage: React.FC = () => {
   const [workflowNodes, setWorkflowNodes] = useState<WorkflowNode[]>([
     { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending' },
     { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending' },
-    { id: 'image',  name: '视觉生图', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
+    { id: 'image',  name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: 'pending' },
     { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: 'pending' },
     { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: 'pending' },
   ]);
@@ -165,7 +165,7 @@ const WorkbenchPage: React.FC = () => {
           setWorkflowNodes([
             { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'completed' },
             { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'completed' },
-            { id: 'image',  name: '视觉生图', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
+            { id: 'image',  name: '分镜编辑', agent: 'ImageAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.imageUrl) ? 'completed' : 'pending' },
             { id: 'video',  name: '分镜渲染', agent: 'VideoAgent',  layer: '执行层', status: p.script.scenes?.some((s: any) => s.videoUrl) ? 'completed' : 'pending' },
             { id: 'clip',   name: '剪辑合成', agent: 'ClipAgent',   layer: '执行层', status: p.videoUrl ? 'completed' : 'pending' },
           ]);
@@ -452,7 +452,8 @@ const WorkbenchPage: React.FC = () => {
         body: JSON.stringify({
           prompt: scene.description,
           referenceImageUrl: scene.referenceImageUrl || null,
-          sceneIndex: index
+          sceneIndex: index,
+          projectId
         })
       });
 
@@ -549,7 +550,7 @@ const WorkbenchPage: React.FC = () => {
           imageUrl: scene.imageUrl || scene.referenceImageUrl || null,
           duration: scene.duration || 5,
           sceneIndex: index,
-          options: settings
+          options: { ...settings, projectId }
         })
       });
 
