@@ -6,6 +6,10 @@ const assetAgent = require('./assetAgent');
 const { VideoOrchestrator, STATES } = require('./orchestrator');
 const { memoryManager, vectorStore, embeddingService } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
+const masterAgent = require('./masterAgent');
+const IntentParser = require('./intent/intentParser');
+const TaskPlanner = require('./planner/taskPlanner');
+const ToolExecutor = require('./executor/toolExecutor');
 
 module.exports = {
   scriptAgent,
@@ -19,5 +23,9 @@ module.exports = {
   memoryManager,
   vectorStore,
   embeddingService,
-  skillLoader
+  skillLoader,
+  masterAgent,
+  IntentParser,
+  TaskPlanner,
+  ToolExecutor
 };

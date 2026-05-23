@@ -1,0 +1,433 @@
+const db = require('../db');
+const projectModel = require('../models/project');
+
+class CanvasSyncService {
+  constructor() {
+    this.eventEmitter = null;
+  }
+
+  setEventEmitter(emitter) {
+    this.eventEmitter = emitter;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 节点操作
+  // ─────────────────────────────────────────────────────────
+
+  async createNode(projectId, nodeType, nodeData, position, style = {}) {
+    const nodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    db.prepare(`
+      INSERT INTO canvas_nodes
+      (id, project_id, node_type, node_data, position_x, position_y, style)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      nodeId,
+      projectId,
+      nodeType,
+      JSON.stringify(nodeData),
+      position.x,
+      position.y,
+      JSON.stringify(style)
+    );
+
+    const node = {
+      id: nodeId,
+      projectId,
+      type: nodeType,
+      data: nodeData,
+      position,
+      style
+    };
+
+    this.broadcast(projectId, {
+      type: 'node_created',
+      node
+    });
+
+    return node;
+  }
+
+  async updateNode(projectId, nodeId, updates) {
+    const node = await this.getNode(nodeId);
+    if (!node) {
+      throw new Error(`节点不存在: ${nodeId}`);
+    }
+
+    const newData = { ...node.data, ...updates };
+
+    db.prepare(`
+      UPDATE canvas_nodes
+      SET node_data = ?, updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(newData), new Date().toISOString(), nodeId);
+
+    const updatedNode = { ...node, data: newData };
+    this.broadcast(projectId, {
+      type: 'node_updated',
+      nodeId,
+      updates,
+      newData
+    });
+
+    return updatedNode;
+  }
+
+  async deleteNode(projectId, nodeId) {
+    db.prepare(`
+      DELETE FROM canvas_connections
+      WHERE source_node_id = ? OR target_node_id = ?
+    `).run(nodeId, nodeId);
+
+    db.prepare('DELETE FROM canvas_nodes WHERE id = ?').run(nodeId);
+
+    this.broadcast(projectId, {
+      type: 'node_deleted',
+      nodeId
+    });
+
+    return true;
+  }
+
+  async getNode(nodeId) {
+    const row = db.prepare('SELECT * FROM canvas_nodes WHERE id = ?').get(nodeId);
+    if (!row) return null;
+
+    return this.parseNode(row);
+  }
+
+  async getNodes(projectId) {
+    const rows = db.prepare(
+      'SELECT * FROM canvas_nodes WHERE project_id = ? ORDER BY created_at'
+    ).all(projectId);
+
+    return rows.map(row => this.parseNode(row));
+  }
+
+  parseNode(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      type: row.node_type,
+      data: JSON.parse(row.node_data),
+      position: { x: row.position_x, y: row.position_y },
+      size: { width: row.width, height: row.height },
+      style: row.style ? JSON.parse(row.style) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 连接线操作
+  // ─────────────────────────────────────────────────────────
+
+  async createConnection(projectId, sourceNodeId, targetNodeId, connectionType, options = {}) {
+    const connectionId = `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    db.prepare(`
+      INSERT INTO canvas_connections
+      (id, project_id, source_node_id, target_node_id, connection_type, label, style)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      connectionId,
+      projectId,
+      sourceNodeId,
+      targetNodeId,
+      connectionType,
+      options.label || null,
+      JSON.stringify(options.style || {})
+    );
+
+    const connection = {
+      id: connectionId,
+      projectId,
+      sourceNodeId,
+      targetNodeId,
+      connectionType,
+      label: options.label,
+      style: options.style
+    };
+
+    this.broadcast(projectId, {
+      type: 'connection_created',
+      connection
+    });
+
+    return connection;
+  }
+
+  async getConnections(projectId) {
+    const rows = db.prepare(
+      'SELECT * FROM canvas_connections WHERE project_id = ?'
+    ).all(projectId);
+
+    return rows.map(row => ({
+      id: row.id,
+      projectId: row.project_id,
+      sourceNodeId: row.source_node_id,
+      targetNodeId: row.target_node_id,
+      connectionType: row.connection_type,
+      label: row.label,
+      style: row.style ? JSON.parse(row.style) : {}
+    }));
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Agent 特定操作
+  // ─────────────────────────────────────────────────────────
+
+  async createIntentAndPlan(projectId, intent, plan, sessionId) {
+    const intentNode = await this.createNode(
+      projectId,
+      'intent',
+      {
+        intent: intent.primaryIntent,
+        originalMessage: intent.originalMessage,
+        entities: intent.entities,
+        confidence: intent.confidence,
+        sessionId
+      },
+      { x: 100, y: 50 },
+      { borderColor: '#1890ff', backgroundColor: '#e6f7ff' }
+    );
+
+    const planNode = await this.createNode(
+      projectId,
+      'plan',
+      {
+        steps: plan.steps,
+        description: plan.description,
+        estimatedDuration: plan.estimatedDuration,
+        status: 'pending_confirmation',
+        parentIntentId: intentNode.id
+      },
+      { x: 100, y: 250 },
+      { borderColor: '#faad14', backgroundColor: '#fffbe6' }
+    );
+
+    await this.createConnection(
+      projectId,
+      intentNode.id,
+      planNode.id,
+      'operation',
+      { label: '生成计划' }
+    );
+
+    const operationNodes = [];
+    let yOffset = 450;
+
+    for (const step of plan.steps) {
+      const operationNode = await this.createNode(
+        projectId,
+        'operation',
+        {
+          operationType: step.type,
+          agentName: step.agent,
+          description: step.description,
+          targetNodeId: step.targetNodeId,
+          status: 'pending',
+          dependsOn: step.dependsOn
+        },
+        { x: 100, y: yOffset },
+        { borderColor: '#52c41a', backgroundColor: '#f6ffed' }
+      );
+
+      await this.createConnection(
+        projectId,
+        planNode.id,
+        operationNode.id,
+        'operation'
+      );
+
+      operationNodes.push(operationNode);
+      yOffset += 120;
+    }
+
+    return {
+      intentNodeId: intentNode.id,
+      planNodeId: planNode.id,
+      operationNodeIds: operationNodes.map(n => n.id)
+    };
+  }
+
+  async updatePlanStatus(planNodeId, status) {
+    const planNode = await this.getNode(planNodeId);
+    if (!planNode) return;
+
+    await this.updateNode(planNode.projectId, planNodeId, {
+      status,
+      ...(status === 'confirmed' ? { confirmedAt: Date.now() } : {}),
+      ...(status === 'completed' ? { completedAt: Date.now() } : {})
+    });
+  }
+
+  async updateStepStatus(planNodeId, stepId, status, result = null, error = null) {
+    const planNode = await this.getNode(planNodeId);
+    if (!planNode) return;
+
+    const steps = [...(planNode.data.steps || [])];
+    const stepIndex = steps.findIndex(s => s.stepId === stepId);
+
+    if (stepIndex >= 0) {
+      steps[stepIndex] = {
+        ...steps[stepIndex],
+        status,
+        result: result || steps[stepIndex].result,
+        error: error || steps[stepIndex].error,
+        ...(status === 'executing' ? { startTime: Date.now() } : {}),
+        ...(status === 'completed' || status === 'failed' ? { endTime: Date.now() } : {})
+      };
+
+      await this.updateNode(planNode.projectId, planNodeId, { steps });
+    }
+  }
+
+  async createOperationNode(projectId, step, parentPlanId) {
+    const operationNode = await this.createNode(
+      projectId,
+      'operation',
+      {
+        operationType: step.type,
+        agentName: step.agent,
+        description: step.description,
+        targetNodeId: step.targetNodeId,
+        status: 'pending',
+        params: step.params
+      },
+      { x: 100, y: Date.now() % 500 + 500 }
+    );
+
+    await this.createConnection(
+      projectId,
+      parentPlanId,
+      operationNode.id,
+      'operation'
+    );
+
+    return operationNode.id;
+  }
+
+  async updateOperationNode(operationNodeId, updates) {
+    const node = await this.getNode(operationNodeId);
+    if (!node) return;
+
+    await this.updateNode(node.projectId, operationNodeId, updates);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 业务表同步
+  // ─────────────────────────────────────────────────────────
+
+  async syncScriptToCanvas(projectId, script) {
+    const existingNodes = await this.getNodes(projectId);
+    const existingScriptNodes = existingNodes.filter(n => n.type === 'script');
+
+    let scriptNodeId;
+    if (existingScriptNodes.length > 0) {
+      scriptNodeId = existingScriptNodes[0].id;
+      await this.updateNode(projectId, scriptNodeId, script);
+    } else {
+      const scriptNode = await this.createNode(
+        projectId,
+        'script',
+        script,
+        { x: 50, y: 50 }
+      );
+      scriptNodeId = scriptNode.id;
+    }
+
+    const existingSceneNodes = existingNodes.filter(n => n.type === 'scene');
+
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
+      const sceneNodeId = `scene_${scene.id}`;
+
+      const existingNode = existingSceneNodes.find(n => n.id === sceneNodeId);
+      if (existingNode) {
+        await this.updateNode(projectId, sceneNodeId, scene);
+      } else {
+        const sceneNode = await this.createNode(
+          projectId,
+          'scene',
+          scene,
+          { x: 350, y: 50 + i * 180 }
+        );
+
+        await this.createConnection(
+          projectId,
+          scriptNodeId,
+          sceneNode.id,
+          'timeline'
+        );
+      }
+    }
+
+    return scriptNodeId;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 实时推送
+  // ─────────────────────────────────────────────────────────
+
+  broadcast(projectId, event) {
+    if (this.eventEmitter) {
+      try {
+        this.eventEmitter.to(`canvas:${projectId}`).emit('canvasEvent', event);
+      } catch (error) {
+        console.error('Broadcast error:', error);
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // 聊天会话管理
+  // ─────────────────────────────────────────────────────────
+
+  async createChatSession(projectId, title = '新会话') {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    db.prepare(`
+      INSERT INTO chat_sessions (id, project_id, title)
+      VALUES (?, ?, ?)
+    `).run(sessionId, projectId, title);
+
+    return sessionId;
+  }
+
+  async addChatMessage(sessionId, role, messageType, content, metadata = {}) {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    db.prepare(`
+      INSERT INTO chat_messages (id, session_id, role, message_type, content, metadata)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      messageId,
+      sessionId,
+      role,
+      messageType,
+      content,
+      JSON.stringify(metadata)
+    );
+
+    return messageId;
+  }
+
+  async getChatHistory(sessionId) {
+    const rows = db.prepare(`
+      SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC
+    `).all(sessionId);
+
+    return rows.map(row => ({
+      id: row.id,
+      role: row.role,
+      messageType: row.message_type,
+      content: row.content,
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      createdAt: row.created_at
+    }));
+  }
+}
+
+module.exports = new CanvasSyncService();

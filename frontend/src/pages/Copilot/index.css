@@ -1,0 +1,32 @@
+.copilot-layout {
+  height: 100vh;
+  background: #f0f2f5;
+}
+
+.copilot-content {
+  padding: 0;
+  height: 100%;
+}
+
+.copilot-main {
+  display: flex;
+  height: 100%;
+}
+
+.copilot-main > *:first-child {
+  width: 400px;
+  flex-shrink: 0;
+}
+
+.copilot-main > *:last-child {
+  flex: 1;
+  height: 100%;
+}
+
+.copilot-loading,
+.copilot-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+}
