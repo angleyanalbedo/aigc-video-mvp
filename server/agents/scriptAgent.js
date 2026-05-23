@@ -1,6 +1,8 @@
 const { generateText, generateStructuredText } = require('./tools/llm');
+const { memoryManager } = require('./memory');
+const skillLoader = require('./skills/skillLoader');
 
-const SYSTEM_PROMPT = `你是电商带货视频剧本生成专家。
+const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 
 根据商品信息，生成高质量的带货视频剧本。
 
@@ -26,13 +28,29 @@ const SYSTEM_PROMPT = `你是电商带货视频剧本生成专家。
 class ScriptAgent {
   constructor() {
     this.name = '剧本生成 Agent';
+    this.agentName = 'ScriptAgent';
+    this.skillId = 'ScriptAgent_generation';
     this.maxScenes = 5;
+  }
+
+  getSystemPrompt() {
+    const skillPrompt = skillLoader.loadPrompt(this.skillId);
+    return skillPrompt || FALLBACK_PROMPT;
   }
 
   async generate(productInfo, projectId = null) {
     console.log('📝 ScriptAgent: 开始生成剧本...');
 
-    // 1. 调用网络搜索工具
+    const sessionId = projectId || `session_${Date.now()}`;
+
+    await memoryManager.addShortTerm({
+      agentName: this.agentName,
+      sessionId,
+      content: `用户请求生成剧本，商品: ${productInfo.title || '未知商品'}`,
+      metadata: { role: 'user', productInfo },
+      importance: 0.6
+    });
+
     let searchResultContext = '';
     try {
       const { webSearch } = require('./tools/searchAPI');
@@ -42,24 +60,43 @@ class ScriptAgent {
       console.error('⚠️ ScriptAgent: 调用网络搜索工具失败:', err);
     }
 
-    // 2. 调用下载参考素材工具
     if (projectId) {
       try {
         const { downloadMaterial } = require('./tools/materialDownloader');
-        // 默认模拟从 Unsplash 高精图片库下载一张电商高清素材作为项目参考图入库
         await downloadMaterial('https://images.unsplash.com/photo-1523275335684-37898b6baf30', projectId);
       } catch (err) {
         console.error('⚠️ ScriptAgent: 调用下载素材工具失败:', err);
       }
     }
 
-    const prompt = this.buildPrompt(productInfo) + (searchResultContext ? `\n\n## 联网流行爆款参考词库/痛点（请融入你的剧本创意）:\n${searchResultContext}` : '');
+    const memories = await memoryManager.recall({
+      agentName: this.agentName,
+      sessionId,
+      query: `${productInfo.title} ${productInfo.sellingPoints || ''} 剧本创作`
+    });
+    const memoryContext = memoryManager.buildContextString(memories);
+
+    let prompt = this.buildPrompt(productInfo);
+    if (searchResultContext) {
+      prompt += `\n\n## 联网流行爆款参考词库/痛点（请融入你的剧本创意）:\n${searchResultContext}`;
+    }
+    if (memoryContext) {
+      prompt += `\n\n## 跨会话记忆上下文（请保持创作连续性）\n${memoryContext}`;
+    }
 
     try {
       const script = await generateStructuredText({
-        system: SYSTEM_PROMPT,
+        system: this.getSystemPrompt(),
         prompt,
         schema: this.getSchema()
+      });
+
+      await memoryManager.addShortTerm({
+        agentName: this.agentName,
+        sessionId,
+        content: `剧本生成完成: ${script.title || '带货视频剧本'}，共 ${script.scenes?.length || 0} 个分镜`,
+        metadata: { role: 'assistant', scriptTitle: script.title, sceneCount: script.scenes?.length },
+        importance: 0.7
       });
 
       console.log('✅ ScriptAgent: 剧本生成成功');
@@ -176,13 +213,30 @@ class ScriptAgent {
   async refine(script, feedback) {
     console.log('📝 ScriptAgent: 根据反馈优化剧本...');
 
+    const sessionId = script.projectId || `session_${Date.now()}`;
+
+    await memoryManager.addShortTerm({
+      agentName: this.agentName,
+      sessionId,
+      content: `用户反馈优化剧本: ${feedback}`,
+      metadata: { role: 'user', feedback },
+      importance: 0.8
+    });
+
+    const memories = await memoryManager.recall({
+      agentName: this.agentName,
+      sessionId,
+      query: feedback
+    });
+    const memoryContext = memoryManager.buildContextString(memories);
+
     const prompt = `## 原始剧本
 ${JSON.stringify(script, null, 2)}
 
 ## 用户反馈
 ${feedback}
 
-## 任务
+${memoryContext ? `## 跨会话记忆上下文\n${memoryContext}\n` : ''}## 任务
 根据用户反馈，优化剧本中的相关分镜。
 只修改需要改进的部分，保持其他部分不变。
 
@@ -190,9 +244,17 @@ ${feedback}
 
     try {
       const refined = await generateStructuredText({
-        system: SYSTEM_PROMPT,
+        system: this.getSystemPrompt(),
         prompt,
         schema: this.getSchema()
+      });
+
+      await memoryManager.addShortTerm({
+        agentName: this.agentName,
+        sessionId,
+        content: `剧本优化完成，根据反馈调整了分镜内容`,
+        metadata: { role: 'assistant', refined: true },
+        importance: 0.7
       });
 
       return this.formatOutput(refined);

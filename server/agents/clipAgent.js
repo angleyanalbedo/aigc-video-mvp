@@ -5,11 +5,12 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 const { generateStructuredText } = require('./tools/llm');
 const { generateTTS } = require('./tools/ttsAPI');
+const skillLoader = require('./skills/skillLoader');
 
 const TASKS_DIR = path.join(__dirname, '../tasks');
 const OUTPUTS_DIR = path.join(__dirname, '../outputs');
 
-const SYSTEM_PROMPT = `你是专业视频剪辑师，负责制定智能剪辑方案。
+const FALLBACK_PROMPT = `你是专业视频剪辑师，负责制定智能剪辑方案。
 
 根据剧本和素材，制定最优的剪辑方案，包括：
 1. 素材匹配：根据分镜描述匹配最合适的素材
@@ -26,8 +27,14 @@ const SYSTEM_PROMPT = `你是专业视频剪辑师，负责制定智能剪辑方
 class ClipAgent {
   constructor() {
     this.name = '智能剪辑 Agent';
+    this.skillId = 'ClipAgent_planning';
     this.transitions = ['cut', 'fade', 'dissolve', 'wipe'];
     this.bgmStyles = ['欢快', '温馨', '动感', '舒缓', '激情'];
+  }
+
+  getSystemPrompt() {
+    const skillPrompt = skillLoader.loadPrompt(this.skillId);
+    return skillPrompt || FALLBACK_PROMPT;
   }
 
   async createClipPlan(script, materials = [], options = {}) {
@@ -39,7 +46,7 @@ class ClipAgent {
 
     try {
       const plan = await generateStructuredText({
-        system: SYSTEM_PROMPT,
+        system: this.getSystemPrompt(),
         prompt,
         schema: this.getSchema()
       });
