@@ -120,39 +120,57 @@ class VideoComposer {
     const outputFile = path.join(this.taskDir, 'composed.mp4');
     
     if (sceneVideos.length === 1) {
-      // 只有一个分镜，直接返回
-      fs.copyFileSync(sceneVideos[0].file, outputFile);
+      // 只有一个分镜，直接复制返回
+      await fs.copyFile(sceneVideos[0].file, outputFile);
       return outputFile;
     }
-    
+
+    // 方法一：concat demuxer（快速，要求编码一致）
+    const listFile = path.join(this.taskDir, 'concat_list.txt');
+    // ⚠️ 必须用无 BOM 的 UTF-8 写入，否则 FFmpeg 无法解析
+    const listContent = sceneVideos.map(v => `file '${v.file.replace(/\\/g, '/')}'`).join('\n');
+    require('fs').writeFileSync(listFile, listContent, { encoding: 'utf8', flag: 'w' });
+
+    console.log(`  🎬 拼接视频: ${sceneVideos.length} 个分镜 (concat demuxer)`);
+
     try {
-      // 尝试用 FFmpeg 拼接
-      // 构建 FFmpeg 命令
-      const inputs = sceneVideos.map(v => `-i "${v.file}"`).join(' ');
-      const transition = this.options.transition;
-      
-      let filterComplex = '';
-      let outputMap = '';
-      
-      if (transition === 'cut') {
-        // 直接拼接
-        filterComplex = sceneVideos.map((v, i) => `[${i}:v][${i}:a]`).join('') + 
-                       `concat=n=${sceneVideos.length}:v=1:a=1[outv][outa]`;
-        outputMap = '-map "[outv]" -map "[outa]"';
-      } else {
-        // 带转场的拼接（fade/dissolve）
-        filterComplex = this.buildTransitionFilter(sceneVideos, transition);
-        outputMap = '-map "[outv]" -map "[outa]"';
+      // 尝试 stream copy（最快，不重新编码）
+      const cmd = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`;
+      await execAsync(cmd, { timeout: 120000 });
+      const stat = require('fs').statSync(outputFile);
+      if (stat.size > 0) {
+        console.log(`  ✅ 视频拼接完成 (copy模式): ${stat.size} bytes`);
+        return outputFile;
       }
-      
-      const cmd = `ffmpeg -y ${inputs} -filter_complex "${filterComplex}" ${outputMap} -c:v libx264 -c:a aac "${outputFile}"`;
-      
-      console.log(`  🎬 拼接视频: ${sceneVideos.length} 个分镜`);
-      await execAsync(cmd);
-    } catch (error) {
-      console.warn(`  ⚠️ FFmpeg 不可用，使用第一个分镜作为 fallback:`, error.message);
-      // FFmpeg 不可用时，直接复制第一个分镜作为 fallback
+    } catch (e1) {
+      console.warn(`  ⚠️ concat copy 模式失败，尝试 re-encode 模式: ${e1.message.split('\n')[0]}`);
+    }
+
+    try {
+      // 方法二：re-encode 模式（兼容编码不一致的视频）
+      // 先把所有视频统一标准化，再 concat
+      const normalizedFiles = [];
+      for (let i = 0; i < sceneVideos.length; i++) {
+        const normFile = path.join(this.taskDir, `norm_${i}.mp4`);
+        // 统一到 720p、24fps、有静音音轨，保证 concat 可用
+        const normCmd = `ffmpeg -y -i "${sceneVideos[i].file}" -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" -r 24 -c:v libx264 -preset fast -crf 23 -af "aresample=44100" -c:a aac -b:a 128k -ar 44100 -ac 2 "${normFile}"`;
+        await execAsync(normCmd, { timeout: 120000 });
+        normalizedFiles.push(normFile);
+      }
+
+      // 写新的 list 文件
+      const normListContent = normalizedFiles.map(f => `file '${f.replace(/\\/g, '/')}'`).join('\n');
+      require('fs').writeFileSync(listFile, normListContent, { encoding: 'utf8', flag: 'w' });
+
+      const cmd2 = `ffmpeg -y -f concat -safe 0 -i "${listFile}" -c copy "${outputFile}"`;
+      await execAsync(cmd2, { timeout: 120000 });
+      const stat2 = require('fs').statSync(outputFile);
+      console.log(`  ✅ 视频拼接完成 (re-encode模式): ${stat2.size} bytes`);
+    } catch (e2) {
+      console.error(`  ❌ 视频拼接完全失败: ${e2.message.split('\n')[0]}`);
+      // 最后降级：把所有视频顺序复制成一个（仅保留第一个视频）
       await fs.copyFile(sceneVideos[0].file, outputFile);
+      console.warn(`  ⚠️ 已降级为仅使用第一个分镜视频`);
     }
     
     return outputFile;
