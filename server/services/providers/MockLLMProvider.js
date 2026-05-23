@@ -29,6 +29,32 @@ class MockLLMProvider extends BaseLLMProvider {
       throw new Error('LLM 返回格式错误');
     }
   }
+
+  async generateImage({ prompt, width = 1024, height = 1024 }) {
+    console.log(`💡 MockLLMProvider: 正在为提示词 "${prompt.slice(0, 30)}..." 模拟生图...`);
+    const mockImages = [
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=800&auto=format&fit=crop&q=80', // 精致腕表
+      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&auto=format&fit=crop&q=80', // 爆款跑鞋
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80', // 降噪耳机
+      'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&auto=format&fit=crop&q=80', // 复古相机
+      'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=800&auto=format&fit=crop&q=80', // 时尚单鞋
+      'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=800&auto=format&fit=crop&q=80'  // 太阳眼镜
+    ];
+
+    let resultUrl = mockImages[Math.floor(Math.random() * mockImages.length)];
+    if (prompt.toLowerCase().includes('watch') || prompt.includes('表')) {
+      resultUrl = mockImages[0];
+    } else if (prompt.toLowerCase().includes('shoe') || prompt.includes('鞋')) {
+      resultUrl = mockImages[1];
+    } else if (prompt.toLowerCase().includes('headphone') || prompt.includes('耳机')) {
+      resultUrl = mockImages[2];
+    } else if (prompt.toLowerCase().includes('camera') || prompt.includes('相机')) {
+      resultUrl = mockImages[3];
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    return resultUrl;
+  }
 }
 
 module.exports = MockLLMProvider;

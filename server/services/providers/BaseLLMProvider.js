@@ -6,6 +6,10 @@ class BaseLLMProvider {
   async generateStructuredText({ system, prompt, schema, maxTokens = 2000 }) {
     throw new Error('Method generateStructuredText() must be implemented');
   }
+
+  async generateImage({ prompt, width = 1024, height = 1024 }) {
+    throw new Error('Method generateImage() must be implemented');
+  }
 }
 
 module.exports = BaseLLMProvider;

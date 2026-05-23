@@ -1,9 +1,40 @@
 const express = require('express');
 const router = express.Router();
 
-const { scriptAgent, videoAgent, clipAgent, orchestrator, STATES } = require('../agents');
+const { scriptAgent, videoAgent, clipAgent, assetAgent, orchestrator, STATES } = require('../agents');
 const agentChatService = require('../services/agentChatService');
 const projectModel = require('../models/project');
+
+router.post('/analyze-materials', async (req, res) => {
+  const { projectId } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ success: false, error: 'Project ID is required' });
+  }
+
+  try {
+    const project = projectModel.getById(projectId);
+    if (!project) {
+      return res.status(404).json({ success: false, error: 'Project not found' });
+    }
+
+    const materials = project.materials || [];
+    console.log(`📡 [analyze-materials] 正在为项目 ${projectId} 运行 AssetAgent 素材分析...`);
+    const analyzedProductInfo = await assetAgent.analyze(materials);
+
+    // 将分析提取出来的 product_info 自动写回到 SQLite 数据库以供后续 ScriptAgent 阶段使用
+    projectModel.update(projectId, { productInfo: analyzedProductInfo });
+    console.log(`✅ [analyze-materials] 数据库 product_info 已同步更新！`);
+
+    res.json({
+      success: true,
+      productInfo: analyzedProductInfo
+    });
+  } catch (error) {
+    console.error('❌ [analyze-materials] 错误:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 router.post('/chat', async (req, res) => {
   const { currentScript, message, projectId } = req.body;

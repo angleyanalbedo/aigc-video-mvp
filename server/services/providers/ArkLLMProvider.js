@@ -63,6 +63,37 @@ class ArkLLMProvider extends BaseLLMProvider {
       throw new Error('LLM 返回格式错误');
     }
   }
+
+  async generateImage({ prompt, width = 1024, height = 1024 }) {
+    try {
+      const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.llmEp,
+          prompt,
+          width,
+          height
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message || 'CV API Error');
+      }
+
+      if (data.data && data.data[0] && data.data[0].url) {
+        return data.data[0].url;
+      }
+      throw new Error('No image URL returned from CV Generations API');
+    } catch (error) {
+      console.error('Ark LLM Provider generateImage 失败:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ArkLLMProvider;
