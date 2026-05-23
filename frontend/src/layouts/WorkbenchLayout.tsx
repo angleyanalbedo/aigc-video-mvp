@@ -13,6 +13,9 @@ import {
   AuditOutlined,
   ProjectOutlined,
   EditOutlined,
+  ArrowLeftOutlined,
+  VideoCameraOutlined,
+  RocketOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ConnectionStatus from '../components/ConnectionStatus';
@@ -33,6 +36,16 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Detect project-level workspace mode
+  const match = location.pathname.match(/\/workbench\/([^/]+)/);
+  const projectId = match ? match[1] : null;
+  const isProjectMode = !!projectId;
+
+  // Read current active tab from query search parameters (e.g. ?tab=script)
+  const searchParams = new URLSearchParams(location.search);
+  const activeTab = searchParams.get('tab') || 'script';
+
+  // Standard global menu items
   const menuItems: MenuItem[] = [
     {
       key: 'projects',
@@ -84,6 +97,40 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
     },
   ];
 
+  // Project-dedicated dynamic menu items
+  const projectMenuItems: MenuItem[] = projectId ? [
+    {
+      key: 'back-to-projects',
+      path: '/projects',
+      icon: <ArrowLeftOutlined />,
+      tooltip: '返回项目列表',
+    },
+    {
+      key: 'script',
+      path: `/workbench/${projectId}?tab=script`,
+      icon: <EditOutlined />,
+      tooltip: '1. 剧本协同',
+    },
+    {
+      key: 'storyboard',
+      path: `/workbench/${projectId}?tab=storyboard`,
+      icon: <VideoCameraOutlined />,
+      tooltip: '2. 分镜设计',
+    },
+    {
+      key: 'audio',
+      path: `/workbench/${projectId}?tab=audio`,
+      icon: <CustomerServiceOutlined />,
+      tooltip: '3. 音轨配音',
+    },
+    {
+      key: 'render',
+      path: `/workbench/${projectId}?tab=render`,
+      icon: <RocketOutlined />,
+      tooltip: '4. 合成输出',
+    },
+  ] : [];
+
   const footerItems: MenuItem[] = [
     {
       key: 'feedback',
@@ -114,6 +161,10 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   };
 
   const isActive = (item: MenuItem) => {
+    if (isProjectMode) {
+      if (item.key === 'back-to-projects') return false;
+      return item.key === activeTab;
+    }
     if (item.key === 'projects') {
       return location.pathname === '/' || location.pathname === '/projects';
     }
@@ -125,13 +176,13 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
 
   return (
     <div className="workbench">
-      <div className="sidebar">
+      <div className={`sidebar ${isProjectMode ? 'sidebar--dark' : ''}`}>
         <div className="sidebar__logo">
           <div className="sidebar__logo-icon"></div>
         </div>
 
         <div className="sidebar__menu">
-          {menuItems.map((item) => (
+          {(isProjectMode ? projectMenuItems : menuItems).map((item) => (
             <Tooltip
               key={item.key}
               title={item.tooltip}
@@ -169,16 +220,18 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
         </div>
       </div>
 
-      <div className="main-content">
+      <div className={`main-content ${isProjectMode ? 'main-content--dark' : ''}`}>
         <div style={{ 
           position: 'fixed', 
           top: 10, 
           right: 10, 
           zIndex: 1000,
-          background: 'white',
+          background: isProjectMode ? '#1e1e2f' : 'white',
+          color: isProjectMode ? '#fff' : '#000',
           padding: '4px 12px',
           borderRadius: '4px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          border: isProjectMode ? '1px solid #27272a' : 'none'
         }}>
           <ConnectionStatus />
         </div>
