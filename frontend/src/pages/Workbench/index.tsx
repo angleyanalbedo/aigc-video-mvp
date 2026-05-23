@@ -140,7 +140,9 @@ const WorkbenchPage: React.FC = () => {
     generateSingleSceneVideo,
     handleRenderAllScenes,
     handleCompileFinalVideo,
+    handlePublishVideo,
   } = useWorkbench();
+
 
   return (
     <Layout style={{ height: '100%', minHeight: '100%', background: '#09090b', color: '#e4e4e7' }}>
@@ -2762,12 +2764,13 @@ const WorkbenchPage: React.FC = () => {
                       <Col span={12}>
                         <Button
                           block
-                          onClick={() => message.success('已模拟提交至短视频排期发布队列！')}
+                          onClick={handlePublishVideo}
                           style={{ height: 40, borderRadius: 6, background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
                         >
                           🚀 一键分发至社交媒体
                         </Button>
                       </Col>
+
                     </Row>
                   </div>
                 ) : !isRenderingAll ? (
