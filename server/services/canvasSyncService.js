@@ -372,6 +372,13 @@ class CanvasSyncService {
   // ─────────────────────────────────────────────────────────
 
   broadcast(projectId, event) {
+    try {
+      const webSocketService = require('./webSocketService');
+      webSocketService.broadcast(projectId, event);
+    } catch (wsErr) {
+      console.warn('⚠️ WebSocket Broadcast error:', wsErr.message);
+    }
+
     if (this.eventEmitter) {
       try {
         if (typeof this.eventEmitter.to === 'function') {

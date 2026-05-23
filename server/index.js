@@ -1169,6 +1169,16 @@ try {
     console.log('✅ 新增 /api/observability 可观测性接口');
     logger.info('Server started successfully', { port: PORT, host: HOST });
   });
+
+  // 初始化 WebSocket 实时同步服务
+  try {
+    const webSocketService = require('./services/webSocketService');
+    webSocketService.init(server);
+    console.log('✅ WebSocket 实时同步服务已成功附加到 Express 服务器');
+  } catch (wsErr) {
+    console.error('❌ WebSocket 服务启动失败:', wsErr.message);
+  }
+
   server.on('error', (err) => {
     console.error('[DEBUG] Server error:', err);
   });
