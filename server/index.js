@@ -490,29 +490,38 @@ app.post('/api/video/batch-generate', async (req, res) => {
       // 7.1 为每个分镜生成视频（带重试）
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
-        console.log(`🎥 正在生成分镜 ${i + 1}/${scenes.length}: ${scene.description}`);
+        console.log(`🎥 处理分镜 ${i + 1}/${scenes.length}: ${scene.description?.slice(0, 40)}...`);
 
         taskStore.set(batchId, {
           ...taskStore.get(batchId),
           progress: Math.floor((i / scenes.length) * 50),
           currentScene: i + 1,
-          message: `正在生成分镜 ${i + 1}/${scenes.length}`
+          message: `正在处理分镜 ${i + 1}/${scenes.length}`
         });
 
-        // 使用重试机制调用视频生成API
-        const videoUrl = await withRetry(async () => {
-          const task = await videoProvider.createTask({
-            prompt: scene.description,
-            resolution: options.resolution || '720p',
-            ratio: options.ratio || '9:16',
-            duration: scene.duration || 5,
-            imageUrl: scene.imageUrl || scene.referenceImageUrl || null
-          });
+        let videoUrl;
 
-          // 轮询等待视频生成完成（最多等待 180 次 × 3 秒 = 9 分钟）
-          console.log(`📹 任务已创建: ${task.id}，开始轮询（最多等待 9 分钟）...`);
-          return await pollVideoCompletion(task.id, 180);
-        }, videoRetryOptions);
+        // ✅ 优先复用已生成的分镜视频，避免重复渲染
+        if (scene.videoUrl && (scene.videoUrl.startsWith('http') || scene.videoUrl.startsWith('file://'))) {
+          console.log(`⚡ 分镜 ${i + 1} 已有视频，直接复用: ${scene.videoUrl}`);
+          videoUrl = scene.videoUrl;
+        } else {
+          // 没有视频时才调用 API 重新生成
+          console.log(`🎬 分镜 ${i + 1} 无视频，调用 API 生成...`);
+          videoUrl = await withRetry(async () => {
+            const task = await videoProvider.createTask({
+              prompt: scene.description,
+              resolution: options.resolution || '720p',
+              ratio: options.ratio || '9:16',
+              duration: scene.duration || 5,
+              imageUrl: scene.imageUrl || scene.referenceImageUrl || null
+            });
+
+            // 轮询等待视频生成完成（最多等待 180 次 × 3 秒 = 9 分钟）
+            console.log(`📹 任务已创建: ${task.id}，开始轮询（最多等待 9 分钟）...`);
+            return await pollVideoCompletion(task.id, 180);
+          }, videoRetryOptions);
+        }
 
         traceService.addStep(batchId, `scene_${i + 1}_generated`, { videoUrl });
 
@@ -544,8 +553,10 @@ app.post('/api/video/batch-generate', async (req, res) => {
           videoPath: videoPath
         });
 
-        // 延迟避免请求过快
-        await sleep(2000);
+        // 仅新生成的分镜才需要延迟，避免 API 请求过快
+        if (!scene.videoUrl) {
+          await sleep(2000);
+        }
       }
 
       taskStore.set(batchId, {
@@ -555,25 +566,37 @@ app.post('/api/video/batch-generate', async (req, res) => {
       });
       traceService.addStep(batchId, 'video_generation_completed', { count: generatedScenes.length });
 
-      // 7.2 生成 TTS 配音（带重试）
+      // 7.2 生成 TTS 配音（可选，失败时降级跳过，不中断整个流程）
       let audioPath = null;
       let subtitlePath = null;
       const fullScriptText = generatedScenes.map(s => s.voiceover || s.description).join(' ');
 
       if (fullScriptText) {
         traceService.addStep(batchId, 'tts_generation_started', { textLength: fullScriptText.length });
+        try {
+          audioPath = await withRetry(async () => {
+            const ttsService = new TTSService();
+            const ttsResult = await ttsService.generate(fullScriptText, {
+              voice: options.voice || 'zh-CN-XiaoxiaoNeural',
+              rate: options.rate || '+0%',
+              outputDir: tempDir
+            });
+            return ttsResult.audioFile;
+          }, ttsRetryOptions);
+          traceService.addStep(batchId, 'tts_generation_completed', { audioPath });
+          console.log(`✅ 配音生成成功: ${audioPath}`);
+        } catch (ttsErr) {
+          // TTS 不可用（edge-tts 未安装等），降级为无配音模式继续合成
+          console.warn(`⚠️ TTS 配音生成失败，将跳过配音直接合成纯视频: ${ttsErr.message}`);
+          traceService.addStep(batchId, 'tts_skipped', { reason: ttsErr.message });
+          audioPath = null;
 
-        audioPath = await withRetry(async () => {
-          const ttsService = new TTSService();
-          const ttsResult = await ttsService.generate(fullScriptText, {
-            voice: options.voice || 'zh-CN-XiaoxiaoNeural',
-            rate: options.rate || '+0%',
-            outputDir: tempDir
+          // 更新状态提示用户
+          taskStore.set(batchId, {
+            ...taskStore.get(batchId),
+            ttsWarning: 'TTS 配音不可用（edge-tts 未安装），已跳过配音，将输出无旁白视频'
           });
-          return ttsResult.audioFile;
-        }, ttsRetryOptions);
-
-        traceService.addStep(batchId, 'tts_generation_completed', { audioPath });
+        }
       }
 
       taskStore.set(batchId, {
