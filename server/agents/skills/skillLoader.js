@@ -2,11 +2,122 @@ const fs = require('fs');
 const path = require('path');
 
 const SKILLS_DIR = path.join(__dirname, '../../skills');
+const DEFAULT_TIMEOUT = 60000;
+const DEFAULT_MAX_RETRIES = 3;
 
 class SkillLoader {
   constructor() {
     this._cache = new Map();
     this._watchers = new Map();
+  }
+
+  async execute(skillId, context = {}, options = {}) {
+    const { timeout = DEFAULT_TIMEOUT, maxRetries = DEFAULT_MAX_RETRIES } = options;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const skill = this.load(skillId);
+        if (!skill) {
+          throw new Error(`Skill "${skillId}" not found`);
+        }
+
+        const prompt = this._injectContext(skill.prompt, context);
+        
+        const result = await Promise.race([
+          this._executeSkill(skillId, prompt, context),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Skill "${skillId}" execution timeout after ${timeout}ms`)), timeout)
+          )
+        ]);
+
+        return {
+          success: true,
+          skillId,
+          result,
+          attempt,
+          timestamp: Date.now()
+        };
+      } catch (error) {
+        console.error(`⚠️ Skill "${skillId}" execution failed (attempt ${attempt}/${maxRetries}):`, error.message);
+        
+        if (attempt === maxRetries) {
+          return {
+            success: false,
+            skillId,
+            error: error.message,
+            attempt,
+            timestamp: Date.now()
+          };
+        }
+        
+        await this._delay(1000 * attempt);
+      }
+    }
+  }
+
+  async _executeSkill(skillId, prompt, context) {
+    const llm = this._getLLM();
+    
+    if (context.schema) {
+      return await llm.generateStructuredText({
+        system: prompt,
+        prompt: context.prompt || '',
+        schema: context.schema
+      });
+    }
+    
+    return await llm.generateText({
+      system: prompt,
+      prompt: context.prompt || ''
+    });
+  }
+
+  _getLLM() {
+    const { generateText, generateStructuredText } = require('../tools/llm');
+    return { generateText, generateStructuredText };
+  }
+
+  _injectContext(prompt, context) {
+    if (!context.params || Object.keys(context.params).length === 0) {
+      return prompt;
+    }
+
+    let enhancedPrompt = prompt;
+    
+    for (const [key, value] of Object.entries(context.params)) {
+      const placeholder = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      enhancedPrompt = enhancedPrompt.replace(placeholder, JSON.stringify(value));
+    }
+
+    return enhancedPrompt;
+  }
+
+  _delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async call(agentName, params = {}, options = {}) {
+    const skill = this.getSkillForAgent(agentName);
+    if (!skill) {
+      throw new Error(`No skill found for agent "${agentName}"`);
+    }
+    return this.execute(skill.id, { params, prompt: params.prompt || '', schema: params.schema }, options);
+  }
+
+  async callSkill(skillId, params = {}, options = {}) {
+    return this.execute(skillId, { params, prompt: params.prompt || '', schema: params.schema }, options);
+  }
+
+  getSkillForAgent(agentName) {
+    const allSkills = this.list();
+    const matched = allSkills.filter(s => s.agentName === agentName);
+    if (matched.length === 0) return null;
+    return this.load(matched[0].id);
+  }
+
+  loadPromptForAgent(agentName) {
+    const skill = this.getSkillForAgent(agentName);
+    return skill ? skill.prompt : null;
   }
 
   list() {
@@ -78,18 +189,6 @@ class SkillLoader {
       size: Buffer.byteLength(content),
       modifiedAt: new Date().toISOString()
     };
-  }
-
-  getSkillForAgent(agentName) {
-    const allSkills = this.list();
-    const matched = allSkills.filter(s => s.agentName === agentName);
-    if (matched.length === 0) return null;
-    return this.load(matched[0].id);
-  }
-
-  loadPromptForAgent(agentName) {
-    const skill = this.getSkillForAgent(agentName);
-    return skill ? skill.prompt : null;
   }
 
   watch(skillId, callback) {

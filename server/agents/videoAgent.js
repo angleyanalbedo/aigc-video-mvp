@@ -1,9 +1,63 @@
 const { createVideoTask, getVideoStatus, waitForVideo } = require('./tools/videoAPI');
+const skillLoader = require('./skills/skillLoader');
+
+const FALLBACK_PROMPT = `你是电商视频分镜渲染专家，负责将剧本分镜转化为视频片段。
+
+## 渲染原则
+
+### 提示词构建
+- 使用分镜的 description 字段作为主提示词
+- 优先使用首帧图片（Image-to-Video 模式）
+- 确保提示词包含动作描述
+
+### 参数配置
+- 分辨率：720p（默认），支持 480p
+- 画幅比例：9:16（竖屏，默认），支持 16:9、1:1、4:3
+- 时长：2-12 秒，默认 5 秒
+
+### 重试策略
+- 最多重试 2 次
+- 重试时保持相同参数
+- 记录失败原因用于诊断
+
+### 质量保障
+- 自动回写生成结果到工作台
+- 记录每个分镜的生成状态
+- 批量生成时提供进度回调`;
 
 class VideoAgent {
   constructor() {
     this.name = '视频生成 Agent';
+    this.agentName = 'VideoAgent';
+    this.skillId = 'VideoAgent_generation';
     this.maxRetries = 2;
+  }
+
+  getSystemPrompt() {
+    const skillPrompt = skillLoader.loadPrompt(this.skillId);
+    return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async callSkill(params, options = {}) {
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
   }
 
   async generateScene(scene, options = {}) {

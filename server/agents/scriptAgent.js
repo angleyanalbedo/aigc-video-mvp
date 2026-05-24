@@ -38,6 +38,29 @@ class ScriptAgent {
     return skillPrompt || FALLBACK_PROMPT;
   }
 
+  async callSkill(params, options = {}) {
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt,
+      schema: this.getSchema()
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
+  }
+
   async generate(productInfo, projectId = null) {
     console.log('📝 ScriptAgent: 开始生成剧本...');
     const prod = productInfo || {};

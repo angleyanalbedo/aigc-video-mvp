@@ -20,6 +20,41 @@ class AssetAgent {
     return skillPrompt || FALLBACK_PROMPT;
   }
 
+  async callSkill(params, options = {}) {
+    const schema = {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "提取的商品名称或提炼的带货推荐标题" },
+        sellingPoints: { type: "string", description: "整理的商品 2-3 个核心卖点摘要，字数控制在 80 字以内" },
+        targetAudience: { type: "string", description: "精准的目标消费人群描述" },
+        style: { type: "string", description: "建议的短视频整体创意风格" },
+        price: { type: "string", description: "推测或提取的产品价格区间" }
+      },
+      required: ["title", "sellingPoints", "targetAudience", "style", "price"]
+    };
+    
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt,
+      schema
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
+  }
+
   async analyze(materials) {
     console.log(`🔍 AssetAgent: 开始分析 ${materials.length} 个项目素材...`);
 
