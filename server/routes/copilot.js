@@ -298,10 +298,14 @@ router.post('/canvas/generate-scene-video', async (req, res) => {
     } catch (error) {
       console.error(`❌ Canvas SceneNode ${sceneId} Video rendering failed:`, error.message);
       
-      await canvasSyncService.updateNode(projectId, `scene_${sceneId}`, {
-        status: 'failed',
-        error: error.message
-      });
+      try {
+        await canvasSyncService.updateNode(projectId, `scene_${sceneId}`, {
+          status: 'failed',
+          error: error.message
+        });
+      } catch (updateErr) {
+        console.error('⚠️ Failed to update scene node status on canvas:', updateErr.message);
+      }
 
       webSocketService.broadcast(projectId, {
         type: 'operation_progress',

@@ -3,7 +3,7 @@ require('dotenv').config();
 console.log('[DEBUG] 1. dotenv loaded');
 
 // 初始化数据库
-require('./db');
+const db = require('./db');
 console.log('[DEBUG] 2. db loaded');
 
 const express = require('express');
