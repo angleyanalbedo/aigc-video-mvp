@@ -127,25 +127,35 @@ const projectModel = {
   calculateProjectStatus(project, newScript) {
     const script = newScript !== undefined ? newScript : project.script;
     
-    // 如果有视频URL，说明项目已完成
     if (project.videoUrl) {
       return 'completed';
     }
     
-    // 如果有剧本但没有视频，说明正在处理中
     if (script && script.scenes && script.scenes.length > 0) {
-      const hasVideos = script.scenes.some(scene => scene.videoUrl);
-      const hasImages = script.scenes.some(scene => scene.imageUrl);
+      const scenes = script.scenes;
+      const allHaveVideo = scenes.every(scene => scene.videoUrl);
+      const allHaveImage = scenes.every(scene => scene.imageUrl);
+      const hasAnyVideo = scenes.some(scene => scene.videoUrl);
+      const hasAnyImage = scenes.some(scene => scene.imageUrl);
+      const hasGenerating = scenes.some(scene => scene.status === 'generating' || scene.rendering);
       
-      if (hasVideos) {
+      if (allHaveVideo) {
+        return 'completed';
+      }
+      
+      if (hasGenerating) {
         return 'processing';
-      } else if (hasImages) {
+      }
+      
+      if (hasAnyVideo || hasAnyImage) {
+        if (allHaveImage && !hasAnyVideo) {
+          return 'processing';
+        }
         return 'processing';
       }
       return 'draft';
     }
     
-    // 其他情况保持原样或默认草稿
     return project.status || 'draft';
   },
 
