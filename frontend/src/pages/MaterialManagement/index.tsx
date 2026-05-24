@@ -162,7 +162,25 @@ const MaterialManagementPage = () => {
     if (type && type.startsWith('image')) return <PictureOutlined />;
     if (type && type.startsWith('video')) return <VideoCameraOutlined />;
     if (type && type.startsWith('audio')) return <SoundOutlined />;
+    // 根据文件名推断类型
+    if (type === null || type === undefined) return <PictureOutlined />;
     return <PictureOutlined />;
+  };
+
+  // 根据文件名推断 MIME 类型
+  const inferMediaType = (filename, type) => {
+    if (type && (type.startsWith('image') || type.startsWith('video') || type.startsWith('audio'))) {
+      return type;
+    }
+    const lowerFilename = (filename || '').toLowerCase();
+    if (lowerFilename.match(/\.(mp4|mov|avi|mkv|webm)$/)) {
+      return 'video/mp4';
+    } else if (lowerFilename.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/)) {
+      return 'audio/mpeg';
+    } else if (lowerFilename.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/)) {
+      return 'image/jpeg';
+    }
+    return type || 'image/jpeg';
   };
 
   return (
@@ -224,9 +242,9 @@ const MaterialManagementPage = () => {
                   hoverable
                   style={{ height: '100%', borderRadius: 12, overflow: 'hidden' }}
                   cover={
-                    item.type && item.type.startsWith('image') ? (
+                    inferMediaType(item.filename, item.type).startsWith('image') ? (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
-                    ) : item.type && item.type.startsWith('video') ? (
+                    ) : inferMediaType(item.filename, item.type).startsWith('video') ? (
                       <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
                         <video
                           src={item.url}
@@ -252,7 +270,7 @@ const MaterialManagementPage = () => {
                           <VideoCameraOutlined style={{ fontSize: 24, color: '#fff' }} />
                         </div>
                       </div>
-                    ) : item.type && item.type.startsWith('audio') ? (
+                    ) : inferMediaType(item.filename, item.type).startsWith('audio') ? (
                       <div style={{ height: 160, backgroundColor: '#121214', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <SoundOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 8 }} />
                         <div style={{ fontSize: 12, color: '#a1a1aa', textAlign: 'center', wordBreak: 'break-word', padding: '0 16px' }}>
@@ -326,20 +344,20 @@ const MaterialManagementPage = () => {
               boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
               border: '1px solid #1f1f23'
             }}>
-              {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
+              {inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('image') ? (
                 <img
                   src={selectedMaterial.url}
                   alt={selectedMaterial.filename}
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
-              ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
+              ) : inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('video') ? (
                 <video
                   src={selectedMaterial.url}
                   controls
                   autoPlay
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
-              ) : selectedMaterial.type && selectedMaterial.type.startsWith('audio') ? (
+              ) : inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('audio') ? (
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   <SoundOutlined style={{ fontSize: 80, color: '#818cf8', marginBottom: 24 }} />
                   <audio
