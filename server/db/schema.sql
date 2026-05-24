@@ -1,4 +1,5 @@
 -- server/db/schema.sql
+-- 数据库初始化脚本 - 包含所有表结构
 
 CREATE TABLE IF NOT EXISTS projects (
   id TEXT PRIMARY KEY,
@@ -12,6 +13,59 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 分镜表（支持AI视频生成首尾帧控制）
+CREATE TABLE IF NOT EXISTS scenes (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  scene_order INTEGER NOT NULL DEFAULT 0,
+  
+  -- 基础内容
+  description TEXT,
+  voiceover TEXT,
+  narration TEXT,
+  subtitle TEXT,
+  
+  -- 视觉参数
+  shot_type TEXT DEFAULT '中景',
+  emotion TEXT DEFAULT '积极',
+  transition TEXT DEFAULT 'fade',
+  music_mood TEXT DEFAULT '无',
+  
+  -- AI生成控制（首尾帧）
+  ai_prompt TEXT,
+  first_frame_url TEXT,
+  last_frame_url TEXT,
+  source_video_url TEXT,
+  
+  -- 素材引用
+  reference_image_id TEXT,
+  reference_image_url TEXT,
+  image_url TEXT,
+  
+  -- 渲染状态
+  duration INTEGER DEFAULT 5,
+  status TEXT DEFAULT 'idle',
+  rendering INTEGER DEFAULT 0,
+  progress INTEGER DEFAULT 0,
+  error_message TEXT,
+  
+  -- 生成结果
+  video_url TEXT,
+  audio_url TEXT,
+  tts_est_duration INTEGER,
+  
+  -- 元数据
+  generated_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_order ON scenes(project_id, scene_order);
+CREATE INDEX IF NOT EXISTS idx_scenes_status ON scenes(status);
 
 CREATE TABLE IF NOT EXISTS materials (
   id TEXT PRIMARY KEY,
