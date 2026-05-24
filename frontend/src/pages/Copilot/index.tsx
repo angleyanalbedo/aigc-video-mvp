@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Layout, Spin, Alert } from 'antd';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Layout, Spin, Alert, Button } from 'antd';
+import { ArrowLeftOutlined } from '@ant-design/icons';
 import CopilotChat from '../../components/CopilotChat';
 import InfiniteCanvas from '../../components/InfiniteCanvas';
 
@@ -10,6 +11,7 @@ const { Content } = Layout;
 
 const Copilot: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error] = useState<string | null>(null);
 
@@ -56,6 +58,19 @@ const Copilot: React.FC = () => {
 
   return (
     <Layout className="copilot-layout">
+      <div className="copilot-topbar">
+        <Button
+          type="text"
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate('/projects')}
+          className="copilot-back-button"
+        >
+          返回项目列表
+        </Button>
+        <div className="copilot-title">
+          <h2>AI 创意助手</h2>
+        </div>
+      </div>
       <Content className="copilot-content">
         <div className="copilot-main">
           <CopilotChat

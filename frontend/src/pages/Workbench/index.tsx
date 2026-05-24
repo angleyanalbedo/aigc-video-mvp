@@ -162,9 +162,20 @@ const WorkbenchPage: React.FC = () => {
           <Space size="large">
             <Button
               type="text"
-              icon={<ArrowLeftOutlined style={{ color: '#fff' }} />}
+              icon={<ArrowLeftOutlined style={{ color: '#a1a1aa', fontSize: '20px' }} />}
               onClick={() => navigate('/projects')}
-            />
+              style={{ 
+                color: '#a1a1aa', 
+                fontSize: '14px',
+                padding: '8px 16px',
+                height: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              返回项目列表
+            </Button>
             <div>
               <Title level={4} style={{ margin: 0, color: '#fff' }}>🎬 {project?.name || '创意工作台'}</Title>
               <Text type="secondary" style={{ fontSize: 12 }}>
