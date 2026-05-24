@@ -134,7 +134,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   const footerItems: MenuItem[] = [
     {
       key: 'feedback',
-      path: 'https://github.com',
+      path: 'https://github.com/angleyanalbedo/aigc-video-mvp/issues',
       icon: <CustomerServiceOutlined />,
       tooltip: '反馈问题',
     },
@@ -146,7 +146,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
     },
     {
       key: 'github',
-      path: 'https://github.com',
+      path: 'https://github.com/angleyanalbedo/aigc-video-mvp',
       icon: <GithubOutlined />,
       tooltip: '访问 GitHub',
     },

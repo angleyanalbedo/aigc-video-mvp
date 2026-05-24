@@ -1,8 +1,9 @@
-import { Card, Form, Input, Select, Button, Switch, Divider, Space, message, Tabs, Tag, Modal, Descriptions, Alert } from 'antd';
+import { Card, Form, Input, Select, Button, Switch, Divider, Space, message, Tabs, Tag, Modal, Descriptions, Alert, Typography } from 'antd';
 import { SettingOutlined, ApiOutlined, VideoCameraOutlined, DatabaseOutlined, InfoCircleOutlined, SaveOutlined, ReloadOutlined, DeleteOutlined, ExperimentOutlined } from '@ant-design/icons';
 import React, { useState, useEffect } from 'react';
 
 const { Option } = Select;
+const { Link } = Typography;
 
 interface SystemConfig {
   apiKey: string;
@@ -506,6 +507,11 @@ const SettingsPage: React.FC = () => {
             </Descriptions.Item>
             <Descriptions.Item label="版本">
               <Tag color="green">v1.0.0</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="GitHub 仓库">
+              <Link href="https://github.com/angleyanalbedo/aigc-video-mvp" target="_blank">
+                https://github.com/angleyanalbedo/aigc-video-mvp
+              </Link>
             </Descriptions.Item>
             <Descriptions.Item label="技术栈">
               React + Ant Design + Node.js + SQLite
