@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Select, Button, Switch, Divider, Space, message, Tabs, Tag, Modal, Descriptions, Alert } from 'antd';
 import { SettingOutlined, ApiOutlined, VideoCameraOutlined, DatabaseOutlined, InfoCircleOutlined, SaveOutlined, ReloadOutlined, DeleteOutlined, ExperimentOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
 
 const { Option } = Select;
-const { TextArea } = Input;
-
-const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 interface SystemConfig {
   apiKey: string;
@@ -55,13 +52,11 @@ const SettingsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // 加载配置
   useEffect(() => {
     loadSettings();
   }, []);
 
   const loadSettings = () => {
-    // 从 localStorage 加载配置
     const savedSystemConfig = localStorage.getItem('systemConfig');
     const savedCreativeDefaults = localStorage.getItem('creativeDefaults');
 
@@ -138,7 +133,7 @@ const SettingsPage: React.FC = () => {
   const initSampleData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/scripts/init-sample-data`, {
+      const response = await fetch('/api/scripts/init-sample-data', {
         method: 'POST'
       });
       if (response.ok) {
@@ -246,7 +241,7 @@ const SettingsPage: React.FC = () => {
               label="自动保存间隔（秒）"
               style={{ width: 200 }}
             >
-              <Select disabled={!systemForm.getFieldValue('autoSave')}>
+              <Select>
                 <Option value={15}>15秒</Option>
                 <Option value={30}>30秒</Option>
                 <Option value={60}>60秒</Option>
@@ -487,7 +482,7 @@ const SettingsPage: React.FC = () => {
 
           <Space style={{ marginTop: 16 }}>
             <Button
-              onClick={() => window.open(`${API_BASE}/api/dashboard/stats`, '_blank')}
+              onClick={() => window.open('/api/dashboard/stats', '_blank')}
             >
               查看数据库统计
             </Button>
