@@ -271,141 +271,39 @@ class CanvasSyncService {
   // ─────────────────────────────────────────────────────────
 
   async createIntentAndPlan(projectId, intent, plan, sessionId) {
-    const intentNode = await this.createNode(
-      projectId,
-      'intent',
-      {
-        intent: intent.primaryIntent,
-        originalMessage: intent.originalMessage,
-        entities: intent.entities,
-        confidence: intent.confidence,
-        sessionId
-      },
-      { x: 100, y: 50 },
-      { borderColor: '#1890ff', backgroundColor: '#e6f7ff' }
-    );
-
-    const planNode = await this.createNode(
-      projectId,
-      'plan',
-      {
-        steps: plan.steps,
-        description: plan.description,
-        estimatedDuration: plan.estimatedDuration,
-        status: 'pending_confirmation',
-        parentIntentId: intentNode.id
-      },
-      { x: 100, y: 250 },
-      { borderColor: '#faad14', backgroundColor: '#fffbe6' }
-    );
-
-    await this.createConnection(
-      projectId,
-      intentNode.id,
-      planNode.id,
-      'operation',
-      { label: '生成计划' }
-    );
-
-    const operationNodes = [];
-    let yOffset = 450;
-
-    for (const step of plan.steps) {
-      const operationNode = await this.createNode(
-        projectId,
-        'operation',
-        {
-          operationType: step.type,
-          agentName: step.agent,
-          description: step.description,
-          targetNodeId: step.targetNodeId,
-          status: 'pending',
-          dependsOn: step.dependsOn
-        },
-        { x: 100, y: yOffset },
-        { borderColor: '#52c41a', backgroundColor: '#f6ffed' }
-      );
-
-      await this.createConnection(
-        projectId,
-        planNode.id,
-        operationNode.id,
-        'operation'
-      );
-
-      operationNodes.push(operationNode);
-      yOffset += 120;
-    }
+    // 根据用户需求：intent 和 plan 不再显示在画布上
+    // Agent 内部理解用户意图并生成执行计划，但不创建节点
+    // 只返回计划信息供 Agent 内部使用
+    
+    console.log(`🤖 Agent 理解用户意图: ${intent.primaryIntent}`);
+    console.log(`📋 Agent 生成执行计划: ${plan.steps.length} 个步骤`);
 
     return {
-      intentNodeId: intentNode.id,
-      planNodeId: planNode.id,
-      operationNodeIds: operationNodes.map(n => n.id)
+      intentNodeId: null,
+      planNodeId: null,
+      operationNodeIds: []
     };
   }
 
   async updatePlanStatus(planNodeId, status) {
-    const planNode = await this.getNode(planNodeId);
-    if (!planNode) return;
-
-    await this.updateNode(planNode.projectId, planNodeId, {
-      status,
-      ...(status === 'confirmed' ? { confirmedAt: Date.now() } : {}),
-      ...(status === 'completed' ? { completedAt: Date.now() } : {})
-    });
+    // 不再更新画布上的 plan 节点
+    console.log(`📋 Plan status updated (internal): ${status}`);
   }
 
   async updateStepStatus(planNodeId, stepId, status, result = null, error = null) {
-    const planNode = await this.getNode(planNodeId);
-    if (!planNode) return;
-
-    const steps = [...(planNode.data.steps || [])];
-    const stepIndex = steps.findIndex(s => s.stepId === stepId);
-
-    if (stepIndex >= 0) {
-      steps[stepIndex] = {
-        ...steps[stepIndex],
-        status,
-        result: result || steps[stepIndex].result,
-        error: error || steps[stepIndex].error,
-        ...(status === 'executing' ? { startTime: Date.now() } : {}),
-        ...(status === 'completed' || status === 'failed' ? { endTime: Date.now() } : {})
-      };
-
-      await this.updateNode(planNode.projectId, planNodeId, { steps });
-    }
+    // 不再更新画布上的 step 状态
+    console.log(`📋 Step ${stepId} status: ${status}`);
   }
 
   async createOperationNode(projectId, step, parentPlanId) {
-    const operationNode = await this.createNode(
-      projectId,
-      'operation',
-      {
-        operationType: step.type,
-        agentName: step.agent,
-        description: step.description,
-        targetNodeId: step.targetNodeId,
-        status: 'pending',
-        params: step.params
-      },
-      { x: 100, y: Date.now() % 500 + 500 }
-    );
-
-    await this.createConnection(
-      projectId,
-      parentPlanId,
-      operationNode.id,
-      'operation'
-    );
-
-    return operationNode.id;
+    // 不再创建 operation 节点到画布
+    console.log(`⚙️ Operation node would be created (not displayed): ${step.type}`);
+    return null;
   }
 
   async updateOperationNode(operationNodeId, updates) {
-    const node = await this.getNode(operationNodeId);
-    if (!node) return;
-
-    await this.updateNode(node.projectId, operationNodeId, updates);
+    // 不再更新画布上的 operation 节点
+    console.log(`⚙️ Operation node updated (internal):`, updates);
   }
 
   // ─────────────────────────────────────────────────────────
