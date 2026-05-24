@@ -44,7 +44,8 @@ export interface Plan {
 export async function sendMessage(
   projectId: string,
   message: string,
-  sessionId?: string
+  sessionId?: string,
+  metadata?: any
 ): Promise<{
   success: boolean;
   type: 'plan_confirmation' | 'completed' | 'error';
@@ -62,7 +63,8 @@ export async function sendMessage(
     body: JSON.stringify({
       message,
       projectId,
-      sessionId
+      sessionId,
+      metadata
     })
   });
   return response.json();
@@ -279,4 +281,20 @@ export function connectWebSocket(
   };
 
   return ws;
+}
+
+export async function getChatSessions(projectId: string): Promise<{
+  success: boolean;
+  sessions: Array<{
+    id: string;
+    projectId: string;
+    title: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/chat/sessions/${projectId}`);
+  return response.json();
 }

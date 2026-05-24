@@ -6,9 +6,16 @@ import {
   LoadingOutlined,
   RobotOutlined,
   UserOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  PaperClipOutlined,
+  FileOutlined,
+  PictureOutlined,
+  PlayCircleOutlined,
+  CloseOutlined,
+  DownloadOutlined,
+  RightOutlined
 } from '@ant-design/icons';
-import { Button, Input, Spin, List, Card, Tag, Typography } from 'antd';
+import { Button, Input, Spin, List, Card, Tag, Typography, Upload, message, Timeline, Image } from 'antd';
 import {
   sendMessage,
   executePlan,
@@ -26,6 +33,8 @@ const { Text, Paragraph } = Typography;
 
 interface CopilotChatProps {
   projectId: string;
+  activeSessionId?: string | null;
+  onSessionCreated?: (sessionId: string) => void;
   onNodesChanged?: (nodes: any[]) => void;
   onConnectionsChanged?: (connections: any[]) => void;
 }
@@ -65,21 +74,110 @@ const mergeMessage = (prev: Message[], newMsg: Message): Message[] => {
   return [...prev, newMsg];
 };
 
-const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, onConnectionsChanged }) => {
+// Define types for grouping consecutive logs
+type GroupedMessageItem =
+  | {
+      type: 'single';
+      message: Message;
+    }
+  | {
+      type: 'trace';
+      id: string;
+      steps: Message[];
+      status: 'executing' | 'completed' | 'failed';
+    };
+
+// Grouping consecutive operation logs and error messages
+const groupMessages = (msgs: Message[], isLoading: boolean): GroupedMessageItem[] => {
+  const grouped: GroupedMessageItem[] = [];
+  let currentTrace: Message[] = [];
+
+  const pushCurrentTrace = (isLastGroup: boolean) => {
+    if (currentTrace.length > 0) {
+      let status: 'executing' | 'completed' | 'failed' = 'completed';
+      
+      const hasError = currentTrace.some(m => m.type === 'error' || m.content.includes('失败') || m.content.includes('❌'));
+      const hasCompletion = currentTrace.some(m => m.content.includes('完成') || m.content.includes('成功') || m.content.includes('✅'));
+
+      if (hasError) {
+        status = 'failed';
+      } else if (hasCompletion) {
+        status = 'completed';
+      } else if (isLastGroup && isLoading) {
+        status = 'executing';
+      } else {
+        status = 'completed'; // Fallback if no longer loading
+      }
+
+      grouped.push({
+        type: 'trace',
+        id: `trace_${currentTrace[0].id}`,
+        steps: [...currentTrace],
+        status
+      });
+      currentTrace = [];
+    }
+  };
+
+  for (let i = 0; i < msgs.length; i++) {
+    const msg = msgs[i];
+    const isLog = msg.type === 'operation_log' || msg.type === 'error' || msg.role === 'system';
+
+    if (isLog) {
+      currentTrace.push(msg);
+    } else {
+      pushCurrentTrace(false);
+      grouped.push({
+        type: 'single',
+        message: msg
+      });
+    }
+  }
+
+  pushCurrentTrace(true);
+  return grouped;
+};
+
+const CopilotChat: React.FC<CopilotChatProps> = ({ 
+  projectId, 
+  activeSessionId, 
+  onSessionCreated, 
+  onNodesChanged, 
+  onConnectionsChanged 
+}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingPlan, setPendingPlan] = useState<Plan & { planNodeId: string, sessionId: string } | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(activeSessionId || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Upload state management
+  const [uploadedFile, setUploadedFile] = useState<{
+    url: string;
+    name: string;
+    type: 'image' | 'video' | 'file';
+  } | null>(null);
+  const [uploading, setUploading] = useState(false);
+
   useEffect(() => {
     const init = async () => {
-      const session = await createChatSession(projectId, '新对话');
-      if (session.success) {
-        setSessionId(session.sessionId);
-        const history = await getChatHistory(session.sessionId);
+      let currentSessionId = activeSessionId;
+      
+      if (!currentSessionId) {
+        const session = await createChatSession(projectId, '新对话');
+        if (session.success) {
+          currentSessionId = session.sessionId;
+          if (onSessionCreated) {
+            onSessionCreated(session.sessionId);
+          }
+        }
+      }
+
+      if (currentSessionId) {
+        setSessionId(currentSessionId);
+        const history = await getChatHistory(currentSessionId);
         if (history.success) {
           const normalizedHistory = history.messages.map((m: any) => ({
             id: m.id,
@@ -124,29 +222,70 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
     return () => {
       wsRef.current?.close();
     };
-  }, [projectId]);
+  }, [projectId, activeSessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handle uploading change
+  const handleUploadChange = (info: any) => {
+    if (info.file.status === 'uploading') {
+      setUploading(true);
+      return;
+    }
+    if (info.file.status === 'done') {
+      setUploading(false);
+      const response = info.file.response;
+      if (response && response.success) {
+        const fileUrl = response.url;
+        const fileName = info.file.name;
+        let fileType: 'image' | 'video' | 'file' = 'file';
+        if (info.file.type?.startsWith('image/')) {
+          fileType = 'image';
+        } else if (info.file.type?.startsWith('video/')) {
+          fileType = 'video';
+        }
+        setUploadedFile({ url: fileUrl, name: fileName, type: fileType });
+        message.success('文件上传成功！');
+      } else {
+        message.error('文件上传失败，服务器错误');
+      }
+    } else if (info.file.status === 'error') {
+      setUploading(false);
+      message.error('文件上传失败，网络错误');
+    }
+  };
+
   const handleSend = async () => {
-    if (!inputValue.trim() || isLoading || !sessionId) return;
+    if ((!inputValue.trim() && !uploadedFile) || isLoading || !sessionId) return;
+
+    const userMetadata = uploadedFile
+      ? {
+          fileUrl: uploadedFile.url,
+          fileName: uploadedFile.name,
+          fileType: uploadedFile.type
+        }
+      : undefined;
+
+    const tempContent = inputValue.trim() || `[已上传${uploadedFile ? (uploadedFile.type === 'image' ? '图片' : uploadedFile.type === 'video' ? '视频' : '文件') : '附件'}]`;
 
     const userMessage: Message = {
       id: `user_${Date.now()}`,
       role: 'user',
       type: 'text',
-      content: inputValue,
-      timestamp: Date.now()
+      content: tempContent,
+      timestamp: Date.now(),
+      metadata: userMetadata
     };
 
     setMessages(prev => mergeMessage(prev, userMessage));
     setInputValue('');
+    setUploadedFile(null);
     setIsLoading(true);
 
     try {
-      const response = await sendMessage(projectId, inputValue, sessionId);
+      const response = await sendMessage(projectId, tempContent, sessionId, userMetadata);
       
       if (response.success) {
         if (response.type === 'plan_confirmation') {
@@ -283,13 +422,15 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
     setPendingPlan(null);
   };
 
+  const groupedItems = groupMessages(messages, isLoading);
+
   return (
     <div className="copilot-chat">
       <div className="chat-header">
         <RobotOutlined className="chat-icon" />
         <div className="chat-title">
           <Text strong>Copilot Agent</Text>
-          <Text type="secondary">智能助手</Text>
+          <Text type="secondary">智能创作助手</Text>
         </div>
       </div>
 
@@ -298,7 +439,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
           <div className="empty-state">
             <InfoCircleOutlined className="empty-icon" />
             <Paragraph>
-              你好！我是你的智能视频创作助手。告诉我你想要什么，我来帮你完成！
+              你好！我是你的智能视频创作助手。上传商品图、写段脚本或者上传素材，我都能全自动为您进行深度创作与编辑！
             </Paragraph>
             <div className="suggestions">
               <Tag color="blue" onClick={() => setInputValue('帮我生成一个破壁机的短视频')}>
@@ -315,9 +456,13 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         )}
 
         <div className="messages-list">
-          {messages.map(msg => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
+          {groupedItems.map(item => {
+            if (item.type === 'single') {
+              return <MessageBubble key={item.message.id} message={item.message} />;
+            } else {
+              return <TracePanel key={item.id} trace={item} />;
+            }
+          })}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -374,7 +519,40 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         </div>
       )}
 
+      {uploadedFile && (
+        <div className="pending-upload-bar">
+          <div className="pending-upload-item">
+            {uploadedFile.type === 'image' && <PictureOutlined className="file-icon img" />}
+            {uploadedFile.type === 'video' && <PlayCircleOutlined className="file-icon video" />}
+            {uploadedFile.type === 'file' && <FileOutlined className="file-icon file" />}
+            <span className="file-name" title={uploadedFile.name}>{uploadedFile.name}</span>
+            <Button
+              type="text"
+              icon={<CloseOutlined style={{ fontSize: 10 }} />}
+              size="small"
+              className="delete-upload"
+              onClick={() => setUploadedFile(null)}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="input-area">
+        <Upload
+          action="/api/upload"
+          name="file"
+          showUploadList={false}
+          disabled={isLoading || uploading}
+          onChange={handleUploadChange}
+          className="chat-uploader"
+        >
+          <Button
+            shape="circle"
+            icon={uploading ? <LoadingOutlined /> : <PaperClipOutlined />}
+            disabled={isLoading || uploading}
+            title="上传素材 (图片/视频/文件)"
+          />
+        </Upload>
         <TextArea
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
@@ -384,16 +562,16 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
               handleSend();
             }
           }}
-          placeholder="输入指令，如：帮我生成一个破壁机的短视频"
+          placeholder="输入创作指令，或直接发送文件上传..."
           autoSize={{ minRows: 1, maxRows: 4 }}
-          disabled={isLoading}
+          disabled={isLoading || uploading}
           showCount
         />
         <Button
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSend}
-          disabled={!inputValue.trim() || isLoading}
+          disabled={(!inputValue.trim() && !uploadedFile) || isLoading || uploading}
           loading={isLoading}
         >
           发送
@@ -403,6 +581,97 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
   );
 };
 
+// Unified step-by-step collapse trace renderer
+const TracePanel: React.FC<{
+  trace: { id: string; steps: Message[]; status: 'executing' | 'completed' | 'failed' };
+}> = ({ trace }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const getStatusHeader = () => {
+    switch (trace.status) {
+      case 'failed':
+        return {
+          text: '创作遇到一些小问题',
+          color: '#ff4d4f',
+          icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+          tagColor: 'error'
+        };
+      case 'executing':
+        return {
+          text: 'AI 正在自主思考并执行创作任务',
+          color: '#1890ff',
+          icon: <LoadingOutlined style={{ color: '#1890ff' }} />,
+          tagColor: 'processing'
+        };
+      case 'completed':
+      default:
+        return {
+          text: 'AI 已成功执行相关步骤',
+          color: '#52c41a',
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          tagColor: 'success'
+        };
+    }
+  };
+
+  const header = getStatusHeader();
+
+  return (
+    <div className={`message system trace-message ${trace.status}`}>
+      <div className="message-icon system-icon">
+        <RobotOutlined style={{ color: header.color }} />
+      </div>
+      <div className="message-content trace-content">
+        <div className="trace-header" onClick={() => setIsExpanded(!isExpanded)}>
+          <span className="trace-header-icon">{header.icon}</span>
+          <span className="trace-header-text">{header.text}</span>
+          <Tag color={header.tagColor} className="trace-header-count">
+            {trace.steps.length} 步
+          </Tag>
+          <RightOutlined className={`trace-toggle-arrow ${isExpanded ? 'expanded' : ''}`} />
+        </div>
+
+        {isExpanded && (
+          <div className="trace-steps-container">
+            <Timeline className="trace-timeline">
+              {trace.steps.map((step) => {
+                let dotIcon = <InfoCircleOutlined />;
+                let dotColor = 'blue';
+
+                if (step.type === 'error' || step.content.includes('失败') || step.content.includes('❌')) {
+                  dotIcon = <CloseCircleOutlined style={{ fontSize: '14px', color: '#ff4d4f' }} />;
+                  dotColor = 'red';
+                } else if (step.content.includes('思考') || step.content.includes('🧠')) {
+                  dotIcon = <RobotOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
+                  dotColor = 'blue';
+                } else if (step.content.includes('成功') || step.content.includes('完成') || step.content.includes('✅')) {
+                  dotIcon = <CheckCircleOutlined style={{ fontSize: '14px', color: '#52c41a' }} />;
+                  dotColor = 'green';
+                } else if (step.content.includes('准备执行') || step.content.includes('正在执行') || step.content.includes('⚙️')) {
+                  dotIcon = <LoadingOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
+                  dotColor = 'blue';
+                }
+
+                return (
+                  <Timeline.Item key={step.id} dot={dotIcon} color={dotColor}>
+                    <div className="timeline-step-content">
+                      <div className="step-text">{step.content}</div>
+                      <div className="step-time">
+                        {new Date(step.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </div>
+                    </div>
+                  </Timeline.Item>
+                );
+              })}
+            </Timeline>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Rich bubble message rendering with visual attachments card
 const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
   const getIcon = () => {
     switch (message.role) {
@@ -423,14 +692,54 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
     return cls;
   };
 
+  const meta = message.metadata;
+
   return (
     <div className={getClassName()}>
       <div className="message-icon">{getIcon()}</div>
       <div className="message-content">
         <div className="message-text">{message.content}</div>
-        {message.metadata?.videoUrl && (
-          <div className="message-attachment">
-            <video src={message.metadata.videoUrl} controls width="100%" height="150" />
+        
+        {/* Render Image Attachment */}
+        {meta?.fileUrl && meta?.fileType === 'image' && (
+          <div className="message-attachment image-attachment">
+            <Image
+              src={meta.fileUrl}
+              alt={meta.fileName || '图片附件'}
+              style={{ borderRadius: '8px', maxHeight: '180px', objectFit: 'contain' }}
+            />
+          </div>
+        )}
+
+        {/* Render Video Attachment (from direct uploads or metadata.videoUrl) */}
+        {((meta?.fileUrl && meta?.fileType === 'video') || meta?.videoUrl) && (
+          <div className="message-attachment video-attachment">
+            <video
+              src={meta?.fileUrl || meta?.videoUrl}
+              controls
+              style={{ borderRadius: '8px', maxWidth: '100%', maxHeight: '200px', background: '#000' }}
+            />
+          </div>
+        )}
+
+        {/* Render Document/General File Attachment */}
+        {meta?.fileUrl && meta?.fileType === 'file' && (
+          <div className="message-attachment file-card">
+            <FileOutlined className="file-card-icon" />
+            <div className="file-card-details">
+              <span className="file-card-name" title={meta.fileName}>
+                {meta.fileName}
+              </span>
+              <a
+                href={meta.fileUrl}
+                download={meta.fileName}
+                className="file-card-download"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <DownloadOutlined /> 下载文件
+              </a>
+            </div>
           </div>
         )}
       </div>

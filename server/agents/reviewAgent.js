@@ -179,27 +179,6 @@ class ReviewAgent {
     }
     return { valid: true };
   }
-
-  async execute(prompt, options = {}) {
-    const { maxSteps = 5 } = options;
-    try {
-      const result = await aiGenerateText({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        tools: this.tools,
-        maxSteps: maxSteps
-      });
-      return {
-        text: result.text,
-        toolResults: result.toolResults,
-        finishReason: result.finishReason
-      };
-    } catch (error) {
-      console.error('❌ ReviewAgent execute 失败:', error);
-      throw error;
-    }
-  }
 }
 
 module.exports = new ReviewAgent();
