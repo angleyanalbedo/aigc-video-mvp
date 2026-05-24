@@ -334,10 +334,17 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       title: node.data.title || '',
       description: node.data.description || '',
       voiceover: node.data.voiceover || '',
+      narration: node.data.narration || '',
       duration: node.data.duration || 3,
       shot_type: node.data.shot_type || '中景',
       emotion: node.data.emotion || '积极',
-      transition: node.data.transition || 'fade'
+      transition: node.data.transition || 'fade',
+      ai_prompt: node.data.ai_prompt || '',
+      music_mood: node.data.music_mood || '无',
+      subtitle: node.data.subtitle || '',
+      referenceImageUrl: node.data.referenceImageUrl || '',
+      videoUrl: node.data.videoUrl || '',
+      status: node.data.status || 'idle'
     });
     setIsDrawerVisible(true);
   };
@@ -1264,6 +1271,10 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
                   <Input.TextArea rows={2} placeholder="这个分镜的旁白配音内容" />
                 </Form.Item>
                 
+                <Form.Item name="narration" label="旁白文案 (备选)">
+                  <Input.TextArea rows={1} placeholder="备用旁白内容" />
+                </Form.Item>
+                
                 <Form.Item name="duration" label="预计时长 (秒)" rules={[{ required: true, message: '请输入时长' }]}>
                   <Input type="number" min={1} max={60} placeholder="5" />
                 </Form.Item>
@@ -1333,6 +1344,23 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 
                 <Form.Item name="subtitle" label="字幕文案">
                   <Input.TextArea rows={1} placeholder="可选的字幕显示内容" />
+                </Form.Item>
+
+                <Form.Item name="referenceImageUrl" label="参考图片URL">
+                  <Input placeholder="分镜的参考图片URL（可选）" />
+                </Form.Item>
+
+                <Form.Item name="videoUrl" label="生成视频URL">
+                  <Input placeholder="AI生成的视频URL（只读）" disabled />
+                </Form.Item>
+
+                <Form.Item name="status" label="分镜状态">
+                  <Select disabled>
+                    <Select.Option value="idle">待生成</Select.Option>
+                    <Select.Option value="generating">生成中</Select.Option>
+                    <Select.Option value="completed">已完成</Select.Option>
+                    <Select.Option value="failed">失败</Select.Option>
+                  </Select>
                 </Form.Item>
               </>
             )}
