@@ -296,6 +296,146 @@ class CanvasSyncService {
     }
   }
 
+  // Plan & Operation Orchestration
+  async createIntentAndPlan(projectId, intent, plan, sessionId) {
+    // 1. 创建 IntentNode
+    const intentNode = await this.createNode(
+      projectId,
+      'intent',
+      {
+        intent: intent.primaryIntent,
+        originalMessage: intent.originalMessage,
+        entities: intent.entities,
+        confidence: intent.confidence,
+        sessionId
+      },
+      { x: 100, y: 50 }
+    );
+
+    // 2. 创建 PlanNode
+    const planNode = await this.createNode(
+      projectId,
+      'plan',
+      {
+        steps: plan.steps,
+        description: plan.description,
+        estimatedDuration: plan.estimatedDuration,
+        status: 'pending_confirmation',
+        parentIntentId: intentNode.id
+      },
+      { x: 100, y: 250 }
+    );
+
+    // 3. 创建 Intent → Plan 连接
+    await this.createConnection(
+      projectId,
+      intentNode.id,
+      planNode.id,
+      'operation'
+    );
+
+    // 4. 为每个步骤创建 OperationNode
+    const operationNodes = [];
+    let yOffset = 450;
+    
+    for (const step of plan.steps) {
+      const operationNode = await this.createNode(
+        projectId,
+        'operation',
+        {
+          operationType: step.type,
+          agentName: step.agent,
+          description: step.description,
+          targetNodeId: step.targetNodeId,
+          status: 'pending',
+          dependsOn: step.dependsOn
+        },
+        { x: 100, y: yOffset }
+      );
+
+      // 创建 Plan → Operation 连接
+      await this.createConnection(
+        projectId,
+        planNode.id,
+        operationNode.id,
+        'operation'
+      );
+
+      operationNodes.push(operationNode);
+      yOffset += 120;
+    }
+
+    return {
+      intentNodeId: intentNode.id,
+      planNodeId: planNode.id,
+      operationNodeIds: operationNodes.map(n => n.id)
+    };
+  }
+
+  async updatePlanStatus(planNodeId, status) {
+    const planNode = await this.getNode(planNodeId);
+    if (!planNode) return;
+
+    await this.updateNode(planNode.projectId, planNodeId, {
+      status,
+      ...(status === 'confirmed' ? { confirmedAt: Date.now() } : {}),
+      ...(status === 'completed' ? { completedAt: Date.now() } : {})
+    });
+  }
+
+  async updateStepStatus(planNodeId, stepId, status, result = null, error = null) {
+    const planNode = await this.getNode(planNodeId);
+    if (!planNode) return;
+
+    const steps = [...planNode.data.steps];
+    const stepIndex = steps.findIndex(s => s.stepId === stepId);
+    
+    if (stepIndex >= 0) {
+      steps[stepIndex] = {
+        ...steps[stepIndex],
+        status,
+        result: result || steps[stepIndex].result,
+        error: error || steps[stepIndex].error,
+        ...(status === 'executing' ? { startTime: Date.now() } : {}),
+        ...(status === 'completed' || status === 'failed' ? { endTime: Date.now() } : {})
+      };
+
+      await this.updateNode(planNode.projectId, planNodeId, { steps });
+    }
+  }
+
+  async createOperationNode(projectId, step, parentPlanId) {
+    const operationNode = await this.createNode(
+      projectId,
+      'operation',
+      {
+        operationType: step.type,
+        agentName: step.agent,
+        description: step.description,
+        targetNodeId: step.targetNodeId,
+        status: 'pending',
+        params: step.params
+      },
+      { x: 100, y: Date.now() % 500 + 500 }
+    );
+
+    await this.createConnection(
+      projectId,
+      parentPlanId,
+      operationNode.id,
+      'operation'
+    );
+
+    return operationNode.id;
+  }
+
+  async updateOperationNode(operationNodeId, updates) {
+    const node = await this.getNode(operationNodeId);
+    if (!node) return;
+
+    await this.updateNode(node.projectId, operationNodeId, updates);
+  }
+
   // Chat Session Management
   async createChatSession(projectId, title = '新会话') {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -342,6 +482,10 @@ class CanvasSyncService {
       metadata: row.metadata ? JSON.parse(row.metadata) : null,
       createdAt: row.created_at
     }));
+  }
+
+  async getChatHistory(sessionId) {
+    return this.getChatMessages(sessionId);
   }
 
   async getChatSessions(projectId) {

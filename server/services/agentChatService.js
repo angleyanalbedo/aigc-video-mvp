@@ -153,6 +153,50 @@ ${memoryContext ? `\n【跨会话记忆上下文】\n${memoryContext}` : ''}`;
       };
     }
   }
+
+  async generateGeneralChat(message, sessionContext = {}) {
+    const project = sessionContext.project || {};
+    const script = project.script || null;
+
+    const systemPrompt = `你是一个资深的电商 AIGC 视频创作助手（Copilot Agent）。
+你的职责是解答用户关于视频创作的疑问、引导用户使用平台功能，并提供优质的创意方案。
+
+【平台功能指南】
+你可以通过识别用户的意图并在无限画布（Canvas）上自动生成“执行计划”来辅助用户操作。你可以做的操作有：
+1. 生成带货剧本分镜（例如：“帮我写个大米带货剧本分镜”）
+2. 生成关键帧图片（例如：“为分镜 1 生成关键帧”）
+3. 渲染单个分镜视频（例如：“一键渲染分镜 2 的视频”）
+4. 剪辑与音画合成最终商业短视频（例如：“合成最终的视频并配乐”）
+5. 添加、修改、删除分镜、调整分镜顺序或添加背景音乐/素材。
+
+【当前项目状态】
+- 项目名称: ${project.name || '未命名项目'}
+- 项目描述: ${project.description || '暂无描述'}
+- 商品背景: ${project.product_info ? JSON.stringify(project.product_info) : '暂无商品信息'}
+- 剧本状态: ${script ? `已生成，共 ${script.scenes?.length || 0} 个分镜` : '尚未生成剧本'}
+
+【回复规范】
+1. 如果用户是进行日常问候或闲聊（如“你好”、“在吗”），请热情地打招呼，并简短介绍你可以怎样帮助他们制作带货视频。
+2. 如果用户提出了一些与剧本、分镜或视频制作相关但不是具体平台指令的问题，请耐心地给予专业解答和创意参考。
+3. 如果用户的指令被分类为未知意图，或者指令不够具体，请礼貌地说明，并主动引导他们使用上述“功能指南”中列出的明确操作（例如一键生成剧本、修改分镜、渲染视频等）。
+4. 语气要求：专业、简练、热情，并带有一点点幽默，字数控制在 150 字以内。
+5. 请使用中文进行自然语言交流，不要带有 JSON 结构或技术代码。`;
+
+    const userPrompt = `用户发送的消息: "${message}"`;
+
+    try {
+      const response = await llmProvider.generateText({
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.7,
+        maxTokens: 500
+      });
+      return response.trim();
+    } catch (error) {
+      console.error('⚠️ AgentChatService generateGeneralChat error:', error);
+      return '你好！我是你的 AI 视频创作助手。刚才大模型稍微打了个盹，但我依然在这里为您服务。如果您需要生成剧本、图片或视频，随时可以向我发送指令哦！';
+    }
+  }
 }
 
 module.exports = new AgentChatService();

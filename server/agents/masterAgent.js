@@ -4,6 +4,7 @@ const TaskPlanner = require('./planner/taskPlanner');
 const ToolExecutor = require('./executor/toolExecutor');
 const canvasSyncService = require('../services/canvasSyncService');
 const projectModel = require('../models/project');
+const agentChatService = require('../services/agentChatService');
 
 class MasterAgent extends EventEmitter {
   constructor() {
@@ -33,6 +34,24 @@ class MasterAgent extends EventEmitter {
 
     const intent = await this.intentParser.parse(message, sessionContext);
     console.log(`🎯 意图识别: ${intent.primaryIntent}, 置信度: ${intent.confidence}`);
+
+    // 若是未知意图（无法匹配到任何指令）或纯解释询问，则直接进入智能对话，不生成画布节点
+    if (intent.primaryIntent === 'unknown' || intent.primaryIntent === 'explain') {
+      const reply = await agentChatService.generateGeneralChat(message, sessionContext);
+      
+      await canvasSyncService.addChatMessage(
+        sessionId,
+        'assistant',
+        'text',
+        reply
+      );
+
+      return {
+        type: 'chat',
+        sessionId,
+        message: reply
+      };
+    }
 
     const plan = await this.taskPlanner.generatePlan(intent, projectId, sessionContext);
     console.log(`📋 生成计划: ${plan.steps.length} 个步骤`);

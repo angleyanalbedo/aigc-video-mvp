@@ -635,6 +635,57 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     });
   };
 
+  const handleRetryFailedScenes = async (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    
+    // Find all scene nodes that are failed
+    const failedScenes = nodes.filter(n => n.type === 'scene' && n.data.status === 'failed');
+    
+    if (failedScenes.length === 0) {
+      message.info('画布上没有渲染失败的分镜节点。');
+      return;
+    }
+
+    Modal.confirm({
+      title: `确定要重试 ${failedScenes.length} 个失败的的分镜吗？`,
+      content: '这些分镜之前渲染失败了，现在将重新触发渲染。',
+      okText: '确认重试',
+      cancelText: '取消',
+      onOk: async () => {
+        message.loading(`🔄 正在重试 ${failedScenes.length} 个失败的分镜...`, 0);
+        
+        try {
+          // Reset failed scenes status and retry rendering
+          failedScenes.forEach(async (sceneNode) => {
+            try {
+              // First reset the status in canvas
+              await updateNodeData(sceneNode.id, { 
+                status: 'idle',
+                errorMessage: ''
+              });
+              
+              // Then trigger the render
+              const res = await generateSceneVideo(projectId, sceneNode.data.sceneId, sceneNode.data);
+              if (res.success) {
+                console.log(`✅ Scene ${sceneNode.data.sceneId} retry task successfully fired.`);
+              } else {
+                console.error(`❌ Scene ${sceneNode.data.sceneId} retry failed:`, res.error);
+              }
+            } catch (err) {
+              console.error(`❌ Failed to retry scene ${sceneNode.data.sceneId}:`, err);
+            }
+          });
+          
+          message.destroy();
+          message.success(`🔄 已成功触发 ${failedScenes.length} 个失败分镜的重试任务！`);
+        } catch (err) {
+          message.destroy();
+          message.error('重试失败，请稍后重试');
+        }
+      }
+    });
+  };
+
   // Rendering Styling Helpers
   const getNodeColor = (type: Node['type']) => {
     const colors = {
@@ -951,6 +1002,8 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       const sceneNodes = nodes.filter(n => n.type === 'scene');
       const totalDuration = sceneNodes.reduce((sum, n) => sum + (n.data.duration || 0), 0);
       const completedScenes = sceneNodes.filter(n => n.data.status === 'completed').length;
+      const failedScenes = sceneNodes.filter(n => n.data.status === 'failed').length;
+      const idleScenes = sceneNodes.filter(n => n.data.status === 'idle').length;
       
       return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 8 }}>
@@ -962,15 +1015,25 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           </div>
           
           {/* 剧本统计信息 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9f0ff', padding: '4px 8px', borderRadius: '4px', marginBottom: 6, border: '1px dashed #d3adf7' }}>
-            <div style={{ fontSize: 10, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>🎬 分镜: <strong>{sceneNodes.length}</strong></span>
-              <span style={{ fontSize: 14 }}>|</span>
-              <span>⏱️ 时长: <strong>{totalDuration}s</strong></span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#f9f0ff', padding: '4px 8px', borderRadius: '4px', marginBottom: 6, border: '1px dashed #d3adf7' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 10, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>🎬 分镜: <strong>{sceneNodes.length}</strong></span>
+                <span style={{ fontSize: 14 }}>|</span>
+                <span>⏱️ 时长: <strong>{totalDuration}s</strong></span>
+              </div>
+              <div style={{ fontSize: 10, color: completedScenes === sceneNodes.length && sceneNodes.length > 0 ? '#52c41a' : '#1890ff' }}>
+                {sceneNodes.length > 0 ? `${completedScenes}/${sceneNodes.length} 完成` : '未创建分镜'}
+              </div>
             </div>
-            <div style={{ fontSize: 10, color: completedScenes === sceneNodes.length && sceneNodes.length > 0 ? '#52c41a' : '#1890ff' }}>
-              {sceneNodes.length > 0 ? `${completedScenes}/${sceneNodes.length} 完成` : '未创建分镜'}
-            </div>
+            
+            {failedScenes > 0 && (
+              <div style={{ fontSize: 10, color: '#ff4d4f', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>❌ 失败: <strong>{failedScenes}</strong></span>
+                {idleScenes > 0 && <span style={{ color: '#8c8c8c' }}>|</span>}
+                {idleScenes > 0 && <span>待生成: <strong>{idleScenes}</strong></span>}
+              </div>
+            )}
           </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 'auto' }}>
@@ -991,6 +1054,17 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
             >
               ⚡ 一键渲染所有分镜
             </Button>
+            {failedScenes > 0 && (
+              <Button
+                size="small"
+                danger
+                icon={<ReloadOutlined />}
+                onClick={(e) => handleRetryFailedScenes(e, node)}
+                style={{ fontSize: 11, width: '100%' }}
+              >
+                🔄 重试失败的 {failedScenes} 个分镜
+              </Button>
+            )}
           </div>
         </div>
       );
