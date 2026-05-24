@@ -231,9 +231,17 @@ class CanvasSyncService {
 
     const existingNodes = await this.getNodes(projectId, 'scene');
     const existingIds = new Set(existingNodes.map(n => n.data.id));
-    const scriptSceneIds = new Set(script.scenes.map(s => s.id));
+    const scriptSceneIds = new Set(script.scenes.map(s => parseInt(s.id, 10)).filter(id => !isNaN(id)));
 
-    // Add new scenes
+    // 1. Delete nodes that were deleted in the workbench
+    for (const node of existingNodes) {
+      const nodeSceneId = parseInt(node.data.id, 10);
+      if (!isNaN(nodeSceneId) && !scriptSceneIds.has(nodeSceneId)) {
+        await this.deleteNode(projectId, node.id);
+      }
+    }
+
+    // 2. Add or Update scenes
     let idx = 0;
     for (const scene of script.scenes) {
       idx++;
@@ -259,10 +267,59 @@ class CanvasSyncService {
         if (scriptNode.length > 0 && newNode) {
           await this.createConnection(projectId, scriptNode[0].id, newNode.id, 'timeline');
         }
+      } else {
+        // Update existing scene node if its data changed
+        const existingNode = existingNodes.find(n => n.data.id === numericId);
+        if (existingNode) {
+          const d = existingNode.data;
+          const hasChanged = 
+            d.description !== (scene.description || '') ||
+            d.voiceover !== (scene.voiceover || '') ||
+            d.duration !== (scene.duration || 5) ||
+            d.shot_type !== (scene.shot_type || '中景') ||
+            d.status !== (scene.status || 'idle') ||
+            d.imageUrl !== scene.imageUrl ||
+            d.videoUrl !== scene.videoUrl;
+
+          if (hasChanged) {
+            const newData = {
+              ...existingNode.data,
+              description: scene.description || '',
+              voiceover: scene.voiceover || '',
+              duration: scene.duration || 5,
+              shot_type: scene.shot_type || '中景',
+              status: scene.status || 'idle',
+              imageUrl: scene.imageUrl || existingNode.data.imageUrl || null,
+              videoUrl: scene.videoUrl || existingNode.data.videoUrl || null
+            };
+
+            db.prepare(`
+              UPDATE canvas_nodes 
+              SET node_data = ?, updated_at = ?
+              WHERE id = ?
+            `).run(JSON.stringify(newData), new Date().toISOString(), existingNode.id);
+
+            // Broadcast node update to websocket for real-time hot reload
+            this.broadcast(projectId, {
+              type: 'node_updated',
+              nodeId: existingNode.id,
+              updates: {
+                description: scene.description || '',
+                voiceover: scene.voiceover || '',
+                duration: scene.duration || 5,
+                shot_type: scene.shot_type || '中景',
+                status: scene.status || 'idle',
+                imageUrl: scene.imageUrl || existingNode.data.imageUrl || null,
+                videoUrl: scene.videoUrl || existingNode.data.videoUrl || null
+              },
+              newData
+            });
+          }
+        }
       }
     }
 
-    // Ensure video node exists
+    // 3. Ensure video node exists
     const videoNodes = await this.getNodes(projectId, 'video');
     if (videoNodes.length === 0) {
       await this.createNode(projectId, 'video', {
