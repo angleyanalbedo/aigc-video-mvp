@@ -327,7 +327,9 @@ const MaterialManagementPage = () => {
             </Button>
           ]}
           width={800}
-          bodyStyle={{ background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }}
+          styles={{
+            body: { background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }
+          }}
           style={{ top: 40 }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
