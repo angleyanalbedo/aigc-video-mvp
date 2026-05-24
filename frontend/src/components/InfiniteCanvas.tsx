@@ -1,11 +1,27 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button, Slider, Tooltip } from 'antd';
-import { ZoomInOutlined, ZoomOutOutlined, ReloadOutlined, SyncOutlined } from '@ant-design/icons';
+import { Button, Slider, Tooltip, Drawer, Form, Input, Select, Modal, message, Tag } from 'antd';
+import {
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  ReloadOutlined,
+  SyncOutlined,
+  DeleteOutlined,
+  PlayCircleOutlined,
+  PlusOutlined,
+  VideoCameraOutlined,
+  BuildOutlined,
+  LoadingOutlined,
+  WarningOutlined
+} from '@ant-design/icons';
 import {
   getNodes,
   getConnections,
   updateNodePosition,
   connectWebSocket,
+  updateNodeData,
+  deleteNodeDirectly,
+  createNodeDirectly,
+  generateSceneVideo,
   type Node,
   type Connection
 } from '../utils/copilotApi';
@@ -28,6 +44,13 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
   const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0 });
   const [nodeStartPosition, setNodeStartPosition] = useState({ x: 0, y: 0 });
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Toonflow state variables
+  const [editingNode, setEditingNode] = useState<Node | null>(null);
+  const [isDrawerVisible, setIsDrawerVisible] = useState(false);
+  const [form] = Form.useForm();
+  const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
 
   useEffect(() => {
     const loadCanvas = async () => {
@@ -62,6 +85,16 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           ));
         } else if (event.type === 'connection_created' && event.connection) {
           setConnections(prev => [...prev, event.connection]);
+        }
+      },
+      onOperationProgress: (data) => {
+        console.log('⚙️ Canvas operation progress:', data);
+        if (data.operationNodeId) {
+          setNodes(prev => prev.map(n =>
+            n.id === data.operationNodeId
+              ? { ...n, data: { ...n.data, progress: data.progress, status: data.status, error: data.error } }
+              : n
+          ));
         }
       },
       onConnected: () => console.log('✅ Canvas WebSocket connected'),
@@ -160,13 +193,133 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     setNodeStartPosition({ ...node.position });
   };
 
+  // Node editing & CRUD
+  const handleNodeDoubleClick = (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    setEditingNode(node);
+    form.setFieldsValue({
+      title: node.data.title || '',
+      description: node.data.description || '',
+      voiceover: node.data.voiceover || '',
+      duration: node.data.duration || 3,
+      shot_type: node.data.shot_type || '中景',
+      emotion: node.data.emotion || '积极',
+      transition: node.data.transition || 'fade'
+    });
+    setIsDrawerVisible(true);
+  };
+
+  const handleSaveProperties = async () => {
+    if (!editingNode) return;
+    try {
+      const values = await form.validateFields();
+      if (values.duration) {
+        values.duration = Number(values.duration);
+      }
+
+      const res = await updateNodeData(editingNode.id, values);
+      if (res.success) {
+        message.success('节点数据更新成功，已完美同步回数据库！');
+        setIsDrawerVisible(false);
+        setEditingNode(null);
+      } else {
+        message.error(res.error || '保存失败');
+      }
+    } catch (err) {
+      console.error('Validation failed:', err);
+    }
+  };
+
+  const handleDeleteNode = async (e: React.MouseEvent, nodeId: string) => {
+    e.stopPropagation();
+    Modal.confirm({
+      title: '确定要从画布上删除这个节点吗？',
+      content: '删除后，所有相关的 timeline/operation 连接线也会被一并移除。如果删除的是分镜节点，相应的底层剧本数据也将被同步删减并自动重组序号。',
+      okText: '确定删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        const res = await deleteNodeDirectly(nodeId);
+        if (res.success) {
+          message.success('节点已成功从画布和数据库中移除！');
+        } else {
+          message.error(res.error || '删除失败');
+        }
+      }
+    });
+  };
+
+  const handleTriggerRender = async (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    if (node.type !== 'scene') return;
+
+    message.loading(`正在为分镜 ${node.data.sceneId} 发起异步生成任务...`, 2);
+    try {
+      const res = await generateSceneVideo(projectId, node.data.sceneId, node.data);
+      if (res.success) {
+        message.success(`分镜 ${node.data.sceneId} 渲染任务已成功启动，请在节点上查看实时进度！`);
+      } else {
+        message.error(res.error || '生成启动失败');
+      }
+    } catch (err) {
+      message.error('生成发起异常，请稍后重试');
+    }
+  };
+
+  const handlePlayPreview = (e: React.MouseEvent, videoUrl: string) => {
+    e.stopPropagation();
+    setPreviewVideoUrl(videoUrl);
+    setIsPreviewVisible(true);
+  };
+
+  const handleAddSceneNode = async () => {
+    const defaultData = {
+      description: '镜头微距特写，展示商品精致的外观与设计，商业摄影光影，极简背景',
+      voiceover: '看看这个精致的工艺与细节，你一定会爱上它！',
+      duration: 3,
+      shot_type: '特写',
+      emotion: '积极',
+      transition: 'fade'
+    };
+
+    const x = -viewport.x / viewport.scale + 150 + Math.random() * 50;
+    const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
+
+    const res = await createNodeDirectly(projectId, 'scene', defaultData, { x, y });
+    if (res.success) {
+      message.success('已在画布和剧本配置中新增了一个分镜节点！');
+    } else {
+      message.error(res.error || '添加分镜失败');
+    }
+  };
+
+  const handleAddMaterialNode = async () => {
+    const defaultData = {
+      filename: '商品宣传图.png',
+      url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30',
+      type: 'image',
+      tags: ['商品图', '高清']
+    };
+
+    const x = -viewport.x / viewport.scale + 150 + Math.random() * 50;
+    const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
+
+    const res = await createNodeDirectly(projectId, 'material', defaultData, { x, y });
+    if (res.success) {
+      message.success('已成功在画布上创建了素材节点！');
+    } else {
+      message.error(res.error || '添加素材失败');
+    }
+  };
+
+  // Rendering Styling Helpers
   const getNodeColor = (type: Node['type']) => {
     const colors = {
       script: { border: '#722ed1', bg: '#f9f0ff' },
       scene: { border: '#1890ff', bg: '#e6f7ff' },
       material: { border: '#fa8c16', bg: '#fffaf0' },
       video: { border: '#eb2f96', bg: '#fff0f5' },
-      intent: { border: '#1890ff', bg: '#e6f7ff' },
+      intent: { border: '#13c2c2', bg: '#e6fffb' },
       plan: { border: '#faad14', bg: '#fffbe6' },
       operation: { border: '#52c41a', bg: '#f6ffed' }
     };
@@ -176,19 +329,19 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
   const getNodeTitle = (node: Node) => {
     switch (node.type) {
       case 'intent':
-        return '意图';
+        return '🤖 用户意图';
       case 'plan':
-        return '计划';
+        return '📋 执行计划';
       case 'operation':
-        return '操作';
+        return '⚙️ 运行操作';
       case 'script':
-        return '剧本';
+        return '📜 剧本';
       case 'scene':
-        return `分镜 ${node.data.sceneId || 0}`;
+        return `🎬 分镜 ${node.data.sceneId || 0}`;
       case 'material':
         return node.data.filename || '素材';
       case 'video':
-        return '视频';
+        return '🎥 最终合成成片';
       default:
         return node.type;
     }
@@ -209,10 +362,143 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       case 'material':
         return node.data.filename || '素材';
       case 'video':
-        return `视频 ${node.data.duration}秒`;
+        return `最终视频 ${node.data.duration}秒`;
       default:
         return node.type;
     }
+  };
+
+  const renderNodeInner = (node: Node) => {
+    const status = node.data.status || 'idle';
+    const progress = node.data.progress || 0;
+
+    if (node.type === 'scene') {
+      return (
+        <div className="scene-node-inner" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div className="scene-desc" style={{ fontSize: 11, color: '#333', maxHeight: 44, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+            {node.data.description}
+          </div>
+          <div className="scene-meta" style={{ marginTop: 4, fontSize: 10, color: '#8c8c8c' }}>
+            <span>时长: {node.data.duration}s</span> | <span>旁白: {node.data.voiceover?.substring(0, 8)}...</span>
+          </div>
+
+          {/* Direct rendering progress bar inside the SceneNode */}
+          {status === 'generating' && (
+            <div className="scene-progress" style={{ marginTop: 'auto', paddingTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#1890ff', marginBottom: 2 }}>
+                <span><LoadingOutlined spin /> 视频渲染中...</span>
+                <span>{progress}%</span>
+              </div>
+              <div style={{ height: 4, background: '#f5f5f5', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #1890ff, #52c41a)', transition: 'width 0.3s ease' }} />
+              </div>
+            </div>
+          )}
+
+          {status === 'completed' && node.data.videoUrl && (
+            <div className="scene-video-ready" style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
+              <span style={{ color: '#52c41a', fontSize: 10, fontWeight: 'bold' }}>✓ 视频已就绪</span>
+              <Button
+                type="primary"
+                size="small"
+                shape="round"
+                icon={<PlayCircleOutlined />}
+                onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+              >
+                预览
+              </Button>
+            </div>
+          )}
+
+          {status === 'failed' && (
+            <div className="scene-video-failed" style={{ marginTop: 'auto', paddingTop: 4 }}>
+              <div style={{ color: '#ff4d4f', fontSize: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <WarningOutlined />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: 140 }}>
+                  生成失败: {node.data.error || '未知错误'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {status !== 'generating' && status !== 'completed' && status !== 'failed' && (
+            <Button
+              type="dashed"
+              size="small"
+              icon={<VideoCameraOutlined />}
+              onClick={(e) => handleTriggerRender(e, node)}
+              style={{ marginTop: 'auto', width: '100%', fontSize: 11 }}
+            >
+              一键渲染分镜
+            </Button>
+          )}
+        </div>
+      );
+    }
+
+    if (node.type === 'video' && node.data.videoUrl) {
+      return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 11, fontWeight: 'bold', color: '#eb2f96', marginBottom: 8 }}>🎥 最终成片 ({node.data.duration}秒)</div>
+          <Button
+            type="primary"
+            danger
+            icon={<PlayCircleOutlined />}
+            onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+          >
+            播放合成成片
+          </Button>
+        </div>
+      );
+    }
+
+    if (node.type === 'plan') {
+      return (
+        <div className="plan-node-inner" style={{ width: '100%', fontSize: 11 }}>
+          <div style={{ fontWeight: 'bold', color: '#faad14', marginBottom: 4 }}>{node.data.description}</div>
+          <div style={{ color: '#8c8c8c', marginBottom: 6 }}>预计耗时: {Math.ceil((node.data.estimatedDuration || 0) / 60)} 分钟</div>
+          <div className="plan-steps-summary">
+            {(node.data.steps || []).map((s: any, idx: number) => (
+              <div key={s.stepId} style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0' }}>
+                <span style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: '50%',
+                  background: s.status === 'completed' ? '#52c41a' : s.status === 'executing' ? '#1890ff' : '#d9d9d9'
+                }} />
+                <span style={{ textDecoration: s.status === 'completed' ? 'line-through' : 'none', color: s.status === 'completed' ? '#8c8c8c' : '#333' }}>
+                  {s.description}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (node.type === 'operation') {
+      const opProgress = node.data.progress || 0;
+      const opStatus = node.data.status || 'pending';
+      return (
+        <div className="op-node-inner" style={{ width: '100%' }}>
+          <div style={{ fontSize: 12, fontWeight: 'bold', color: '#52c41a', marginBottom: 4 }}>{node.data.description}</div>
+          <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 6 }}>Agent: {node.data.agentName}</div>
+          
+          {opStatus === 'executing' && (
+            <div>
+              <div style={{ height: 4, background: '#f5f5f5', borderRadius: 2, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${opProgress}%`, background: 'linear-gradient(90deg, #1890ff, #52c41a)', transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize: 9, color: '#1890ff', textAlign: 'right', marginTop: 2 }}>{opProgress}%</div>
+            </div>
+          )}
+          {opStatus === 'completed' && <Tag color="success">✓ 完成</Tag>}
+          {opStatus === 'failed' && <Tag color="error">❌ 失败: {node.data.error?.slice(0, 15)}...</Tag>}
+        </div>
+      );
+    }
+
+    return <span>{getNodeContent(node)}</span>;
   };
 
   const getConnectionPath = (conn: Connection) => {
@@ -220,9 +506,9 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     const target = nodes.find(n => n.id === conn.targetNodeId);
     if (!source || !target) return '';
 
-    const x1 = source.position.x + source.size.width / 2;
-    const y1 = source.position.y + source.size.height;
-    const x2 = target.position.x + target.size.width / 2;
+    const x1 = source.position.x + (source.size?.width || 200) / 2;
+    const y1 = source.position.y + (source.size?.height || 150);
+    const x2 = target.position.x + (target.size?.width || 200) / 2;
     const y2 = target.position.y;
 
     const cpY1 = y1 + Math.abs(y2 - y1) / 2;
@@ -301,30 +587,28 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
                 style={{
                   left: node.position.x,
                   top: node.position.y,
-                  width: node.size.width || 200,
-                  height: node.size.height || 150,
+                  width: node.size?.width || 200,
+                  height: node.size?.height || 150,
                   borderColor: node.style?.borderColor || colors.border,
                   backgroundColor: node.style?.backgroundColor || colors.bg
                 }}
                 onMouseDown={(e) => handleNodeMouseDown(e, node)}
+                onDoubleClick={(e) => handleNodeDoubleClick(e, node)}
               >
                 <div
                   className="node-header"
                   style={{ backgroundColor: node.style?.borderColor || colors.border }}
                 >
                   <span className="node-title">{getNodeTitle(node)}</span>
+                  <Tooltip title="从画布删除">
+                    <DeleteOutlined
+                      className="node-delete-btn"
+                      onClick={(e) => handleDeleteNode(e, node.id)}
+                    />
+                  </Tooltip>
                 </div>
                 <div className="node-content">
-                  {node.type === 'video' && node.data.videoUrl ? (
-                    <video
-                      src={node.data.videoUrl}
-                      className="node-video"
-                      muted
-                      playsInline
-                    />
-                  ) : (
-                    <span>{getNodeContent(node)}</span>
-                  )}
+                  {renderNodeInner(node)}
                 </div>
               </div>
             );
@@ -332,10 +616,32 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
         </div>
       </div>
 
+      {/* Floating Add Node toolbox */}
+      <div className="canvas-toolbox">
+        <div style={{ fontSize: 12, fontWeight: 'bold', color: '#8c8c8c', marginBottom: 4 }}>
+          <BuildOutlined /> 画布工具箱 (Toonflow)
+        </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleAddSceneNode}
+          size="small"
+        >
+          添加分镜节点
+        </Button>
+        <Button
+          icon={<PlusOutlined />}
+          onClick={handleAddMaterialNode}
+          size="small"
+        >
+          添加素材节点
+        </Button>
+      </div>
+
       <div className="canvas-toolbar">
         <Tooltip title="刷新画布">
           <Button
-            icon={<SyncOutlined spin={false} />}
+            icon={<SyncOutlined />}
             onClick={() => {
               getNodes(projectId).then(r => r.success && setNodes(r.nodes));
               getConnections(projectId).then(r => r.success && setConnections(r.connections));
@@ -375,6 +681,88 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       </div>
 
       <MiniMap nodes={nodes} viewport={viewport} />
+
+      {/* Floating properties editor Drawer */}
+      <Drawer
+        title={`编辑 ${editingNode ? getNodeTitle(editingNode) : '节点属性'}`}
+        placement="right"
+        width={360}
+        onClose={() => { setIsDrawerVisible(false); setEditingNode(null); }}
+        open={isDrawerVisible}
+        extra={
+          <Button type="primary" onClick={handleSaveProperties}>
+            确定修改
+          </Button>
+        }
+      >
+        {editingNode && (
+          <Form form={form} layout="vertical">
+            {editingNode.type === 'script' && (
+              <Form.Item name="title" label="剧本标题" rules={[{ required: true, message: '请输入剧本标题' }]}>
+                <Input />
+              </Form.Item>
+            )}
+
+            {editingNode.type === 'scene' && (
+              <>
+                <Form.Item name="description" label="画面描述 (大模型生成提示词)" rules={[{ required: true, message: '请输入画面描述' }]}>
+                  <Input.TextArea rows={4} />
+                </Form.Item>
+                <Form.Item name="voiceover" label="分镜旁白 (TTS 文案)" rules={[{ required: true, message: '请输入分镜旁白' }]}>
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+                <Form.Item name="duration" label="分镜时长 (秒)" rules={[{ required: true, message: '请输入时长' }]}>
+                  <Input type="number" min={1} max={30} />
+                </Form.Item>
+                <Form.Item name="shot_type" label="镜头类型">
+                  <Select>
+                    <Select.Option value="特写">特写</Select.Option>
+                    <Select.Option value="近景">近景</Select.Option>
+                    <Select.Option value="中景">中景</Select.Option>
+                    <Select.Option value="全景">全景</Select.Option>
+                    <Select.Option value="俯拍">俯拍</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item name="emotion" label="情感风格">
+                  <Select>
+                    <Select.Option value="积极">积极</Select.Option>
+                    <Select.Option value="专业">专业</Select.Option>
+                    <Select.Option value="热情">热情</Select.Option>
+                    <Select.Option value="平静">平静</Select.Option>
+                  </Select>
+                </Form.Item>
+                <Form.Item name="transition" label="转场效果">
+                  <Select>
+                    <Select.Option value="fade">淡入淡出</Select.Option>
+                    <Select.Option value="none">无转场</Select.Option>
+                    <Select.Option value="wipe">滑动转场</Select.Option>
+                  </Select>
+                </Form.Item>
+              </>
+            )}
+          </Form>
+        )}
+      </Drawer>
+
+      {/* Rich Video Player Overlay Preview Modal */}
+      <Modal
+        title="分镜视频播放预览 (Toonflow Preview)"
+        open={isPreviewVisible}
+        onCancel={() => { setIsPreviewVisible(false); setPreviewVideoUrl(null); }}
+        footer={null}
+        destroyOnClose
+        width={400}
+        bodyStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 0' }}
+      >
+        {previewVideoUrl && (
+          <video
+            src={previewVideoUrl}
+            controls
+            autoPlay
+            style={{ width: '280px', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
+          />
+        )}
+      </Modal>
     </div>
   );
 };

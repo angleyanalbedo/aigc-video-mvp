@@ -153,20 +153,145 @@ router.get('/chat/sessions/:sessionId/messages', async (req, res) => {
   }
 });
 
-router.post('/chat/sessions', async (req, res) => {
-  const { projectId, title } = req.body;
+router.put('/canvas/nodes/:nodeId', async (req, res) => {
+  const { nodeId } = req.params;
+  const { updates } = req.body;
 
-  if (!projectId) {
-    return res.status(400).json({ success: false, error: 'Project ID is required' });
+  if (!updates) {
+    return res.status(400).json({ success: false, error: 'Updates object is required' });
   }
 
   try {
-    const sessionId = await canvasSyncService.createChatSession(projectId, title || '新会话');
-    res.json({ success: true, sessionId });
+    const node = await canvasSyncService.getNode(nodeId);
+    if (!node) {
+      return res.status(404).json({ success: false, error: 'Node not found' });
+    }
+
+    const updatedNode = await canvasSyncService.updateNode(node.projectId, nodeId, updates);
+    res.json({ success: true, node: updatedNode });
   } catch (error) {
-    console.error('Create chat session error:', error);
+    console.error('Node updates error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+router.delete('/canvas/nodes/:nodeId', async (req, res) => {
+  const { nodeId } = req.params;
+
+  try {
+    const node = await canvasSyncService.getNode(nodeId);
+    if (!node) {
+      return res.status(404).json({ success: false, error: 'Node not found' });
+    }
+
+    await canvasSyncService.deleteNode(node.projectId, nodeId);
+    res.json({ success: true, nodeId });
+  } catch (error) {
+    console.error('Node deletion error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/canvas/nodes', async (req, res) => {
+  const { projectId, type, data, position } = req.body;
+
+  if (!projectId || !type) {
+    return res.status(400).json({ success: false, error: 'Project ID and node type are required' });
+  }
+
+  try {
+    let node;
+    if (type === 'scene') {
+      node = await canvasSyncService.createSceneNodeDirectly(projectId, data || {}, position);
+    } else {
+      node = await canvasSyncService.createNode(projectId, type, data || {}, position || { x: 100, y: 100 });
+    }
+    res.json({ success: true, node });
+  } catch (error) {
+    console.error('Node creation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/canvas/generate-scene-video', async (req, res) => {
+  const { projectId, sceneId, scene } = req.body;
+
+  if (!projectId || !sceneId || !scene) {
+    return res.status(400).json({ success: false, error: 'Project ID, scene ID, and scene data are required' });
+  }
+
+  // 1. Send the HTTP response immediately to prevent timeout, and run rendering in background
+  res.json({ success: true, message: '视频生成任务已在后台启动' });
+
+  (async () => {
+    const webSocketService = require('../services/webSocketService');
+    const videoAgent = require('../agents/videoAgent');
+
+    // Broadcast starting status
+    webSocketService.broadcast(projectId, {
+      type: 'operation_progress',
+      operationNodeId: `scene_${sceneId}`,
+      progress: 0,
+      stepId: `scene_${sceneId}_render`,
+      status: 'executing'
+    });
+
+    try {
+      // Direct scene update status on canvas
+      await canvasSyncService.updateNode(projectId, `scene_${sceneId}`, { status: 'generating' });
+
+      const result = await videoAgent.generateScene(scene, {
+        projectId,
+        sceneIndex: sceneId - 1,
+        resolution: '720p',
+        ratio: '9:16'
+      }, (progress) => {
+        // Broadcast rendering progress in real-time!
+        webSocketService.broadcast(projectId, {
+          type: 'operation_progress',
+          operationNodeId: `scene_${sceneId}`,
+          progress: progress.progress || 0,
+          stepId: `scene_${sceneId}_render`,
+          status: 'executing'
+        });
+      });
+
+      // Update node data with final video url and status completed
+      if (result && result.videoUrl) {
+        await canvasSyncService.updateNode(projectId, `scene_${sceneId}`, {
+          videoUrl: result.videoUrl,
+          status: 'completed'
+        });
+      } else {
+        throw new Error('视频渲染成功，但未返回有效的视频 URL');
+      }
+
+      webSocketService.broadcast(projectId, {
+        type: 'operation_progress',
+        operationNodeId: `scene_${sceneId}`,
+        progress: 100,
+        stepId: `scene_${sceneId}_render`,
+        status: 'completed'
+      });
+
+    } catch (error) {
+      console.error(`❌ Canvas SceneNode ${sceneId} Video rendering failed:`, error.message);
+      
+      await canvasSyncService.updateNode(projectId, `scene_${sceneId}`, {
+        status: 'failed',
+        error: error.message
+      });
+
+      webSocketService.broadcast(projectId, {
+        type: 'operation_progress',
+        operationNodeId: `scene_${sceneId}`,
+        progress: 0,
+        stepId: `scene_${sceneId}_render`,
+        status: 'failed',
+        error: error.message
+      });
+    }
+  })();
 });
 
 module.exports = router;

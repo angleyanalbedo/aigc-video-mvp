@@ -30,6 +30,41 @@ interface CopilotChatProps {
   onConnectionsChanged?: (connections: any[]) => void;
 }
 
+const mergeMessage = (prev: Message[], newMsg: Message): Message[] => {
+  // 1. Check if exact ID already exists
+  if (prev.some(m => m.id === newMsg.id)) {
+    return prev;
+  }
+
+  // 2. Check for content + role duplicates (especially with temp IDs)
+  const duplicateIdx = prev.findIndex(m => 
+    m.role === newMsg.role && 
+    m.content === newMsg.content && 
+    (m.id.startsWith('user_') || m.id.startsWith('assistant_') || m.id.startsWith('system_'))
+  );
+
+  if (duplicateIdx !== -1) {
+    // Replace the temporary message with the official broadcasted one
+    const updated = [...prev];
+    updated[duplicateIdx] = newMsg;
+    return updated;
+  }
+
+  // Also check if there's any identical content/role that was just added recently (e.g. within 8 seconds)
+  const timeDifferenceThreshold = 8000; // 8 seconds
+  const recentDuplicate = prev.some(m =>
+    m.role === newMsg.role &&
+    m.content === newMsg.content &&
+    Math.abs(m.timestamp - newMsg.timestamp) < timeDifferenceThreshold
+  );
+
+  if (recentDuplicate) {
+    return prev;
+  }
+
+  return [...prev, newMsg];
+};
+
 const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, onConnectionsChanged }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -46,7 +81,15 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         setSessionId(session.sessionId);
         const history = await getChatHistory(session.sessionId);
         if (history.success) {
-          setMessages(history.messages);
+          const normalizedHistory = history.messages.map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            type: m.type || m.messageType || 'text',
+            content: m.content,
+            timestamp: m.timestamp || m.createdAt || Date.now(),
+            metadata: m.metadata
+          }));
+          setMessages(normalizedHistory);
         }
       }
     };
@@ -61,6 +104,19 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
       },
       onOperationProgress: (progress) => {
         console.log('⚙️ Operation progress:', progress);
+      },
+      onChatMessage: (message) => {
+        console.log('💬 WS Chat message received:', message);
+        const normalizedMsg: Message = {
+          id: message.id,
+          role: message.role as any,
+          type: (message.type || (message as any).messageType || 'text') as any,
+          content: message.content,
+          timestamp: message.timestamp || (message as any).createdAt || Date.now(),
+          metadata: message.metadata
+        };
+
+        setMessages(prev => mergeMessage(prev, normalizedMsg));
       },
       onError: (error) => console.error('❌ WebSocket error:', error)
     });
@@ -85,7 +141,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
       timestamp: Date.now()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => mergeMessage(prev, userMessage));
     setInputValue('');
     setIsLoading(true);
 
@@ -111,7 +167,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
               intentNodeId: response.intentNodeId
             }
           };
-          setMessages(prev => [...prev, assistantMessage]);
+          setMessages(prev => mergeMessage(prev, assistantMessage));
         } else {
           const assistantMessage: Message = {
             id: `assistant_${Date.now()}`,
@@ -120,7 +176,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
             content: response.message || '操作完成！',
             timestamp: Date.now()
           };
-          setMessages(prev => [...prev, assistantMessage]);
+          setMessages(prev => mergeMessage(prev, assistantMessage));
         }
       } else {
         const errorMessage: Message = {
@@ -130,7 +186,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
           content: response.error || '请求失败，请稍后重试',
           timestamp: Date.now()
         };
-        setMessages(prev => [...prev, errorMessage]);
+        setMessages(prev => mergeMessage(prev, errorMessage));
       }
     } catch (error) {
       console.error('❌ Send message error:', error);
@@ -141,7 +197,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         content: '请求失败，请稍后重试',
         timestamp: Date.now()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => mergeMessage(prev, errorMessage));
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +213,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
       content: '🚀 开始执行计划...',
       timestamp: Date.now()
     };
-    setMessages(prev => [...prev, executingMessage]);
+    setMessages(prev => mergeMessage(prev, executingMessage));
     setPendingPlan(null);
     setIsLoading(true);
 
@@ -172,7 +228,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
           content: response.summary || '执行完成！',
           timestamp: Date.now()
         };
-        setMessages(prev => [...prev, successMessage]);
+        setMessages(prev => mergeMessage(prev, successMessage));
       } else {
         const errorMessage: Message = {
           id: `assistant_${Date.now()}`,
@@ -181,7 +237,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
           content: response.error || '执行失败',
           timestamp: Date.now()
         };
-        setMessages(prev => [...prev, errorMessage]);
+        setMessages(prev => mergeMessage(prev, errorMessage));
       }
     } catch (error) {
       console.error('❌ Execute plan error:', error);
@@ -192,7 +248,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         content: '执行失败，请稍后重试',
         timestamp: Date.now()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => mergeMessage(prev, errorMessage));
     } finally {
       setIsLoading(false);
     }
@@ -208,7 +264,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
       content: '取消执行...',
       timestamp: Date.now()
     };
-    setMessages(prev => [...prev, cancelingMessage]);
+    setMessages(prev => mergeMessage(prev, cancelingMessage));
     
     try {
       await cancelPlan(pendingPlan.planNodeId, projectId, pendingPlan.sessionId);
@@ -219,7 +275,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({ projectId, onNodesChanged, on
         content: '❌ 已取消执行',
         timestamp: Date.now()
       };
-      setMessages(prev => [...prev, canceledMessage]);
+      setMessages(prev => mergeMessage(prev, canceledMessage));
     } catch (error) {
       console.error('❌ Cancel plan error:', error);
     }
