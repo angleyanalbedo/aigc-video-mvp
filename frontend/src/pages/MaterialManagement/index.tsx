@@ -226,8 +226,30 @@ const MaterialManagementPage = () => {
                     item.type && item.type.startsWith('image') ? (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
                     ) : item.type && item.type.startsWith('video') ? (
-                      <div style={{ height: 160, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <VideoCameraOutlined style={{ fontSize: 48, color: '#fff' }} />
+                      <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
+                        <video
+                          src={item.url}
+                          muted
+                          loop
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onMouseEnter={(e) => e.currentTarget.play()}
+                          onMouseLeave={(e) => e.currentTarget.pause()}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          borderRadius: '50%',
+                          width: 48,
+                          height: 48,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <VideoCameraOutlined style={{ fontSize: 24, color: '#fff' }} />
+                        </div>
                       </div>
                     ) : (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />

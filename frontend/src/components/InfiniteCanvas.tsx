@@ -11,7 +11,8 @@ import {
   VideoCameraOutlined,
   BuildOutlined,
   LoadingOutlined,
-  WarningOutlined
+  WarningOutlined,
+  RobotOutlined
 } from '@ant-design/icons';
 import {
   getNodes,
@@ -466,6 +467,152 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     }
   };
 
+  const handleAddBgmNode = async () => {
+    const defaultData = {
+      filename: '商业欢快氛围BGM.mp3',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      type: 'audio',
+      duration: 180,
+      tags: ['BGM', '欢快']
+    };
+
+    const x = -viewport.x / viewport.scale + 150 + Math.random() * 50;
+    const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
+
+    const res = await createNodeDirectly(projectId, 'material', defaultData, { x, y });
+    if (res.success) {
+      message.success('已成功在画布上添加了背景音乐节点！双击可编辑音频信息。');
+    } else {
+      message.error(res.error || '添加背景音乐失败');
+    }
+  };
+
+  const handleAddVideoNode = async () => {
+    const defaultData = {
+      title: '合成总视频',
+      duration: 0,
+      status: 'idle',
+      videoUrl: null
+    };
+
+    const x = -viewport.x / viewport.scale + 450;
+    const y = -viewport.y / viewport.scale + 150;
+
+    const res = await createNodeDirectly(projectId, 'video', defaultData, { x, y });
+    if (res.success) {
+      message.success('已成功在画布上添加了最终成片节点！您可以在节点中一键触发多分镜合成。');
+    } else {
+      message.error(res.error || '添加视频合成节点失败');
+    }
+  };
+
+  const handleTriggerSynthesis = async (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    
+    // Find all scene nodes that are completed and have videoUrls!
+    const completedScenes = nodes
+      .filter(n => n.type === 'scene' && n.data.status === 'completed' && n.data.videoUrl)
+      .map(n => ({
+        id: n.data.id || n.data.sceneId,
+        sceneId: n.data.sceneId,
+        description: n.data.description,
+        voiceover: n.data.voiceover,
+        duration: n.data.duration,
+        videoUrl: n.data.videoUrl
+      }))
+      .sort((a, b) => a.sceneId - b.sceneId); // Sort chronologically!
+
+    if (completedScenes.length === 0) {
+      message.warning('当前画布上没有已渲染完成的分镜视频，请先生成部分分镜视频再触发合成！');
+      return;
+    }
+
+    // Find if there is a BGM audio node in the nodes!
+    const bgmNode = nodes.find(n => n.type === 'material' && n.data.type === 'audio');
+    const audioUrl = bgmNode ? bgmNode.data.url : null;
+
+    message.loading('正在拼接多分镜视频并合成最终成片，请稍后...', 0);
+    try {
+      // Direct call to video compose endpoint
+      const response = await fetch('/api/video/compose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenes: completedScenes,
+          options: {
+            bgmUrl: audioUrl
+          }
+        })
+      });
+      const res = await response.json();
+      message.destroy();
+      
+      if (res.success && res.videoUrl) {
+        message.success('🎬 最终成片拼接与音频合成成功！已在节点上提供预览！');
+        // Update the video node on the canvas
+        const updatedVideoNode = await updateNodeData(node.id, {
+          videoUrl: res.videoUrl,
+          duration: res.duration || completedScenes.reduce((sum, s) => sum + s.duration, 0),
+          status: 'completed'
+        });
+        if (updatedVideoNode.success) {
+          // Local state update
+          setNodes(prev => prev.map(n => n.id === node.id ? { ...n, data: { ...n.data, videoUrl: res.videoUrl, status: 'completed' } } : n));
+        }
+      } else {
+        message.error(res.error || '合成成片失败，请检查音视频素材是否正确');
+      }
+    } catch (err) {
+      message.destroy();
+      message.error('成片合成触发异常，请稍后重试');
+    }
+  };
+
+  const handleTriggerAIScenes = async (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    message.loading('正在触发 AI Copilot 故事分镜大纲生成，请稍后...', 0);
+    try {
+      const response = await fetch('/api/copilot/canvas/generate-script-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId })
+      });
+      const res = await response.json();
+      message.destroy();
+      if (res.success) {
+        message.success('🤖 AI 分镜创作任务已成功在后台启动！请留意聊天栏日志和画布刷新。');
+      } else {
+        message.error(res.error || '大纲分镜生成失败');
+      }
+    } catch (err) {
+      message.destroy();
+      message.error('触发 AI Storyboard 大纲生成异常');
+    }
+  };
+
+  const handleTriggerRenderAllScenes = async (e: React.MouseEvent, node: Node) => {
+    e.stopPropagation();
+    
+    // Find all scene nodes that are idle (not completed and not generating)
+    const idleScenes = nodes.filter(n => n.type === 'scene' && n.data.status !== 'completed' && n.data.status !== 'generating');
+    
+    if (idleScenes.length === 0) {
+      message.info('画布上没有需要渲染的分镜节点（所有分镜已完成或正在渲染中）。');
+      return;
+    }
+
+    message.success(`⚡ 已批量触发 ${idleScenes.length} 个分镜视频并发生成任务！`, 3);
+    
+    // Loop and fire background rendering for all of them
+    idleScenes.forEach(sceneNode => {
+      generateSceneVideo(projectId, sceneNode.data.sceneId, sceneNode.data).then(res => {
+        if (res.success) {
+          console.log(`⚡ Scene ${sceneNode.data.sceneId} render task successfully fired.`);
+        }
+      });
+    });
+  };
+
   // Rendering Styling Helpers
   const getNodeColor = (type: Node['type']) => {
     const colors = {
@@ -550,17 +697,52 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           )}
 
           {status === 'completed' && node.data.videoUrl && (
-            <div className="scene-video-ready" style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
-              <span style={{ color: '#52c41a', fontSize: 10, fontWeight: 'bold' }}>✓ 视频已就绪</span>
-              <Button
-                type="primary"
-                size="small"
-                shape="round"
-                icon={<PlayCircleOutlined />}
-                onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+            <div 
+              className="scene-video-wrapper" 
+              style={{ 
+                marginTop: 'auto', 
+                position: 'relative', 
+                width: '100%', 
+                height: '75px', 
+                borderRadius: '6px', 
+                overflow: 'hidden', 
+                border: '1.5px solid #e8e8e8', 
+                backgroundColor: '#0c0c0c',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                cursor: 'zoom-in'
+              }}
+              onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+            >
+              <video
+                src={node.data.videoUrl}
+                muted
+                loop
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+              />
+              <div 
+                style={{ 
+                  position: 'absolute', 
+                  bottom: '4px', 
+                  right: '4px', 
+                  zIndex: 10 
+                }}
+                onClick={(e) => e.stopPropagation()}
               >
-                预览
-              </Button>
+                <Button
+                  type="primary"
+                  size="small"
+                  shape="circle"
+                  icon={<PlayCircleOutlined />}
+                  onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+                  style={{ width: 22, height: 22, minWidth: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}
+                />
+              </div>
+              <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0, 0, 0, 0.65)', color: '#fff', fontSize: '8px', padding: '1px 4px', borderRadius: '2px', pointerEvents: 'none', fontWeight: 500, letterSpacing: '0.5px' }}>
+                Hover 播放
+              </div>
             </div>
           )}
 
@@ -590,20 +772,120 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       );
     }
 
-    if (node.type === 'video' && node.data.videoUrl) {
-      return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 11, fontWeight: 'bold', color: '#eb2f96', marginBottom: 8 }}>🎥 最终成片 ({node.data.duration}秒)</div>
-          <Button
-            type="primary"
-            danger
-            icon={<PlayCircleOutlined />}
-            onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
-          >
-            播放合成成片
-          </Button>
-        </div>
-      );
+    if (node.type === 'video') {
+      if (node.data.videoUrl) {
+        return (
+          <div className="synthesis-node-inner" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div className="synthesis-desc" style={{ fontSize: 11, fontWeight: 'bold', color: '#eb2f96', marginBottom: 4 }}>
+              🎥 最终成片已就绪 ({node.data.duration}秒)
+            </div>
+            <div 
+              className="scene-video-wrapper" 
+              style={{ 
+                marginTop: 'auto', 
+                position: 'relative', 
+                width: '100%', 
+                height: '75px', 
+                borderRadius: '6px', 
+                overflow: 'hidden', 
+                border: '1.5px solid #e8e8e8', 
+                backgroundColor: '#0c0c0c',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+                cursor: 'zoom-in'
+              }}
+              onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+            >
+              <video
+                src={node.data.videoUrl}
+                muted
+                loop
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onMouseEnter={(e) => e.currentTarget.play()}
+                onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+              />
+              <div 
+                style={{ 
+                  position: 'absolute', 
+                  bottom: '4px', 
+                  right: '4px', 
+                  zIndex: 10 
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Button
+                  type="primary"
+                  danger
+                  size="small"
+                  shape="circle"
+                  icon={<PlayCircleOutlined />}
+                  onClick={(e) => handlePlayPreview(e, node.data.videoUrl)}
+                  style={{ width: 22, height: 22, minWidth: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}
+                />
+              </div>
+              <div style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(235, 47, 150, 0.85)', color: '#fff', fontSize: '8px', padding: '1px 4px', borderRadius: '2px', pointerEvents: 'none', fontWeight: 500, letterSpacing: '0.5px' }}>
+                Hover 播放成片
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        return (
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 8 }}>
+            <div style={{ fontSize: 10, color: '#8c8c8c', marginBottom: 8, textAlign: 'center' }}>
+              将所有分镜视频与背景音乐合成最终商业短视频
+            </div>
+            <Button
+              type="primary"
+              size="small"
+              icon={<BuildOutlined />}
+              style={{ background: '#eb2f96', borderColor: '#eb2f96', width: '100%' }}
+              onClick={(e) => handleTriggerSynthesis(e, node)}
+            >
+              一键合成成片
+            </Button>
+          </div>
+        );
+      }
+    }
+
+    if (node.type === 'material') {
+      if (node.data.type === 'audio') {
+        return (
+          <div className="audio-node-inner" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 8, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{ fontSize: 18 }}>🎵</span>
+              <div style={{ overflow: 'hidden', flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 'bold', color: '#13c2c2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {node.data.filename}
+                </div>
+                <div style={{ fontSize: 9, color: '#8c8c8c' }}>时长: {node.data.duration}s</div>
+              </div>
+            </div>
+            <audio src={node.data.url} controls style={{ width: '100%', height: 26, scale: '0.85', transformOrigin: 'left center', marginTop: 4 }} />
+          </div>
+        );
+      } else {
+        return (
+          <div className="material-node-inner" style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 6 }}>
+            {node.data.url && (
+              <img 
+                src={node.data.url} 
+                alt={node.data.filename} 
+                style={{ width: '100%', height: 60, objectFit: 'cover', borderRadius: 6, marginBottom: 4, border: '1px solid #f0f0f0' }} 
+              />
+            )}
+            <div style={{ fontSize: 11, fontWeight: 500, color: '#333', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+              {node.data.filename}
+            </div>
+            <div style={{ marginTop: 2 }}>
+              {(node.data.tags || []).slice(0, 2).map((t: string) => (
+                <Tag key={t} size="small" color="orange" style={{ fontSize: 9, lineHeight: '14px', height: 16 }}>{t}</Tag>
+              ))}
+            </div>
+          </div>
+        );
+      }
     }
 
     if (node.type === 'plan') {
@@ -648,6 +930,38 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           )}
           {opStatus === 'completed' && <Tag color="success">✓ 完成</Tag>}
           {opStatus === 'failed' && <Tag color="error">❌ 失败: {node.data.error?.slice(0, 15)}...</Tag>}
+        </div>
+      );
+    }
+
+    if (node.type === 'script') {
+      return (
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 'bold', color: '#722ed1', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            📜 {node.data.title || '剧本大纲'}
+          </div>
+          <div style={{ fontSize: 10, color: '#8c8c8c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginBottom: 6 }}>
+            {node.data.description || '双击编辑产品大纲描述...'}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 'auto' }}>
+            <Button
+              type="primary"
+              size="small"
+              icon={<RobotOutlined />}
+              onClick={(e) => handleTriggerAIScenes(e, node)}
+              style={{ background: '#722ed1', borderColor: '#722ed1', fontSize: 11, width: '100%' }}
+            >
+              🤖 AI 智能生成分镜
+            </Button>
+            <Button
+              size="small"
+              icon={<SyncOutlined />}
+              onClick={(e) => handleTriggerRenderAllScenes(e, node)}
+              style={{ fontSize: 11, width: '100%' }}
+            >
+              ⚡ 一键渲染所有分镜
+            </Button>
+          </div>
         </div>
       );
     }
@@ -770,24 +1084,44 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 
       {/* Floating Add Node toolbox */}
       <div className="canvas-toolbox">
-        <div style={{ fontSize: 12, fontWeight: 'bold', color: '#8c8c8c', marginBottom: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 'bold', color: '#8c8c8c', marginBottom: 6 }}>
           <BuildOutlined /> 画布工具箱 (Toonflow)
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAddSceneNode}
-          size="small"
-        >
-          添加分镜节点
-        </Button>
-        <Button
-          icon={<PlusOutlined />}
-          onClick={handleAddMaterialNode}
-          size="small"
-        >
-          添加素材节点
-        </Button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddSceneNode}
+            size="small"
+            className="scene-toolbox-btn"
+          >
+            添加分镜节点
+          </Button>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={handleAddMaterialNode}
+            size="small"
+            className="material-toolbox-btn"
+          >
+            添加图片素材
+          </Button>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={handleAddBgmNode}
+            size="small"
+            className="bgm-toolbox-btn"
+          >
+            添加背景音乐
+          </Button>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={handleAddVideoNode}
+            size="small"
+            className="synthesis-toolbox-btn"
+          >
+            添加成片合成节点
+          </Button>
+        </div>
 
         {selectedNodeIds.length > 0 && (
           <Button

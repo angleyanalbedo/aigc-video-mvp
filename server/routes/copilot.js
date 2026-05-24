@@ -293,5 +293,82 @@ router.post('/canvas/generate-scene-video', async (req, res) => {
     }
   })();
 });
+router.post('/canvas/generate-script-scenes', async (req, res) => {
+  const { projectId } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ success: false, error: 'Project ID is required' });
+  }
+
+  // 1. Send immediate response to prevent frontend timeout
+  res.json({ success: true, message: 'AI 剧本分镜生成任务已在后台启动' });
+
+  // 2. Run script generation in background
+  (async () => {
+    const { scriptAgent } = require('../agents');
+    const webSocketService = require('../services/webSocketService');
+    const projectModel = require('../models/project');
+
+    try {
+      const project = await projectModel.getById(projectId);
+      if (!project) throw new Error('项目不存在');
+
+      // Set canvas status of script node to generating/loading
+      webSocketService.broadcast(projectId, {
+        type: 'chat_message_created',
+        message: {
+          id: `sys_${Date.now()}`,
+          role: 'system',
+          messageType: 'operation_log',
+          content: '🤖 AI Copilot 正在深度解析产品大纲，创作宣传剧本与分镜故事线...',
+          createdAt: Date.now()
+        }
+      });
+
+      const productInfo = project.product_info || {
+        title: project.title || '宣传商品',
+        description: project.description || '高端智能设备'
+      };
+
+      console.log('🤖 Starting AI Script generation inside canvas trigger...');
+      const script = await scriptAgent.generate(productInfo, projectId);
+
+      // Clean up old canvas scene nodes first to avoid cluttering!
+      const existingNodes = await canvasSyncService.getNodes(projectId, true);
+      const sceneNodes = existingNodes.filter(n => n.type === 'scene');
+      for (const node of sceneNodes) {
+        await canvasSyncService.deleteNode(projectId, node.id);
+      }
+
+      // Sync the newly generated script and scenes to database & canvas
+      await projectModel.update(projectId, { script });
+      await canvasSyncService.syncScriptToCanvas(projectId, script);
+
+      webSocketService.broadcast(projectId, {
+        type: 'chat_message_created',
+        message: {
+          id: `sys_${Date.now()}`,
+          role: 'system',
+          messageType: 'text',
+          content: `✅ AI 分镜生成完成！已为您自动在画布上布局了 ${script.scenes?.length || 0} 个分镜故事节点。您可以点击分镜节点中的“一键渲染分镜”或在剧本节点上选择“一键渲染所有分镜”。`,
+          createdAt: Date.now()
+        }
+      });
+
+    } catch (err) {
+      console.error('❌ Canvas AI Storyboard generation failed:', err);
+      webSocketService.broadcast(projectId, {
+        type: 'chat_message_created',
+        message: {
+          id: `sys_${Date.now()}`,
+          role: 'system',
+          messageType: 'error',
+          content: `❌ AI 分镜生成失败: ${err.message}`,
+          createdAt: Date.now()
+        }
+      });
+    }
+  })();
+});
 
 module.exports = router;
