@@ -62,6 +62,26 @@ class CanvasSyncService {
       WHERE id = ?
     `).run(JSON.stringify(newData), new Date().toISOString(), nodeId);
 
+    // If it's a scene node, sync back to projects.script.scenes
+    if (node.type === 'scene' && node.data.id) {
+      try {
+        const project = await projectModel.getById(projectId);
+        if (project && project.script) {
+          const script = project.script;
+          if (script.scenes) {
+            const idx = script.scenes.findIndex(s => s.id === node.data.id);
+            if (idx >= 0) {
+              script.scenes[idx] = { ...script.scenes[idx], ...updates };
+              await projectModel.update(projectId, { script });
+              console.log(`✅ Synced Canvas SceneNode ${node.data.id} update back to projects.script!`);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ Failed to sync SceneNode update to projects:', err.message);
+      }
+    }
+
     const updatedNode = { ...node, data: newData };
     this.broadcast(projectId, {
       type: 'node_updated',
@@ -74,12 +94,37 @@ class CanvasSyncService {
   }
 
   async deleteNode(projectId, nodeId) {
+    const node = await this.getNode(nodeId);
+    if (!node) return false;
+
     db.prepare(`
       DELETE FROM canvas_connections
       WHERE source_node_id = ? OR target_node_id = ?
     `).run(nodeId, nodeId);
 
     db.prepare('DELETE FROM canvas_nodes WHERE id = ?').run(nodeId);
+
+    // If it's a scene node, sync back deletion and re-index remaining scenes!
+    if (node.type === 'scene' && node.data.id) {
+      try {
+        const project = await projectModel.getById(projectId);
+        if (project && project.script) {
+          const script = project.script;
+          if (script.scenes) {
+            script.scenes = script.scenes.filter(s => s.id !== node.data.id);
+            // Re-index remaining scenes 1, 2, 3...
+            script.scenes.forEach((s, index) => {
+              s.id = index + 1;
+              if (s.sceneId) s.sceneId = index + 1;
+            });
+            await projectModel.update(projectId, { script });
+            console.log(`✅ Synced Canvas SceneNode ${node.data.id} deletion and re-indexing back to projects.script!`);
+          }
+        }
+      } catch (err) {
+        console.error('⚠️ Failed to sync SceneNode deletion to projects:', err.message);
+      }
+    }
 
     this.broadcast(projectId, {
       type: 'node_deleted',
@@ -96,7 +141,30 @@ class CanvasSyncService {
     return this.parseNode(row);
   }
 
-  async getNodes(projectId) {
+  async ensureCanvasInitialized(projectId) {
+    try {
+      const countRow = db.prepare(
+        'SELECT COUNT(*) as count FROM canvas_nodes WHERE project_id = ?'
+      ).get(projectId);
+
+      if (countRow && countRow.count > 0) {
+        return; // Already initialized
+      }
+
+      const project = await projectModel.getById(projectId);
+      if (project && project.script && project.script.scenes && project.script.scenes.length > 0) {
+        console.log(`🤖 Auto-initializing canvas nodes from project script for project: ${projectId}`);
+        await this.syncScriptToCanvas(projectId, project.script);
+      }
+    } catch (err) {
+      console.error('⚠️ Failed to auto-initialize canvas nodes:', err.message);
+    }
+  }
+
+  async getNodes(projectId, skipInit = false) {
+    if (!skipInit) {
+      await this.ensureCanvasInitialized(projectId);
+    }
     const rows = db.prepare(
       'SELECT * FROM canvas_nodes WHERE project_id = ? ORDER BY created_at'
     ).all(projectId);
@@ -158,7 +226,10 @@ class CanvasSyncService {
     return connection;
   }
 
-  async getConnections(projectId) {
+  async getConnections(projectId, skipInit = false) {
+    if (!skipInit) {
+      await this.ensureCanvasInitialized(projectId);
+    }
     const rows = db.prepare(
       'SELECT * FROM canvas_connections WHERE project_id = ?'
     ).all(projectId);
@@ -321,7 +392,7 @@ class CanvasSyncService {
   // ─────────────────────────────────────────────────────────
 
   async syncScriptToCanvas(projectId, script) {
-    const existingNodes = await this.getNodes(projectId);
+    const existingNodes = await this.getNodes(projectId, true);
     const existingScriptNodes = existingNodes.filter(n => n.type === 'script');
 
     let scriptNodeId;
@@ -422,6 +493,28 @@ class CanvasSyncService {
       JSON.stringify(metadata)
     );
 
+    // Broadcast chat message created event
+    try {
+      const session = db.prepare('SELECT project_id FROM chat_sessions WHERE id = ?').get(sessionId);
+      if (session) {
+        const projectId = session.project_id;
+        const message = {
+          id: messageId,
+          role,
+          messageType,
+          content,
+          metadata,
+          createdAt: Date.now()
+        };
+        this.broadcast(projectId, {
+          type: 'chat_message_created',
+          message
+        });
+      }
+    } catch (broadcastErr) {
+      console.warn('⚠️ Failed to broadcast chat message over WebSocket:', broadcastErr.message);
+    }
+
     return messageId;
   }
 
@@ -438,6 +531,44 @@ class CanvasSyncService {
       metadata: row.metadata ? JSON.parse(row.metadata) : {},
       createdAt: row.created_at
     }));
+  }
+
+  async createSceneNodeDirectly(projectId, sceneData, position) {
+    const project = await projectModel.getById(projectId);
+    let script = project.script || { title: '未命名剧本', scenes: [] };
+    if (!script.scenes) script.scenes = [];
+
+    const newSceneId = script.scenes.length + 1;
+    const newScene = {
+      id: newSceneId,
+      sceneId: newSceneId,
+      description: sceneData.description || '新分镜描述',
+      voiceover: sceneData.voiceover || '新旁白文案',
+      duration: Number(sceneData.duration) || 3,
+      shot_type: sceneData.shot_type || '中景',
+      emotion: sceneData.emotion || '积极',
+      transition: sceneData.transition || 'fade',
+      status: 'idle',
+      videoUrl: null,
+      audioUrl: null
+    };
+
+    script.scenes.push(newScene);
+    await projectModel.update(projectId, { script });
+
+    const sceneNode = await this.createNode(
+      projectId,
+      'scene',
+      newScene,
+      position || { x: 350, y: 50 + (newSceneId - 1) * 180 }
+    );
+
+    const scriptNode = (await this.getNodes(projectId)).find(n => n.type === 'script');
+    if (scriptNode) {
+      await this.createConnection(projectId, scriptNode.id, sceneNode.id, 'timeline');
+    }
+
+    return sceneNode;
   }
 }
 
