@@ -1,4 +1,5 @@
 const db = require('../db');
+const canvasSyncService = require('../services/canvasSyncService');
 
 function generateId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -85,6 +86,13 @@ const projectModel = {
   create(data) {
     const id = generateId('proj');
     const now = new Date().toISOString();
+    
+    const defaultScript = data.script || {
+      title: '未命名剧本',
+      description: '点击编辑剧本标题和描述',
+      scenes: []
+    };
+
     db.prepare(`
       INSERT INTO projects (id, name, description, status, product_info, script, settings, video_url, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -94,7 +102,7 @@ const projectModel = {
       data.description || null,
       data.status || 'draft',
       stringifyJSON(data.productInfo || null),
-      stringifyJSON(data.script || null),
+      stringifyJSON(defaultScript),
       stringifyJSON(data.settings || null),
       data.videoUrl || null,
       now,
@@ -107,6 +115,10 @@ const projectModel = {
         updateStmt.run(id, matId);
       }
     }
+
+    canvasSyncService.syncScriptToCanvas(id, defaultScript).catch(err => {
+      console.error('⚠️ 初始化画布失败:', err.message);
+    });
 
     return projectModel.getById(id);
   },
@@ -173,6 +185,13 @@ const projectModel = {
       for (const matId of data.materialIds) {
         updateStmt.run(id, matId);
       }
+    }
+
+    // 如果更新了剧本，自动同步到画布
+    if (data.script !== undefined) {
+      canvasSyncService.syncScriptToCanvas(id, data.script).catch(err => {
+        console.error('⚠️ 同步剧本到画布失败:', err.message);
+      });
     }
 
     return projectModel.getById(id);

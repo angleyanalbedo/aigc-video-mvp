@@ -315,6 +315,7 @@ class CanvasSyncService {
     const existingScriptNodes = existingNodes.filter(n => n.type === 'script');
 
     let scriptNodeId;
+
     if (existingScriptNodes.length > 0) {
       scriptNodeId = existingScriptNodes[0].id;
       await this.updateNode(projectId, scriptNodeId, script);
@@ -352,6 +353,36 @@ class CanvasSyncService {
           'timeline'
         );
       }
+    }
+
+    const existingVideoNodes = existingNodes.filter(n => n.type === 'video');
+    let videoNodeId;
+
+    if (existingVideoNodes.length === 0) {
+      const videoNode = await this.createNode(
+        projectId,
+        'video',
+        {
+          title: '最终合成成片',
+          description: '将所有分镜视频与背景音乐合成最终商业短视频',
+          status: 'idle',
+          videoUrl: null
+        },
+        { x: 680, y: 50 }
+      );
+      videoNodeId = videoNode.id;
+
+      for (let i = 0; i < script.scenes.length; i++) {
+        const sceneNodeId = `scene_${script.scenes[i].id}`;
+        await this.createConnection(
+          projectId,
+          sceneNodeId,
+          videoNodeId,
+          'dependency'
+        );
+      }
+    } else {
+      videoNodeId = existingVideoNodes[0].id;
     }
 
     return scriptNodeId;
