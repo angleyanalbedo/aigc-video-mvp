@@ -1282,8 +1282,16 @@ const memoryRoutes = require('./routes/memory');
 // 引入 Skill 管理路由
 const skillRoutes = require('./routes/skills');
 
+// 引入视频因子路由
+console.log('[DEBUG] about to require videoFactorsRoutes');
+const videoFactorsRoutes = require('./routes/videoFactors');
+console.log('[DEBUG] videoFactorsRoutes loaded');
+
 // 引入 Copilot 路由
 const copilotRoutes = require('./routes/copilot');
+
+// 使用视频因子路由
+app.use('/api/video-factors', videoFactorsRoutes);
 
 // 使用 Agent 路由
 app.use('/api/agent', agentRoutes);

@@ -245,3 +245,81 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_session ON chat_messages(session_id);
+
+-- 视频因子记录表 - 记录每个视频生成时使用的创作因子
+CREATE TABLE IF NOT EXISTS video_factors (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  video_id TEXT,
+  
+  -- 创作因子
+  opening_style TEXT,
+  bgm_style TEXT,
+  bgm_volume REAL,
+  voiceover_style TEXT,
+  voiceover_gender TEXT,
+  color_tone TEXT,
+  saturation TEXT,
+  subtitle_style TEXT,
+  subtitle_position TEXT,
+  
+  -- 技术参数
+  aspect_ratio TEXT,
+  duration INTEGER,
+  scene_count INTEGER,
+  resolution TEXT,
+  
+  -- 产品信息
+  product_name TEXT,
+  product_category TEXT,
+  
+  -- 元数据
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_factors_project ON video_factors(project_id);
+CREATE INDEX IF NOT EXISTS idx_video_factors_opening ON video_factors(opening_style);
+CREATE INDEX IF NOT EXISTS idx_video_factors_bgm ON video_factors(bgm_style);
+CREATE INDEX IF NOT EXISTS idx_video_factors_voiceover ON video_factors(voiceover_style);
+CREATE INDEX IF NOT EXISTS idx_video_factors_color ON video_factors(color_tone);
+CREATE INDEX IF NOT EXISTS idx_video_factors_aspect ON video_factors(aspect_ratio);
+CREATE INDEX IF NOT EXISTS idx_video_factors_created ON video_factors(created_at);
+
+-- 视频发布记录表 - 记录视频发布和模拟效果数据
+CREATE TABLE IF NOT EXISTS video_publishing_records (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  video_factor_id TEXT,
+  
+  -- 发布信息
+  platform TEXT,
+  published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  status TEXT DEFAULT 'published',
+  
+  -- 模拟效果数据 (基于因子智能生成)
+  mock_views INTEGER DEFAULT 0,
+  mock_completion_rate REAL DEFAULT 0,
+  mock_click_rate REAL DEFAULT 0,
+  mock_conversion_rate REAL DEFAULT 0,
+  mock_likes INTEGER DEFAULT 0,
+  mock_comments INTEGER DEFAULT 0,
+  mock_shares INTEGER DEFAULT 0,
+  
+  -- 关联的A/B实验
+  experiment_id TEXT,
+  variant_id TEXT,
+  
+  -- 元数据
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (video_factor_id) REFERENCES video_factors(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_publishing_project ON video_publishing_records(project_id);
+CREATE INDEX IF NOT EXISTS idx_publishing_experiment ON video_publishing_records(experiment_id);
+CREATE INDEX IF NOT EXISTS idx_publishing_platform ON video_publishing_records(platform);
+CREATE INDEX IF NOT EXISTS idx_publishing_created ON video_publishing_records(created_at);

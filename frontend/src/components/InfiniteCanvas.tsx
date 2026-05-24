@@ -343,8 +343,16 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       music_mood: node.data.music_mood || '无',
       subtitle: node.data.subtitle || '',
       referenceImageUrl: node.data.referenceImageUrl || '',
+      referenceImageId: node.data.referenceImageId || '',
+      firstFrameUrl: node.data.firstFrameUrl || '',
+      lastFrameUrl: node.data.lastFrameUrl || '',
+      sourceVideoUrl: node.data.sourceVideoUrl || '',
+      imageUrl: node.data.imageUrl || '',
+      audioUrl: node.data.audioUrl || '',
+      ttsEstDuration: node.data.ttsEstDuration || '',
       videoUrl: node.data.videoUrl || '',
-      status: node.data.status || 'idle'
+      status: node.data.status || 'idle',
+      errorMessage: node.data.errorMessage || ''
     });
     setIsDrawerVisible(true);
   };
@@ -940,6 +948,10 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     }
 
     if (node.type === 'script') {
+      const sceneNodes = nodes.filter(n => n.type === 'scene');
+      const totalDuration = sceneNodes.reduce((sum, n) => sum + (n.data.duration || 0), 0);
+      const completedScenes = sceneNodes.filter(n => n.data.status === 'completed').length;
+      
       return (
         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 'bold', color: '#722ed1', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -948,6 +960,19 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           <div style={{ fontSize: 10, color: '#8c8c8c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginBottom: 6 }}>
             {node.data.description || '双击编辑产品大纲描述...'}
           </div>
+          
+          {/* 剧本统计信息 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f9f0ff', padding: '4px 8px', borderRadius: '4px', marginBottom: 6, border: '1px dashed #d3adf7' }}>
+            <div style={{ fontSize: 10, color: '#722ed1', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>🎬 分镜: <strong>{sceneNodes.length}</strong></span>
+              <span style={{ fontSize: 14 }}>|</span>
+              <span>⏱️ 时长: <strong>{totalDuration}s</strong></span>
+            </div>
+            <div style={{ fontSize: 10, color: completedScenes === sceneNodes.length && sceneNodes.length > 0 ? '#52c41a' : '#1890ff' }}>
+              {sceneNodes.length > 0 ? `${completedScenes}/${sceneNodes.length} 完成` : '未创建分镜'}
+            </div>
+          </div>
+          
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 'auto' }}>
             <Button
               type="primary"
@@ -1349,9 +1374,51 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
                 <Form.Item name="referenceImageUrl" label="参考图片URL">
                   <Input placeholder="分镜的参考图片URL（可选）" />
                 </Form.Item>
+                
+                <Form.Item name="referenceImageId" label="参考图片素材ID">
+                  <Input placeholder="素材库中的参考图片ID（可选）" />
+                </Form.Item>
+
+                <Row gutter={8}>
+                  <Col span={12}>
+                    <Form.Item name="firstFrameUrl" label="首帧图片URL">
+                      <Input placeholder="AI视频首帧控制图片（可选）" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item name="lastFrameUrl" label="尾帧图片URL">
+                      <Input placeholder="AI视频尾帧控制图片（可选）" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                
+                <Form.Item name="sourceVideoUrl" label="源视频素材URL">
+                  <Input placeholder="已有视频素材链接（可选）" />
+                </Form.Item>
+                
+                <Form.Item name="imageUrl" label="AI生成图片URL">
+                  <Input placeholder="AI生成的图片URL（只读）" disabled />
+                </Form.Item>
+
+                <Row gutter={8}>
+                  <Col span={12}>
+                    <Form.Item name="audioUrl" label="配音音频URL">
+                      <Input placeholder="TTS生成的配音URL（只读）" disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item name="ttsEstDuration" label="TTS预计时长(秒)">
+                      <Input type="number" placeholder="配音预计时长" disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
                 <Form.Item name="videoUrl" label="生成视频URL">
                   <Input placeholder="AI生成的视频URL（只读）" disabled />
+                </Form.Item>
+
+                <Form.Item name="errorMessage" label="错误信息">
+                  <Input.TextArea rows={2} placeholder="生成失败时显示的错误信息（只读）" disabled />
                 </Form.Item>
 
                 <Form.Item name="status" label="分镜状态">
