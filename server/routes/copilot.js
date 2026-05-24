@@ -141,6 +141,27 @@ router.get('/chat/sessions/:projectId', async (req, res) => {
   }
 });
 
+router.post('/chat/sessions', async (req, res) => {
+  const { projectId, title } = req.body;
+
+  if (!projectId) {
+    return res.status(400).json({ success: false, error: 'Project ID is required' });
+  }
+
+  try {
+    const db = require('../db');
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const stmt = db.prepare('INSERT INTO chat_sessions (id, project_id, title, status) VALUES (?, ?, ?, ?)');
+    stmt.run(sessionId, projectId, title || '新会话', 'active');
+
+    res.json({ success: true, sessionId });
+  } catch (error) {
+    console.error('Create chat session error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/chat/sessions/:sessionId/messages', async (req, res) => {
   const { sessionId } = req.params;
 
