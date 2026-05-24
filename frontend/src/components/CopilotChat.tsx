@@ -585,7 +585,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
 const TracePanel: React.FC<{
   trace: { id: string; steps: Message[]; status: 'executing' | 'completed' | 'failed' };
 }> = ({ trace }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const getStatusHeader = () => {
     switch (trace.status) {
