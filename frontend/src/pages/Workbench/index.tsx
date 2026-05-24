@@ -33,6 +33,8 @@ import {
   InboxOutlined,
   UploadOutlined,
   ReloadOutlined,
+  SoundOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import AssetPanel from './AssetPanel';
 import {
@@ -100,6 +102,14 @@ const WorkbenchPage: React.FC = () => {
     setLibrarySearchKeyword,
     isLoadingLibrary,
     setIsLoadingLibrary,
+    audioLibraryModalVisible,
+    setAudioLibraryModalVisible,
+    audioLibraryMaterials,
+    setAudioLibraryMaterials,
+    isLoadingAudioLibrary,
+    setIsLoadingAudioLibrary,
+    currentSceneForAudioSelect,
+    setCurrentSceneForAudioSelect,
     saveStatus,
     project,
     setProject,
@@ -2376,89 +2386,126 @@ const WorkbenchPage: React.FC = () => {
                               )}
                               
                               {/* 声音参考 */}
-                              <div>
-                                <Text type="secondary" style={{ fontSize: 10, marginBottom: 4, display: 'block' }}>
-                                  🎵 声音参考（可选）
-                                </Text>
-                                {scene.referenceAudioUrl ? (
-                                  <div style={{
-                                    background: '#202023',
-                                    borderRadius: 4,
-                                    padding: 6,
-                                    border: '1px solid #818cf8',
-                                  }}>
-                                    <Row gutter={4} align="middle">
-                                      <Col span={18}>
-                                        <audio 
-                                          src={scene.referenceAudioUrl} 
-                                          controls 
-                                          style={{ width: '100%', height: 24 }} 
-                                        />
-                                      </Col>
-                                      <Col span={6}>
-                                        <Button
-                                          size="small"
-                                          danger
-                                          block
-                                          onClick={() => {
-                                            updateSceneField(index, 'referenceAudioUrl', undefined);
-                                            message.info('🗑️ 已清除声音参考');
-                                          }}
-                                          style={{ height: 24, fontSize: 9, padding: '0 4px' }}
-                                        >
-                                          删除
-                                        </Button>
-                                      </Col>
-                                    </Row>
-                                  </div>
-                                ) : (
-                                  <Button
-                                    type="dashed"
-                                    size="small"
-                                    block
-                                    icon={<AudioOutlined />}
-                                    onClick={() => {
-                                      const input = document.createElement('input');
-                                      input.type = 'file';
-                                      input.accept = 'audio/*';
-                                      input.onchange = async (e: any) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const formData = new FormData();
-                                          formData.append('file', file);
-                                          message.loading(`正在上传声音参考 "${file.name}"...`, 0);
-                                          try {
-                                            const res = await fetch(`${API_BASE}/api/upload`, {
-                                              method: 'POST',
-                                              body: formData
-                                            });
-                                            const uploadData = await res.json();
-                                            message.destroy();
-                                            if (uploadData.success && uploadData.url) {
-                                              updateSceneField(index, 'referenceAudioUrl', uploadData.url);
-                                              message.success('🎵 声音参考上传成功！');
-                                            } else {
-                                              throw new Error(uploadData.error || '上传失败');
-                                            }
-                                          } catch (err: any) {
-                                            message.error('上传失败: ' + err.message);
-                                          }
-                                        }
-                                      };
-                                      input.click();
-                                    }}
-                                    style={{ 
-                                      background: 'rgba(129, 140, 248, 0.08)', 
-                                      border: '1px dashed #818cf8',
-                                      color: '#818cf8',
-                                      fontSize: 10,
-                                      height: 26
-                                    }}
-                                  >
-                                    📤 上传声音参考
-                                  </Button>
-                                )}
-                              </div>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 10, marginBottom: 4, display: 'block' }}>
+                      🎵 声音参考（可选）
+                    </Text>
+                    {scene.referenceAudioUrl ? (
+                      <div style={{
+                        background: '#202023',
+                        borderRadius: 4,
+                        padding: 6,
+                        border: '1px solid #818cf8',
+                      }}>
+                        <Row gutter={4} align="middle">
+                          <Col span={18}>
+                            <audio 
+                              src={scene.referenceAudioUrl} 
+                              controls 
+                              style={{ width: '100%', height: 24 }} 
+                            />
+                          </Col>
+                          <Col span={6}>
+                            <Button
+                              size="small"
+                              danger
+                              block
+                              onClick={() => {
+                                updateSceneField(index, 'referenceAudioUrl', undefined);
+                                message.info('🗑️ 已清除声音参考');
+                              }}
+                              style={{ height: 24, fontSize: 9, padding: '0 4px' }}
+                            >
+                              删除
+                            </Button>
+                          </Col>
+                        </Row>
+                      </div>
+                    ) : (
+                      <Space direction="vertical" style={{ width: '100%' }} size={4}>
+                        <Button
+                          type="dashed"
+                          size="small"
+                          block
+                          icon={<UploadOutlined />}
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'audio/*';
+                            input.onchange = async (e: any) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                message.loading(`正在上传声音参考 "${file.name}"...`, 0);
+                                try {
+                                  const res = await fetch(`${API_BASE}/api/upload`, {
+                                    method: 'POST',
+                                    body: formData
+                                  });
+                                  const uploadData = await res.json();
+                                  message.destroy();
+                                  if (uploadData.success && uploadData.url) {
+                                    updateSceneField(index, 'referenceAudioUrl', uploadData.url);
+                                    message.success('🎵 声音参考上传成功！');
+                                  } else {
+                                    throw new Error(uploadData.error || '上传失败');
+                                  }
+                                } catch (err: any) {
+                                  message.error('上传失败: ' + err.message);
+                                }
+                              }
+                            };
+                            input.click();
+                          }}
+                          style={{ 
+                            background: 'rgba(129, 140, 248, 0.08)', 
+                            border: '1px dashed #818cf8',
+                            color: '#818cf8',
+                            fontSize: 10,
+                            height: 26
+                          }}
+                        >
+                          📤 上传声音参考
+                        </Button>
+                        <Button
+                          type="dashed"
+                          size="small"
+                          block
+                          icon={<FolderOpenOutlined />}
+                          onClick={async () => {
+                            setCurrentSceneForAudioSelect(index);
+                            setIsLoadingAudioLibrary(true);
+                            try {
+                              const res = await fetch(`${API_BASE}/api/materials/library`);
+                              const data = await res.json();
+                              if (data.success) {
+                                // 只保留音频类型的素材
+                                const audioMaterials = (data.materials || []).filter((m: any) => 
+                                  m.type && m.type.startsWith('audio')
+                                );
+                                setAudioLibraryMaterials(audioMaterials);
+                              }
+                            } catch (err: any) {
+                              message.error('加载素材库失败: ' + err.message);
+                            } finally {
+                              setIsLoadingAudioLibrary(false);
+                            }
+                            setAudioLibraryModalVisible(true);
+                          }}
+                          style={{ 
+                            background: 'rgba(16, 185, 129, 0.08)', 
+                            border: '1px dashed #10b981',
+                            color: '#10b981',
+                            fontSize: 10,
+                            height: 26
+                          }}
+                        >
+                          📚 从素材库选择
+                        </Button>
+                      </Space>
+                    )}
+                  </div>
                             </Space>
                           </Col>
                           
@@ -3036,6 +3083,99 @@ const WorkbenchPage: React.FC = () => {
             </>
           )}
         </Form>
+      </Modal>
+
+      {/* 音频素材库选择模态框 */}
+      <Modal
+        title={
+          <div>
+            🎵 从素材库选择声音参考
+          </div>
+        }
+        open={audioLibraryModalVisible}
+        onCancel={() => {
+          setAudioLibraryModalVisible(false);
+          setCurrentSceneForAudioSelect(null);
+        }}
+        width={900}
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setAudioLibraryModalVisible(false);
+            setCurrentSceneForAudioSelect(null);
+          }}>
+            取消
+          </Button>
+        ]}
+      >
+        {isLoadingAudioLibrary ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <LoadingOutlined style={{ fontSize: 40, color: '#818cf8' }} />
+            <p style={{ marginTop: 16, color: '#a1a1aa' }}>正在加载素材库...</p>
+          </div>
+        ) : audioLibraryMaterials.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40 }}>
+            <SoundOutlined style={{ fontSize: 60, color: '#3f3f46' }} />
+            <p style={{ marginTop: 16, color: '#a1a1aa' }}>
+              素材库中暂无音频素材，请先在素材管理页面上传音频。
+            </p>
+          </div>
+        ) : (
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            <List
+              grid={{ gutter: 16, xs: 1, sm: 2, md: 2, lg: 3, xl: 3 }}
+              dataSource={audioLibraryMaterials}
+              renderItem={(material: any) => (
+                <List.Item>
+                  <Card
+                    hoverable
+                    style={{ borderRadius: 8, overflow: 'hidden', cursor: 'pointer' }}
+                    onClick={() => {
+                      if (currentSceneForAudioSelect !== null) {
+                        updateSceneField(currentSceneForAudioSelect, 'referenceAudioUrl', material.url);
+                        message.success('🎵 已添加声音参考！');
+                        setAudioLibraryModalVisible(false);
+                        setCurrentSceneForAudioSelect(null);
+                      }
+                    }}
+                  >
+                    <div style={{
+                      height: 120,
+                      background: '#202023',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      padding: '16px'
+                    }}>
+                      <SoundOutlined style={{ fontSize: 36, color: '#818cf8', marginBottom: 12 }} />
+                      <audio
+                        src={material.url}
+                        controls
+                        style={{ width: '100%', height: 32 }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: '#a1a1aa',
+                        textAlign: 'center',
+                        wordBreak: 'break-word',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical'
+                      }}>
+                        {material.filename}
+                      </div>
+                    </div>
+                  </Card>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
       </Modal>
     </Layout>
   );

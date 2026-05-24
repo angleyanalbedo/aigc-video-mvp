@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
-import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, SoundOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -161,6 +161,7 @@ const MaterialManagementPage = () => {
   const getIcon = (type) => {
     if (type && type.startsWith('image')) return <PictureOutlined />;
     if (type && type.startsWith('video')) return <VideoCameraOutlined />;
+    if (type && type.startsWith('audio')) return <SoundOutlined />;
     return <PictureOutlined />;
   };
 
@@ -205,7 +206,7 @@ const MaterialManagementPage = () => {
         >
           <p className="ant-upload-drag-icon"><UploadOutlined /></p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-          <p className="ant-upload-hint">支持图片和视频文件</p>
+          <p className="ant-upload-hint">支持图片、视频和音频文件</p>
         </Upload.Dragger>
       </Card>
 
@@ -249,6 +250,13 @@ const MaterialManagementPage = () => {
                           justifyContent: 'center'
                         }}>
                           <VideoCameraOutlined style={{ fontSize: 24, color: '#fff' }} />
+                        </div>
+                      </div>
+                    ) : item.type && item.type.startsWith('audio') ? (
+                      <div style={{ height: 160, backgroundColor: '#121214', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <SoundOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 8 }} />
+                        <div style={{ fontSize: 12, color: '#a1a1aa', textAlign: 'center', wordBreak: 'break-word', padding: '0 16px' }}>
+                          {item.filename}
                         </div>
                       </div>
                     ) : (
@@ -331,6 +339,16 @@ const MaterialManagementPage = () => {
                   autoPlay
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
+              ) : selectedMaterial.type && selectedMaterial.type.startsWith('audio') ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <SoundOutlined style={{ fontSize: 80, color: '#818cf8', marginBottom: 24 }} />
+                  <audio
+                    src={selectedMaterial.url}
+                    controls
+                    autoPlay
+                    style={{ width: '100%', maxWidth: 400 }}
+                  />
+                </div>
               ) : (
                 <img
                   src={selectedMaterial.url}
