@@ -359,9 +359,8 @@ router.post('/canvas/generate-script-scenes', async (req, res) => {
       const script = await scriptAgent.generate(productInfo, projectId);
 
       // Clean up old canvas scene nodes first to avoid cluttering!
-      const existingNodes = await canvasSyncService.getNodes(projectId, true);
-      const sceneNodes = existingNodes.filter(n => n.type === 'scene');
-      for (const node of sceneNodes) {
+      const existingNodes = await canvasSyncService.getNodes(projectId, 'scene');
+      for (const node of existingNodes) {
         await canvasSyncService.deleteNode(projectId, node.id);
       }
 
