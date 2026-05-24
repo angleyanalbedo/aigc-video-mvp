@@ -1,6 +1,10 @@
 const { generateStructuredText } = require('./tools/llm');
 const { memoryManager } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
+const { generateText: aiGenerateText, generateTextWithStructuredOutput } = require('ai');
+const { llmProvider } = require('../services/providers');
+const { getToolsForAgent } = require('./tools/agentTools');
+const { z } = require('zod');
 
 const FALLBACK_PROMPT = `你是一个资深的电商 AIGC 视觉与文案分析专家。
 你的职责是智能解析用户上传/选中的商品图片、视频或描述性素材，提取出商品的卖点、目标受众、商品品类与价格区间，并为其量身定制带货视频的推荐风格和主打语调。
@@ -13,11 +17,33 @@ class AssetAgent {
     this.layer = '决策层';
     this.agentName = 'AssetAgent';
     this.skillId = 'AssetAgent_analysis';
+    this.tools = getToolsForAgent('AssetAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async execute(prompt, options = {}) {
+    const { maxSteps = 5 } = options;
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: this.tools,
+        maxSteps: maxSteps
+      });
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ AssetAgent execute 失败:', error);
+      throw error;
+    }
   }
 
   async callSkill(params, options = {}) {

@@ -6,6 +6,10 @@ const execAsync = promisify(exec);
 const { generateStructuredText } = require('./tools/llm');
 const { generateTTS } = require('./tools/ttsAPI');
 const skillLoader = require('./skills/skillLoader');
+const { generateText: aiGenerateText, generateTextWithStructuredOutput } = require('ai');
+const { llmProvider } = require('../services/providers');
+const { getToolsForAgent } = require('./tools/agentTools');
+const { z } = require('zod');
 
 const TASKS_DIR = path.join(__dirname, '../tasks');
 const OUTPUTS_DIR = path.join(__dirname, '../outputs');
@@ -31,11 +35,33 @@ class ClipAgent {
     this.skillId = 'ClipAgent_planning';
     this.transitions = ['cut', 'fade', 'dissolve', 'wipe'];
     this.bgmStyles = ['欢快', '温馨', '动感', '舒缓', '激情'];
+    this.tools = getToolsForAgent('ClipAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async executePrompt(prompt, options = {}) {
+    const { maxSteps = 5 } = options;
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: this.tools,
+        maxSteps: maxSteps
+      });
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ ClipAgent execute 失败:', error);
+      throw error;
+    }
   }
 
   async callSkill(params, options = {}) {

@@ -1,6 +1,9 @@
-const { generateText, generateStructuredText } = require('./tools/llm');
+const { generateText: aiGenerateText, generateTextWithStructuredOutput } = require('ai');
+const { llmProvider } = require('../services/providers');
 const { memoryManager } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
+const { getToolsForAgent } = require('./tools/agentTools');
+const { z } = require('zod');
 
 const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 
@@ -25,17 +28,70 @@ const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 - 15秒视频：3-4个分镜
 - 总时长控制在15秒以内`;
 
+const SCRIPT_SCHEMA = z.object({
+  title: z.string(),
+  scenes: z.array(z.object({
+    id: z.number(),
+    description: z.string(),
+    voiceover: z.string(),
+    duration: z.number(),
+    shot: z.string().optional()
+  }))
+});
+
 class ScriptAgent {
   constructor() {
     this.name = '剧本生成 Agent';
     this.agentName = 'ScriptAgent';
     this.skillId = 'ScriptAgent_generation';
     this.maxScenes = 5;
+    this.tools = getToolsForAgent('ScriptAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async execute(prompt, options = {}) {
+    const { projectId, maxSteps = 10 } = options;
+    
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: this.tools,
+        maxSteps: maxSteps
+      });
+      
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ ScriptAgent execute 失败:', error);
+      throw error;
+    }
+  }
+
+  async generateStructured(prompt, schema = SCRIPT_SCHEMA) {
+    try {
+      const result = await generateTextWithStructuredOutput({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        schema: schema,
+        tools: this.tools,
+        maxSteps: 10
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ ScriptAgent generateStructured 失败:', error);
+      throw error;
+    }
   }
 
   async callSkill(params, options = {}) {
@@ -109,10 +165,13 @@ class ScriptAgent {
     }
 
     try {
-      const script = await generateStructuredText({
+      const script = await generateTextWithStructuredOutput({
+        model: llmProvider.getModel(),
         system: this.getSystemPrompt(),
-        prompt,
-        schema: this.getSchema()
+        prompt: prompt,
+        schema: SCRIPT_SCHEMA,
+        tools: this.tools,
+        maxSteps: 10
       });
 
       await memoryManager.addShortTerm({
@@ -173,16 +232,13 @@ class ScriptAgent {
         shot_type: scene.shot || scene.shot_type || '中景',
         emotion: scene.emotion || '积极',
         transition: scene.transition || 'fade',
-        // 状态机初始化
         status: 'idle',
         videoUrl: null,
         audioUrl: null,
         ttsEstDuration: null,
         generatedAt: null,
-        // 商品参考图注入
         referenceImageId: null,
         referenceImageUrl: null,
-        // 画布预留字段（未来升级 React Flow 零改动）
         x: null,
         y: null,
       })),
@@ -267,10 +323,13 @@ ${memoryContext ? `## 跨会话记忆上下文\n${memoryContext}\n` : ''}## 任�
 请返回修改后的完整剧本（JSON格式）。`;
 
     try {
-      const refined = await generateStructuredText({
+      const refined = await generateTextWithStructuredOutput({
+        model: llmProvider.getModel(),
         system: this.getSystemPrompt(),
-        prompt,
-        schema: this.getSchema()
+        prompt: prompt,
+        schema: SCRIPT_SCHEMA,
+        tools: this.tools,
+        maxSteps: 10
       });
 
       await memoryManager.addShortTerm({

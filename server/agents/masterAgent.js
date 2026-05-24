@@ -7,6 +7,16 @@ const projectModel = require('../models/project');
 const agentChatService = require('../services/agentChatService');
 const { llmProvider } = require('../services/providers');
 const skillLoader = require('./skills/skillLoader');
+const { generateText: aiGenerateText } = require('ai');
+const { createAgent } = require('ai');
+const { getToolsForAgent } = require('./tools/agentTools');
+const scriptAgent = require('./scriptAgent');
+const videoAgent = require('./videoAgent');
+const imageAgent = require('./imageAgent');
+const clipAgent = require('./clipAgent');
+const assetAgent = require('./assetAgent');
+const reviewAgent = require('./reviewAgent');
+const { z } = require('zod');
 
 const FALLBACK_PROMPT = `你是 Copilot Master Agent，负责协调所有子 Agent 完成复杂任务。
 
@@ -36,6 +46,16 @@ class MasterAgent extends EventEmitter {
     this.taskPlanner = new TaskPlanner();
     this.toolExecutor = new ToolExecutor();
     this.activeSessions = new Map();
+    this.tools = getToolsForAgent('MasterAgent');
+
+    this.subAgents = {
+      scriptAgent,
+      videoAgent,
+      imageAgent,
+      clipAgent,
+      assetAgent,
+      reviewAgent
+    };
 
     canvasSyncService.setEventEmitter(this);
   }
@@ -43,6 +63,47 @@ class MasterAgent extends EventEmitter {
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async execute(prompt, options = {}) {
+    const { maxSteps = 15, tools = this.tools } = options;
+    
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: tools,
+        maxSteps: maxSteps
+      });
+      
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ MasterAgent execute 失败:', error);
+      throw error;
+    }
+  }
+
+  async executeWithAgents(prompt, options = {}) {
+    const { maxSteps = 15 } = options;
+    
+    const subAgentTools = {};
+    for (const [name, agent] of Object.entries(this.subAgents)) {
+      if (agent.tools) {
+        for (const [toolName, tool] of Object.entries(agent.tools)) {
+          subAgentTools[`${name}_${toolName}`] = tool;
+        }
+      }
+    }
+
+    return this.execute(prompt, {
+      maxSteps,
+      tools: { ...this.tools, ...subAgentTools }
+    });
   }
 
   async callSkill(params, options = {}) {
