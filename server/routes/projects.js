@@ -245,8 +245,12 @@ router.post('/:id/publish', (req, res) => {
       return res.status(404).json({ success: false, error: '项目不存在' });
     }
 
-    // 1. 更新项目状态为已发布
-    projectModel.update(id, { status: 'published' });
+    // 1. 更新项目状态为已完成/已发布，并保存模拟的视频 URL
+    const mockVideoUrl = `https://example.com/videos/${id}.mp4`;
+    projectModel.update(id, { 
+      status: 'completed', 
+      videoUrl: mockVideoUrl 
+    });
 
     // 2. 提取生成因子 (Factors)
     const script = project.script || {};

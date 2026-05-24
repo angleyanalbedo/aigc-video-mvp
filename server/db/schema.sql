@@ -8,9 +8,13 @@ CREATE TABLE IF NOT EXISTS projects (
   product_info TEXT,
   script TEXT,
   settings TEXT,
+  video_url TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 如果 video_url 列不存在，添加它（向后兼容）
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_url TEXT;
 
 CREATE TABLE IF NOT EXISTS materials (
   id TEXT PRIMARY KEY,

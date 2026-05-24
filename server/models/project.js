@@ -48,10 +48,14 @@ const projectModel = {
         const materials = db.prepare('SELECT * FROM materials WHERE project_id = ?').all(item.id);
         return {
           ...item,
+          // 同时提供两种格式的日期字段，兼容不同的前端代码
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          videoUrl: item.video_url, // 同时支持两种命名
           product_info: parseJSON(item.product_info),
           script: parseJSON(item.script),
           settings: parseJSON(item.settings),
-          materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags) }))
+          materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags), createdAt: m.created_at }))
         };
       }),
       total,
@@ -67,10 +71,14 @@ const projectModel = {
     const materials = db.prepare('SELECT * FROM materials WHERE project_id = ?').all(id);
     return {
       ...item,
+      // 同时提供两种格式的日期字段，兼容不同的前端代码
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      videoUrl: item.video_url, // 同时支持两种命名
       product_info: parseJSON(item.product_info),
       script: parseJSON(item.script),
       settings: parseJSON(item.settings),
-      materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags) }))
+      materials: materials.map(m => ({ ...m, tags: parseJSON(m.tags), createdAt: m.created_at }))
     };
   },
 
@@ -78,8 +86,8 @@ const projectModel = {
     const id = generateId('proj');
     const now = new Date().toISOString();
     db.prepare(`
-      INSERT INTO projects (id, name, description, status, product_info, script, settings, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, name, description, status, product_info, script, settings, video_url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.name || 'Untitled Project',
@@ -88,6 +96,7 @@ const projectModel = {
       stringifyJSON(data.productInfo || null),
       stringifyJSON(data.script || null),
       stringifyJSON(data.settings || null),
+      data.videoUrl || null,
       now,
       now
     );
@@ -102,21 +111,58 @@ const projectModel = {
     return projectModel.getById(id);
   },
 
+  // 辅助函数：根据项目内容智能计算状态
+  calculateProjectStatus(project, newScript) {
+    const script = newScript !== undefined ? newScript : project.script;
+    
+    // 如果有视频URL，说明项目已完成
+    if (project.videoUrl) {
+      return 'completed';
+    }
+    
+    // 如果有剧本但没有视频，说明正在处理中
+    if (script && script.scenes && script.scenes.length > 0) {
+      const hasVideos = script.scenes.some(scene => scene.videoUrl);
+      const hasImages = script.scenes.some(scene => scene.imageUrl);
+      
+      if (hasVideos) {
+        return 'processing';
+      } else if (hasImages) {
+        return 'processing';
+      }
+      return 'draft';
+    }
+    
+    // 其他情况保持原样或默认草稿
+    return project.status || 'draft';
+  },
+
   update(id, data) {
     const now = new Date().toISOString();
     const project = projectModel.getById(id);
     if (!project) return null;
+    
+    // 智能计算项目状态
+    let newStatus = data.status;
+    if (newStatus === undefined) {
+      newStatus = projectModel.calculateProjectStatus(
+        {...project, videoUrl: data.videoUrl}, 
+        data.script
+      );
+    }
+
     db.prepare(`
       UPDATE projects
-      SET name = ?, description = ?, status = ?, product_info = ?, script = ?, settings = ?, updated_at = ?
+      SET name = ?, description = ?, status = ?, product_info = ?, script = ?, settings = ?, video_url = ?, updated_at = ?
       WHERE id = ?
     `).run(
       data.name !== undefined ? data.name : project.name,
       data.description !== undefined ? data.description : project.description,
-      data.status !== undefined ? data.status : project.status,
+      newStatus,
       data.productInfo !== undefined ? stringifyJSON(data.productInfo) : stringifyJSON(project.product_info),
       data.script !== undefined ? stringifyJSON(data.script) : stringifyJSON(project.script),
       data.settings !== undefined ? stringifyJSON(data.settings) : stringifyJSON(project.settings),
+      data.videoUrl !== undefined ? data.videoUrl : project.video_url,
       now,
       id
     );

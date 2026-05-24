@@ -35,6 +35,22 @@ const { Option } = Select;
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
+// 安全的日期格式化函数
+const formatDate = (dateInput: any): string => {
+  if (!dateInput) return '暂无';
+  
+  try {
+    const date = new Date(dateInput);
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return '暂无';
+    }
+    return date.toLocaleDateString();
+  } catch (e) {
+    return '暂无';
+  }
+};
+
 const ProjectListPage: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
@@ -268,14 +284,14 @@ const ProjectListPage: React.FC = () => {
                             </Text>
                             <br /><br />
                             <Space direction="vertical" size="small" style={{ fontSize: 12 }}>
-                              <Text type="secondary">
-                                <CalendarOutlined /> 创建于 {new Date(project.createdAt).toLocaleDateString()}
-                              </Text>
-                              <br />
-                              <Text type="secondary">
-                                更新于 {new Date(project.updatedAt).toLocaleDateString()}
-                              </Text>
-                            </Space>
+              <Text type="secondary">
+                <CalendarOutlined /> 创建于 {formatDate(project.createdAt || project.created_at)}
+              </Text>
+              <br />
+              <Text type="secondary">
+                更新于 {formatDate(project.updatedAt || project.updated_at)}
+              </Text>
+            </Space>
                           </>
                         }
                       />
