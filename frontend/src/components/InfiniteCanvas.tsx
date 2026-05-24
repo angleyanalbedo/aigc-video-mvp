@@ -35,15 +35,67 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [nodeStartPositions, setNodeStartPositions] = useState<{ [id: string]: { x: number; y: number } }>({});
+  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
+  const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+
+  const [viewport, setViewport] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`canvas_viewport_${projectId}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Failed to load canvas viewport:', e);
+    }
+    return { x: 0, y: 0, scale: 1 };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`canvas_viewport_${projectId}`, JSON.stringify(viewport));
+    } catch (e) {
+      console.warn('Failed to save canvas viewport:', e);
+    }
+  }, [viewport, projectId]);
+
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [isDraggingNode, setIsDraggingNode] = useState(false);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0 });
-  const [nodeStartPosition, setNodeStartPosition] = useState({ x: 0, y: 0 });
   const wsRef = useRef<WebSocket | null>(null);
+
+  const getCanvasCoords = useCallback((clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (clientX - rect.left - viewport.x) / viewport.scale,
+      y: (clientY - rect.top - viewport.y) / viewport.scale
+    };
+  }, [viewport]);
+
+  const getMarqueeStyle = () => {
+    if (!marqueeStart || !marqueeEnd) return {};
+    const left = Math.min(marqueeStart.x, marqueeEnd.x);
+    const top = Math.min(marqueeStart.y, marqueeEnd.y);
+    const width = Math.abs(marqueeStart.x - marqueeEnd.x);
+    const height = Math.abs(marqueeStart.y - marqueeEnd.y);
+    return {
+      left,
+      top,
+      width,
+      height,
+      position: 'absolute' as const,
+      border: '1.5px dashed #1890ff',
+      backgroundColor: 'rgba(24, 144, 255, 0.08)',
+      borderRadius: '4px',
+      pointerEvents: 'none' as const,
+      zIndex: 9999
+    };
+  };
 
   // Toonflow state variables
   const [editingNode, setEditingNode] = useState<Node | null>(null);
@@ -126,17 +178,29 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current || (e.target as HTMLElement).classList.contains('canvas-background')) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - viewport.x,
-        y: e.clientY - viewport.y
-      });
-      setSelectedNodeId(null);
+      if (e.shiftKey) {
+        // Shift + Drag starts marquee selection
+        const coords = getCanvasCoords(e.clientX, e.clientY);
+        setMarqueeStart(coords);
+        setMarqueeEnd(coords);
+        setIsMarqueeSelecting(true);
+      } else {
+        // Regular Drag pans viewport
+        setIsDragging(true);
+        setDragStart({
+          x: e.clientX - viewport.x,
+          y: e.clientY - viewport.y
+        });
+        setSelectedNodeIds([]);
+      }
     }
-  }, [viewport]);
+  }, [viewport, getCanvasCoords]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDragging) {
+    if (isMarqueeSelecting && marqueeStart) {
+      const coords = getCanvasCoords(e.clientX, e.clientY);
+      setMarqueeEnd(coords);
+    } else if (isDragging) {
       setViewport(prev => ({
         ...prev,
         x: e.clientX - dragStart.x,
@@ -146,28 +210,63 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       const dx = (e.clientX - nodeDragStart.x) / viewport.scale;
       const dy = (e.clientY - nodeDragStart.y) / viewport.scale;
 
-      const newPosition = {
-        x: nodeStartPosition.x + dx,
-        y: nodeStartPosition.y + dy
-      };
-
-      setNodes(prev => prev.map(n =>
-        n.id === draggingNodeId ? { ...n, position: newPosition } : n
-      ));
+      setNodes(prev => prev.map(n => {
+        if (nodeStartPositions[n.id]) {
+          return {
+            ...n,
+            position: {
+              x: nodeStartPositions[n.id].x + dx,
+              y: nodeStartPositions[n.id].y + dy
+            }
+          };
+        }
+        return n;
+      }));
     }
-  }, [isDragging, dragStart, isDraggingNode, draggingNodeId, nodeDragStart, nodeStartPosition, viewport]);
+  }, [isMarqueeSelecting, marqueeStart, isDragging, dragStart, isDraggingNode, draggingNodeId, nodeDragStart, nodeStartPositions, viewport, getCanvasCoords]);
 
   const handleMouseUp = useCallback(() => {
-    if (isDraggingNode && draggingNodeId) {
-      const node = nodes.find(n => n.id === draggingNodeId);
-      if (node) {
-        updateNodePosition(draggingNodeId, node.position);
+    if (isMarqueeSelecting && marqueeStart && marqueeEnd) {
+      const x1 = Math.min(marqueeStart.x, marqueeEnd.x);
+      const y1 = Math.min(marqueeStart.y, marqueeEnd.y);
+      const x2 = Math.max(marqueeStart.x, marqueeEnd.x);
+      const y2 = Math.max(marqueeStart.y, marqueeEnd.y);
+
+      const newlySelected = nodes.filter(n => {
+        const nx = n.position.x;
+        const ny = n.position.y;
+        const nw = n.size?.width || 200;
+        const nh = n.size?.height || 150;
+        return !(nx + nw < x1 || nx > x2 || ny + nh < y1 || ny > y2);
+      }).map(n => n.id);
+
+      setSelectedNodeIds(newlySelected);
+      if (newlySelected.length > 0) {
+        message.success(`已框选 ${newlySelected.length} 个节点！拖动其中任意一个可整体移动。`);
       }
+      
+      setMarqueeStart(null);
+      setMarqueeEnd(null);
+      setIsMarqueeSelecting(false);
+    } else if (isDraggingNode) {
+      const activeSelection = Object.keys(nodeStartPositions);
+      Promise.all(activeSelection.map(id => {
+        const targetNode = nodes.find(n => n.id === id);
+        if (targetNode) {
+          return updateNodePosition(id, targetNode.position);
+        }
+        return Promise.resolve({ success: false });
+      })).then(results => {
+        console.log('✅ Batch node positions persisted:', results);
+      });
+
+      setNodeStartPositions({});
+      setIsDraggingNode(false);
+      setDraggingNodeId(null);
     }
+    
     setIsDragging(false);
-    setIsDraggingNode(false);
-    setDraggingNodeId(null);
-  }, [isDraggingNode, draggingNodeId, nodes]);
+  }, [isMarqueeSelecting, marqueeStart, marqueeEnd, nodes, nodeStartPositions]);
 
   const resetViewport = () => {
     setViewport({ x: 0, y: 0, scale: 1 });
@@ -186,11 +285,37 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 
   const handleNodeMouseDown = (e: React.MouseEvent, node: Node) => {
     e.stopPropagation();
-    setSelectedNodeId(node.id);
+    
+    let activeSelection = [...selectedNodeIds];
+    if (e.shiftKey) {
+      // Toggle node selection on Shift + Click
+      if (activeSelection.includes(node.id)) {
+        activeSelection = activeSelection.filter(id => id !== node.id);
+      } else {
+        activeSelection.push(node.id);
+      }
+      setSelectedNodeIds(activeSelection);
+    } else {
+      // Regular click: if not already selected, select only this node
+      if (!activeSelection.includes(node.id)) {
+        activeSelection = [node.id];
+        setSelectedNodeIds(activeSelection);
+      }
+    }
+
     setIsDraggingNode(true);
     setDraggingNodeId(node.id);
     setNodeDragStart({ x: e.clientX, y: e.clientY });
-    setNodeStartPosition({ ...node.position });
+
+    // Store start positions for all nodes in the selection
+    const starts: { [id: string]: { x: number; y: number } } = {};
+    activeSelection.forEach(id => {
+      const targetNode = nodes.find(n => n.id === id);
+      if (targetNode) {
+        starts[id] = { ...targetNode.position };
+      }
+    });
+    setNodeStartPositions(starts);
   };
 
   // Node editing & CRUD
@@ -244,6 +369,35 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           message.success('节点已成功从画布和数据库中移除！');
         } else {
           message.error(res.error || '删除失败');
+        }
+      }
+    });
+  };
+
+  const handleDeleteSelectedNodes = () => {
+    if (selectedNodeIds.length === 0) return;
+    Modal.confirm({
+      title: `确定要从画布上批量删除这 ${selectedNodeIds.length} 个节点吗？`,
+      content: '删除后，所有相关的 timeline/operation 连接线也会被一并移除。如果删除的包含分镜节点，底层剧本数据也将自动被删减并重组序号。',
+      okText: '确定批量删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        const hide = message.loading('正在批量删除节点...', 0);
+        try {
+          const promises = selectedNodeIds.map(id => deleteNodeDirectly(id));
+          const results = await Promise.all(promises);
+          
+          hide();
+          if (results.every(r => r.success)) {
+            message.success('选中的所有节点已成功从画布和数据库中移除！');
+            setSelectedNodeIds([]);
+          } else {
+            message.error('部分节点删除失败，请重试');
+          }
+        } catch (err) {
+          hide();
+          message.error('批量删除操作发生异常，请重试');
         }
       }
     });
@@ -518,14 +672,14 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
   };
 
   const getConnectionColor = (type: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       timeline: '#8c8c8c',
       reference: '#1890ff',
       dependency: '#fa8c16',
       operation: '#722ed1',
       alternative: '#d9d9d9'
     };
-    return colors[type as keyof typeof colors] || '#d9d9d9';
+    return colors[type] || '#8c8c8c';
   };
 
   return (
@@ -555,14 +709,7 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
         >
           <svg className="connections-layer">
             <defs>
-              <marker
-                id="arrowhead"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
-                orient="auto"
-              >
+              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="#8c8c8c" />
               </marker>
             </defs>
@@ -578,13 +725,18 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
             ))}
           </svg>
 
+          {isMarqueeSelecting && marqueeStart && marqueeEnd && (
+            <div style={getMarqueeStyle()} />
+          )}
+
           {nodes.map(node => {
             const colors = getNodeColor(node.type);
             return (
               <div
                 key={node.id}
-                className={`canvas-node ${node.type} ${selectedNodeId === node.id ? 'selected' : ''}`}
+                className={`canvas-node ${node.type} ${selectedNodeIds.includes(node.id) ? 'selected' : ''}`}
                 style={{
+                  position: 'absolute',
                   left: node.position.x,
                   top: node.position.y,
                   width: node.size?.width || 200,
@@ -636,6 +788,27 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
         >
           添加素材节点
         </Button>
+
+        {selectedNodeIds.length > 0 && (
+          <Button
+            danger
+            type="primary"
+            icon={<DeleteOutlined />}
+            onClick={handleDeleteSelectedNodes}
+            size="small"
+            style={{ marginTop: 8 }}
+          >
+            批量删除 ({selectedNodeIds.length})
+          </Button>
+        )}
+
+        <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px dashed #e8e8e8', paddingTop: 8 }}>
+          <span style={{ fontWeight: 'bold', color: '#262626' }}>💡 高级快捷操作：</span>
+          <span>• <b>Shift + 框选画布</b>：批量选择多个节点</span>
+          <span>• <b>Shift + 点击节点</b>：多选或反选节点</span>
+          <span>• <b>拖动选中节点</b>：整体移动所选组合</span>
+          <span>• <b>批量删除按钮</b>：一键清除所选节点</span>
+        </div>
       </div>
 
       <div className="canvas-toolbar">
@@ -770,7 +943,6 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
 const MiniMap: React.FC<{ nodes: Node[]; viewport: { x: number; y: number; scale: number } }> = ({ nodes, viewport }) => {
   const miniWidth = 200;
   const miniHeight = 150;
-
   if (nodes.length === 0) return null;
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -789,35 +961,16 @@ const MiniMap: React.FC<{ nodes: Node[]; viewport: { x: number; y: number; scale
   const toMiniX = (x: number) => (x - minX + padding) * scale;
   const toMiniY = (y: number) => (y - minY + padding) * scale;
 
-  const viewportWidth = 800;
-  const viewportHeight = 600;
-
   const vpX = -viewport.x / viewport.scale - minX + padding;
   const vpY = -viewport.y / viewport.scale - minY + padding;
 
   return (
-    <div className="mini-map">
+    <div className="mini-map" style={{ position: 'absolute', bottom: 20, right: 20, background: 'white', border: '1px solid #ccc' }}>
       <svg width={miniWidth} height={miniHeight}>
         {nodes.map(node => (
-          <rect
-            key={node.id}
-            x={toMiniX(node.position.x)}
-            y={toMiniY(node.position.y)}
-            width={(node.size?.width || 200) * scale}
-            height={(node.size?.height || 150) * scale}
-            fill="#d9d9d9"
-            stroke="#bfbfbf"
-          />
+          <rect key={node.id} x={toMiniX(node.position.x)} y={toMiniY(node.position.y)} width={(node.size?.width || 200) * scale} height={(node.size?.height || 150) * scale} fill="#d9d9d9" />
         ))}
-        <rect
-          x={vpX * scale}
-          y={vpY * scale}
-          width={viewportWidth * scale / viewport.scale}
-          height={viewportHeight * scale / viewport.scale}
-          fill="rgba(24, 144, 255, 0.1)"
-          stroke="#1890ff"
-          strokeWidth="2"
-        />
+        <rect x={vpX * scale} y={vpY * scale} width={800 * scale / viewport.scale} height={600 * scale / viewport.scale} fill="rgba(24, 144, 255, 0.1)" stroke="#1890ff" />
       </svg>
     </div>
   );

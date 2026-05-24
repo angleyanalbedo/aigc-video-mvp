@@ -54,13 +54,34 @@ class CanvasSyncService {
       throw new Error(`节点不存在: ${nodeId}`);
     }
 
-    const newData = { ...node.data, ...updates };
+    // Filter out columns from data updates if they are stored in columns
+    const { position, size, style, metadata, ...dataUpdates } = updates;
+    const newData = { ...node.data, ...dataUpdates };
 
-    db.prepare(`
-      UPDATE canvas_nodes
-      SET node_data = ?, updated_at = ?
-      WHERE id = ?
-    `).run(JSON.stringify(newData), new Date().toISOString(), nodeId);
+    let query = 'UPDATE canvas_nodes SET node_data = ?, updated_at = ?';
+    const params = [JSON.stringify(newData), new Date().toISOString()];
+
+    if (position) {
+      query += ', position_x = ?, position_y = ?';
+      params.push(position.x, position.y);
+    }
+    if (size) {
+      query += ', width = ?, height = ?';
+      params.push(size.width, size.height);
+    }
+    if (style) {
+      query += ', style = ?';
+      params.push(JSON.stringify(style));
+    }
+    if (metadata) {
+      query += ', metadata = ?';
+      params.push(JSON.stringify(metadata));
+    }
+
+    query += ' WHERE id = ?';
+    params.push(nodeId);
+
+    db.prepare(query).run(...params);
 
     // If it's a scene node, sync back to projects.script.scenes
     if (node.type === 'scene' && node.data.id) {
