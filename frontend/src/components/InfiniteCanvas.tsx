@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button, Slider, Tooltip, Drawer, Form, Input, Select, Modal, message, Tag } from 'antd';
+import { Button, Slider, Tooltip, Drawer, Form, Input, Select, Modal, message, Tag, Row, Col } from 'antd';
 import {
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -98,6 +98,9 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     };
   };
 
+  // 只显示创作相关的节点类型：script、scene、material、video
+  const DISPLAY_NODE_TYPES = ['script', 'scene', 'material', 'video'];
+  
   // Toonflow state variables
   const [editingNode, setEditingNode] = useState<Node | null>(null);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
@@ -113,7 +116,9 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       ]);
 
       if (nodesResult.success) {
-        setNodes(nodesResult.nodes);
+        // 过滤掉不需要显示的节点类型
+        const displayNodes = nodesResult.nodes.filter((n: Node) => DISPLAY_NODE_TYPES.includes(n.type));
+        setNodes(displayNodes);
       }
       if (connectionsResult.success) {
         setConnections(connectionsResult.connections);
@@ -125,9 +130,11 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     // WebSocket 连接
     wsRef.current = connectWebSocket(projectId, {
       onCanvasEvent: (event) => {
-        if (event.type === 'node_created' && event.node) {
+        // 只处理创作相关的节点事件
+        if (event.type === 'node_created' && event.node && DISPLAY_NODE_TYPES.includes(event.node.type)) {
           setNodes(prev => [...prev, event.node]);
         } else if (event.type === 'node_updated' && event.nodeId) {
+          // 更新时也只处理创作相关的节点
           setNodes(prev => prev.map(n =>
             n.id === event.nodeId ? { ...n, data: { ...n.data, ...event.updates } } : n
           ));
@@ -619,22 +626,13 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
       script: { border: '#722ed1', bg: '#f9f0ff' },
       scene: { border: '#1890ff', bg: '#e6f7ff' },
       material: { border: '#fa8c16', bg: '#fffaf0' },
-      video: { border: '#eb2f96', bg: '#fff0f5' },
-      intent: { border: '#13c2c2', bg: '#e6fffb' },
-      plan: { border: '#faad14', bg: '#fffbe6' },
-      operation: { border: '#52c41a', bg: '#f6ffed' }
+      video: { border: '#eb2f96', bg: '#fff0f5' }
     };
-    return colors[type] || colors.scene;
+    return colors[type as keyof typeof colors] || colors.scene;
   };
 
   const getNodeTitle = (node: Node) => {
     switch (node.type) {
-      case 'intent':
-        return '🤖 用户意图';
-      case 'plan':
-        return '📋 执行计划';
-      case 'operation':
-        return '⚙️ 运行操作';
       case 'script':
         return '📜 剧本';
       case 'scene':
@@ -1205,45 +1203,136 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
         {editingNode && (
           <Form form={form} layout="vertical">
             {editingNode.type === 'script' && (
-              <Form.Item name="title" label="剧本标题" rules={[{ required: true, message: '请输入剧本标题' }]}>
-                <Input />
-              </Form.Item>
+              <>
+                <Form.Item name="title" label="剧本标题" rules={[{ required: true, message: '请输入剧本标题' }]}>
+                  <Input placeholder="给这个视频起个吸引人的标题" />
+                </Form.Item>
+                
+                <Form.Item name="description" label="产品/主题描述">
+                  <Input.TextArea rows={2} placeholder="简要描述这个视频要介绍的产品或主题" />
+                </Form.Item>
+
+                <Form.Item name="totalDuration" label="视频总时长 (秒)">
+                  <Input type="number" min={10} max={600} placeholder="60" />
+                </Form.Item>
+
+                <Form.Item name="style" label="视频风格">
+                  <Select mode="multiple" placeholder="选择视频风格">
+                    <Select.Option value="专业">专业</Select.Option>
+                    <Select.Option value="轻松">轻松</Select.Option>
+                    <Select.Option value="科技感">科技感</Select.Option>
+                    <Select.Option value="温暖">温暖</Select.Option>
+                    <Select.Option value="简约">简约</Select.Option>
+                    <Select.Option value="活力">活力</Select.Option>
+                    <Select.Option value="电影感">电影感</Select.Option>
+                    <Select.Option value="Vlog风格">Vlog风格</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item name="targetAudience" label="目标受众">
+                  <Select placeholder="选择目标受众">
+                    <Select.Option value="年轻白领">年轻白领</Select.Option>
+                    <Select.Option value="中年商务">中年商务</Select.Option>
+                    <Select.Option value="学生群体">学生群体</Select.Option>
+                    <Select.Option value="家庭主妇">家庭主妇</Select.Option>
+                    <Select.Option value="老年用户">老年用户</Select.Option>
+                    <Select.Option value="专业从业者">专业从业者</Select.Option>
+                    <Select.Option value="普通大众">普通大众</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item name="narrator" label="配音风格">
+                  <Select placeholder="选择配音风格">
+                    <Select.Option value="男声-磁性">男声-磁性</Select.Option>
+                    <Select.Option value="男声-活力">男声-活力</Select.Option>
+                    <Select.Option value="女声-甜美">女声-甜美</Select.Option>
+                    <Select.Option value="女声-知性">女声-知性</Select.Option>
+                    <Select.Option value="AI合成">AI合成</Select.Option>
+                    <Select.Option value="无需配音">无需配音</Select.Option>
+                  </Select>
+                </Form.Item>
+              </>
             )}
 
             {editingNode.type === 'scene' && (
               <>
-                <Form.Item name="description" label="画面描述 (大模型生成提示词)" rules={[{ required: true, message: '请输入画面描述' }]}>
-                  <Input.TextArea rows={4} />
+                <Form.Item name="description" label="画面描述 (核心内容)" rules={[{ required: true, message: '请输入画面描述' }]}>
+                  <Input.TextArea rows={3} placeholder="描述这个分镜要展示的核心画面内容" />
                 </Form.Item>
-                <Form.Item name="voiceover" label="分镜旁白 (TTS 文案)" rules={[{ required: true, message: '请输入分镜旁白' }]}>
-                  <Input.TextArea rows={3} />
+                
+                <Form.Item name="voiceover" label="旁白文案 (TTS)" rules={[{ required: true, message: '请输入旁白' }]}>
+                  <Input.TextArea rows={2} placeholder="这个分镜的旁白配音内容" />
                 </Form.Item>
-                <Form.Item name="duration" label="分镜时长 (秒)" rules={[{ required: true, message: '请输入时长' }]}>
-                  <Input type="number" min={1} max={30} />
+                
+                <Form.Item name="duration" label="预计时长 (秒)" rules={[{ required: true, message: '请输入时长' }]}>
+                  <Input type="number" min={1} max={60} placeholder="5" />
                 </Form.Item>
-                <Form.Item name="shot_type" label="镜头类型">
-                  <Select>
-                    <Select.Option value="特写">特写</Select.Option>
-                    <Select.Option value="近景">近景</Select.Option>
-                    <Select.Option value="中景">中景</Select.Option>
-                    <Select.Option value="全景">全景</Select.Option>
-                    <Select.Option value="俯拍">俯拍</Select.Option>
-                  </Select>
+
+                <Row gutter={8}>
+                  <Col span={12}>
+                    <Form.Item name="shot_type" label="镜头类型">
+                      <Select placeholder="选择镜头">
+                        <Select.Option value="特写">特写</Select.Option>
+                        <Select.Option value="近景">近景</Select.Option>
+                        <Select.Option value="中景">中景</Select.Option>
+                        <Select.Option value="全景">全景</Select.Option>
+                        <Select.Option value="远景">远景</Select.Option>
+                        <Select.Option value="俯拍">俯拍</Select.Option>
+                        <Select.Option value="仰拍">仰拍</Select.Option>
+                        <Select.Option value="航拍">航拍</Select.Option>
+                        <Select.Option value="移动镜头">移动镜头</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item name="emotion" label="情感基调">
+                      <Select placeholder="选择情感">
+                        <Select.Option value="积极">积极</Select.Option>
+                        <Select.Option value="专业">专业</Select.Option>
+                        <Select.Option value="热情">热情</Select.Option>
+                        <Select.Option value="平静">平静</Select.Option>
+                        <Select.Option value="紧张">紧张</Select.Option>
+                        <Select.Option value="轻松">轻松</Select.Option>
+                        <Select.Option value="浪漫">浪漫</Select.Option>
+                        <Select.Option value="神秘">神秘</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Form.Item name="ai_prompt" label="AI 生图提示词">
+                  <Input.TextArea rows={2} placeholder="用于 AI 生成图片的英文提示词" />
                 </Form.Item>
-                <Form.Item name="emotion" label="情感风格">
-                  <Select>
-                    <Select.Option value="积极">积极</Select.Option>
-                    <Select.Option value="专业">专业</Select.Option>
-                    <Select.Option value="热情">热情</Select.Option>
-                    <Select.Option value="平静">平静</Select.Option>
-                  </Select>
-                </Form.Item>
-                <Form.Item name="transition" label="转场效果">
-                  <Select>
-                    <Select.Option value="fade">淡入淡出</Select.Option>
-                    <Select.Option value="none">无转场</Select.Option>
-                    <Select.Option value="wipe">滑动转场</Select.Option>
-                  </Select>
+
+                <Row gutter={8}>
+                  <Col span={12}>
+                    <Form.Item name="transition" label="转场效果">
+                      <Select>
+                        <Select.Option value="none">无转场</Select.Option>
+                        <Select.Option value="fade">淡入淡出</Select.Option>
+                        <Select.Option value="wipe">滑动转场</Select.Option>
+                        <Select.Option value="dissolve">溶解</Select.Option>
+                        <Select.Option value="zoom">缩放转场</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item name="music_mood" label="配乐氛围">
+                      <Select>
+                        <Select.Option value="无">无背景音乐</Select.Option>
+                        <Select.Option value="轻快">轻快</Select.Option>
+                        <Select.Option value="舒缓">舒缓</Select.Option>
+                        <Select.Option value="动感">动感</Select.Option>
+                        <Select.Option value="紧张">紧张</Select.Option>
+                        <Select.Option value="浪漫">浪漫</Select.Option>
+                        <Select.Option value="史诗">史诗</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Form.Item name="subtitle" label="字幕文案">
+                  <Input.TextArea rows={1} placeholder="可选的字幕显示内容" />
                 </Form.Item>
               </>
             )}
