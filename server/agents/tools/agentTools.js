@@ -18,15 +18,16 @@ const updateSceneTool = {
   description: '更新分镜的内容和属性，包括描述、旁白、时长等',
   parameters: z.object({
     projectId: z.string().describe('项目ID'),
-    sceneIndex: z.number().describe('分镜索引（从0开始）'),
+    sceneId: z.number().describe('分镜ID（从1开始）'),
     field: z.string().describe('要更新的字段名'),
     value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe('字段值')
   }),
-  execute: async ({ projectId, sceneIndex, field, value }) => {
+  execute: async ({ projectId, sceneId, field, value }) => {
     try {
+      const sceneIndex = sceneId - 1;
       const result = await updateSceneAsset(projectId, sceneIndex, field, value);
       if (result.success) {
-        return `✅ 分镜 ${sceneIndex} 的 ${field} 已更新为: ${value}`;
+        return `✅ 分镜 ${sceneId} 的 ${field} 已更新为: ${value}`;
       }
       return `❌ 更新失败: ${result.error}`;
     } catch (error) {
@@ -120,9 +121,9 @@ const generateVideoTool = {
     imageUrl: z.string().optional().describe('首帧图片URL'),
     duration: z.number().optional().describe('视频时长（秒）'),
     projectId: z.string().optional().describe('项目ID'),
-    sceneIndex: z.number().optional().describe('分镜索引')
+    sceneId: z.number().optional().describe('分镜ID（从1开始）')
   }),
-  execute: async ({ prompt, imageUrl, duration, projectId, sceneIndex }) => {
+  execute: async ({ prompt, imageUrl, duration, projectId, sceneId }) => {
     try {
       const result = await videoAPI.createVideoTask({
         prompt,
@@ -130,7 +131,8 @@ const generateVideoTool = {
         duration: duration || 5
       });
       
-      if (projectId && sceneIndex !== undefined) {
+      if (projectId && sceneId !== undefined) {
+        const sceneIndex = sceneId - 1;
         await updateSceneAsset(projectId, sceneIndex, 'taskId', result.id);
       }
       
