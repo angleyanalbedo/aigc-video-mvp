@@ -346,6 +346,23 @@ const ProjectListPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                     {m.type && m.type.startsWith('image') ? (
                       <img src={m.url} alt={m.filename} style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />
+                    ) : m.type && m.type.startsWith('video') ? (
+                      <div style={{ width: 32, height: 32, position: 'relative', borderRadius: 4, overflow: 'hidden' }}>
+                        <video
+                          src={m.url}
+                          muted
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: 12,
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                        }}>🎥</div>
+                      </div>
                     ) : (
                       <div style={{ width: 32, height: 32, backgroundColor: '#eaeaea', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4 }}>🎥</div>
                     )}

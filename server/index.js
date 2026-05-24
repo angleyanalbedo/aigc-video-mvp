@@ -577,17 +577,176 @@ app.post('/api/video/compose', async (req, res) => {
     return res.status(400).json({ error: '缺少分镜数据' });
   }
 
+  const tempFilesToClean = []; // 用于存放本次合成产生的临时文件路径，成功或失败后统一清理
+
   try {
-    console.log('🎬 开始视频拼接...');
+    console.log('🎬 [Canvas Compose] 开始视频拼接与音频多轨混音流程...');
     console.log(`📊 分镜数量: ${scenes.length}`);
 
-    const composer = new VideoComposer(scenes, {
-      ...options,
+    // 6.1 预处理：解析每个分镜的 videoUrl，确保其有可用的本地 videoPath
+    const processedScenes = [];
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      let videoPath = scene.videoPath || null;
+
+      if (!videoPath || !fs.existsSync(videoPath)) {
+        if (scene.videoUrl) {
+          const urlStr = scene.videoUrl;
+          // A. 自动映射本地生成的 outputs 路径
+          if (urlStr.includes('outputs/')) {
+            const filename = path.basename(urlStr);
+            const localPath = path.join(outputDir, filename);
+            if (fs.existsSync(localPath)) {
+              videoPath = localPath;
+              console.log(`✅ [Canvas Compose] 成功自动映射本地输出视频: ${filename}`);
+            }
+          } 
+          // B. 自动映射本地上传的 uploads 路径
+          else if (urlStr.includes('uploads/')) {
+            const filename = path.basename(urlStr);
+            const localPath = path.join(uploadsDir, filename);
+            if (fs.existsSync(localPath)) {
+              videoPath = localPath;
+              console.log(`✅ [Canvas Compose] 成功自动映射本地素材库视频: ${filename}`);
+            }
+          }
+
+          // C. 外部/远程链接下载
+          if (!videoPath) {
+            videoPath = path.join(tempDir, `download_compose_scene_${scene.sceneId || i}_${Date.now()}.mp4`);
+            console.log(`📥 [Canvas Compose] 下载外部远程分镜视频: ${urlStr} -> ${videoPath}`);
+            await downloadFile(urlStr, videoPath);
+            tempFilesToClean.push(videoPath);
+          }
+        }
+      }
+
+      if (!videoPath || !fs.existsSync(videoPath)) {
+        throw new Error(`分镜 ${scene.sceneId || (i + 1)} 缺少有效的本地视频文件，请先在画布卡片上生成视频片段！`);
+      }
+
+      processedScenes.push({
+        ...scene,
+        videoPath: videoPath
+      });
+    }
+
+    // 6.2 提取分镜中的旁白文案，一键生成 TTS 连续旁白音频轨
+    let narrationAudioPath = null;
+    const fullScriptText = processedScenes
+      .map(s => s.voiceover || '')
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    if (fullScriptText) {
+      console.log(`🎙️ [Canvas Compose] 提取到旁白文本 (共 ${fullScriptText.length} 字)，生成 TTS 配音...`);
+      try {
+        const ttsService = new TTSService();
+        const ttsResult = await ttsService.generate(fullScriptText, {
+          voice: options.voice || 'zh-CN-XiaoxiaoNeural',
+          rate: options.rate || '+0%',
+          outputDir: tempDir
+        });
+        narrationAudioPath = ttsResult.audioFile;
+        tempFilesToClean.push(narrationAudioPath);
+        console.log(`✅ [Canvas Compose] TTS 整合旁白配音生成成功: ${narrationAudioPath}`);
+      } catch (ttsErr) {
+        console.warn(`⚠️ [Canvas Compose] TTS 配音生成失败，将继续视频无声拼接: ${ttsErr.message}`);
+      }
+    }
+
+    // 6.3 提取并解析背景音乐 BGM
+    let bgmPath = null;
+    if (options.bgmUrl) {
+      console.log(`🎵 [Canvas Compose] 提取到背景音乐 URL: ${options.bgmUrl}`);
+      const bgmUrlStr = options.bgmUrl;
+      
+      if (bgmUrlStr.includes('uploads/')) {
+        const filename = path.basename(bgmUrlStr);
+        const localPath = path.join(uploadsDir, filename);
+        if (fs.existsSync(localPath)) {
+          bgmPath = localPath;
+          console.log(`✅ [Canvas Compose] 成功自动映射本地 BGM 素材: ${filename}`);
+        }
+      } else if (bgmUrlStr.includes('outputs/')) {
+        const filename = path.basename(bgmUrlStr);
+        const localPath = path.join(outputDir, filename);
+        if (fs.existsSync(localPath)) {
+          bgmPath = localPath;
+          console.log(`✅ [Canvas Compose] 成功自动映射本地 BGM 输出: ${filename}`);
+        }
+      }
+
+      if (!bgmPath) {
+        bgmPath = path.join(tempDir, `download_compose_bgm_${Date.now()}.mp3`);
+        try {
+          console.log(`📥 [Canvas Compose] 下载远程 BGM 素材音频: ${bgmUrlStr} -> ${bgmPath}`);
+          await downloadFile(bgmUrlStr, bgmPath);
+          tempFilesToClean.push(bgmPath);
+        } catch (bgmErr) {
+          console.warn(`⚠️ [Canvas Compose] 下载 BGM 音乐失败，将跳过 BGM 背景音: ${bgmErr.message}`);
+          bgmPath = null;
+        }
+      }
+    }
+
+    // 6.4 使用 ffmpeg-static 进行专业多音轨重叠混音处理 (Voiceover + BGM)
+    let finalAudioPath = null;
+    if (narrationAudioPath && bgmPath) {
+      const ffmpegStaticPath = require('ffmpeg-static');
+      const mixedPath = path.join(tempDir, `mixed_narration_bgm_${Date.now()}.aac`);
+      
+      console.log(`🎛️ [Canvas Compose] 开始进行旁白声与背景乐多音轨混合 (使用 execFileSync)...`);
+      try {
+        // [0:a]volume=1.0[vov] 旁白声音主导音量
+        // [1:a]volume=0.15[bg] BGM 降低为 0.15 确保配音清晰
+        // 使用 execFileSync 排除 Windows 命令行下对包含空格或特殊字符的文件路径混淆
+        require('child_process').execFileSync(ffmpegStaticPath, [
+          '-y',
+          '-i', narrationAudioPath,
+          '-i', bgmPath,
+          '-filter_complex', '[0:a]volume=1.0[vov];[1:a]volume=0.15[bg];[vov][bg]amix=inputs=2:duration=first[a]',
+          '-map', '[a]',
+          '-c:a', 'aac',
+          mixedPath
+        ], { stdio: 'ignore' });
+        
+        finalAudioPath = mixedPath;
+        tempFilesToClean.push(finalAudioPath);
+        console.log(`✅ [Canvas Compose] 多轨专业混音成功! 输出混音音频: ${finalAudioPath}`);
+      } catch (mixErr) {
+        console.warn(`⚠️ [Canvas Compose] 音频混音命令失败，降级仅使用旁白配音: ${mixErr.message}`);
+        finalAudioPath = narrationAudioPath;
+      }
+    } else if (narrationAudioPath) {
+      finalAudioPath = narrationAudioPath;
+      console.log(`🔊 [Canvas Compose] 仅使用旁白音频轨进行合成`);
+    } else if (bgmPath) {
+      finalAudioPath = bgmPath;
+      console.log(`🔊 [Canvas Compose] 仅使用背景音乐轨进行合成`);
+    }
+
+    // 6.5 使用视频拼接器拼接分镜，并合并最终音频轨
+    const composer = new VideoComposer(processedScenes, {
       outputDir: outputDir,
-      tempDir: tempDir
+      tempDir: tempDir,
+      transition: options.transition || 'fade'
     });
 
-    const result = await composer.compose();
+    const result = await composer.compose(finalAudioPath);
+
+    // 6.6 清理产生的临时视频及混音文件
+    tempFilesToClean.forEach(f => {
+      try {
+        if (fs.existsSync(f)) {
+          fs.unlinkSync(f);
+          console.log(`🧹 [Canvas Compose] 已清理临时文件: ${path.basename(f)}`);
+        }
+      } catch (cleanErr) {
+        console.warn(`⚠️ [Canvas Compose] 清理临时文件失败: ${f}`, cleanErr.message);
+      }
+    });
 
     res.json({
       success: true,
@@ -595,9 +754,18 @@ app.post('/api/video/compose', async (req, res) => {
       duration: result.duration,
       tracks: result.tracks
     });
+
   } catch (error) {
-    console.error('视频拼接失败:', error);
-    res.status(500).json({ error: '视频拼接失败: ' + error.message });
+    console.error('❌ [Canvas Compose] 视频拼接多音轨合成失败:', error);
+    
+    // 失败也执行清理，避免临时资源残留
+    tempFilesToClean.forEach(f => {
+      try {
+        if (fs.existsSync(f)) fs.unlinkSync(f);
+      } catch (e) {}
+    });
+
+    res.status(500).json({ error: '视频拼接合成失败: ' + error.message });
   }
 });
 
