@@ -213,29 +213,37 @@ class AttributionService {
     for (const video of data) {
       let groupKey;
 
-      // 处理不同的字段名格式（数据库格式 vs Mock格式）
       const videoData = {
-        opening_style: video.opening_style || video.openingStyle,
-        bgm_style: video.bgm_style || video.bgmStyle,
-        voiceover_style: video.voiceover_style || video.voiceoverStyle,
-        color_tone: video.color_tone || video.colorTone,
-        subtitle_style: video.subtitle_style || video.subtitleStyle,
-        aspect_ratio: video.aspect_ratio || video.aspectRatio,
-        duration: video.duration || video.videoLength,
-        scene_count: video.scene_count || video.sceneCount,
+        openingStyle: video.openingStyle || video.opening_style,
+        bgmStyle: video.bgmStyle || video.bgm_style,
+        voiceoverStyle: video.voiceoverStyle || video.voiceover_style,
+        colorTone: video.colorTone || video.color_tone,
+        subtitleStyle: video.subtitleStyle || video.subtitle_style,
+        aspectRatio: video.aspectRatio || video.aspect_ratio,
+        duration: video.duration || video.videoLength || video.video_length,
+        sceneCount: video.sceneCount || video.scene_count,
         views: video.views || video.totalViews || 0,
-        completion_rate: video.completion_rate || video.completionRate,
-        click_through_rate: video.click_through_rate || video.clickThroughRate,
-        conversion_rate: video.conversion_rate || video.conversionRate
+        completionRate: video.completionRate || video.completion_rate,
+        clickThroughRate: video.clickThroughRate || video.click_through_rate,
+        conversionRate: video.conversionRate || video.conversion_rate
       };
 
       if (factorInfo.type === 'categorical') {
-        groupKey = videoData[factorKey];
+        // 直接使用 camelCase 字段名
+        if (videoData[factorKey] !== undefined && videoData[factorKey] !== null) {
+          groupKey = videoData[factorKey];
+        } else {
+          // 尝试 snake_case
+          const snakeKey = factorKey.replace(/([A-Z])/g, '_$1').toLowerCase();
+          if (videoData[snakeKey] !== undefined && videoData[snakeKey] !== null) {
+            groupKey = videoData[snakeKey];
+          }
+        }
       } else if (factorInfo.type === 'range') {
-        groupKey = this.getRangeLabel(videoData[factorKey], factorInfo.options);
+        groupKey = this.getRangeLabel(videoData.duration, factorInfo.options);
       }
 
-      if (!groupKey) continue;
+      if (!groupKey || groupKey === undefined) continue;
 
       if (!groups[groupKey]) {
         groups[groupKey] = {
@@ -259,20 +267,19 @@ class AttributionService {
 
       if (count === 0) continue;
 
-      // 统一计算各指标
       let totalCompletionRate = 0;
       let totalClickRate = 0;
       let totalConversionRate = 0;
 
       for (const video of videos) {
-        const videoData = {
-          completion_rate: video.completion_rate || video.completionRate,
-          click_through_rate: video.click_through_rate || video.clickThroughRate,
-          conversion_rate: video.conversion_rate || video.conversionRate
+        const vData = {
+          completionRate: video.completionRate || video.completion_rate,
+          clickThroughRate: video.clickThroughRate || video.click_through_rate,
+          conversionRate: video.conversionRate || video.conversion_rate
         };
-        totalCompletionRate += videoData.completion_rate || 0;
-        totalClickRate += videoData.click_through_rate || 0;
-        totalConversionRate += videoData.conversion_rate || 0;
+        totalCompletionRate += vData.completionRate || 0;
+        totalClickRate += vData.clickThroughRate || 0;
+        totalConversionRate += vData.conversionRate || 0;
       }
 
       const avgCompletionRate = totalCompletionRate / count;
@@ -281,13 +288,13 @@ class AttributionService {
 
       results.push({
         factorName: factorInfo.name,
-        value: groupKey, // frontend uses 'value'
+        value: groupKey,
         count: count,
         totalViews: groupData.totalViews,
         avgViews: Math.round(groupData.totalViews / count),
-        avgCompletionRate: Math.round(avgCompletionRate * 1000) / 1000, // fractional e.g. 0.685
+        avgCompletionRate: Math.round(avgCompletionRate * 1000) / 1000,
         avgClickThroughRate: Math.round(avgClickThroughRate * 1000) / 1000,
-        avgConversionRate: Math.round(avgConversionRate * 1000) / 1000 // fractional e.g. 0.023
+        avgConversionRate: Math.round(avgConversionRate * 1000) / 1000
       });
     }
 
