@@ -13,7 +13,6 @@ class WebSocketService {
 
     server.on('upgrade', (request, socket, head) => {
       const pathname = url.parse(request.url).pathname;
-      console.log(`[DEBUG] WebSocket Upgrade Request: pathname = ${pathname}`);
       
       // Matches /ws/canvas/:projectId
       const match = pathname.match(/^\/ws\/canvas\/([^/]+)$/);
@@ -24,7 +23,6 @@ class WebSocketService {
           this.wss.emit('connection', ws, request, projectId);
         });
       } else {
-        console.warn(`⚠️  WebSocket Upgrade Denied: ${pathname}`);
         socket.destroy();
       }
     });
@@ -38,7 +36,6 @@ class WebSocketService {
       this.projectClients.get(projectId).add(ws);
 
       ws.on('close', () => {
-        console.log(`🔌 WebSocket: Client disconnected for project "${projectId}"`);
         const clients = this.projectClients.get(projectId);
         if (clients) {
           clients.delete(ws);
@@ -58,7 +55,6 @@ class WebSocketService {
     try {
       const masterAgent = require('../agents/masterAgent');
       masterAgent.on('operationProgress', ({ projectId, operationNodeId, progress, stepId }) => {
-        console.log(`⚙️  WebSocketService: Received progress event for project ${projectId}, Node ${operationNodeId}: ${progress}%`);
         this.broadcast(projectId, {
           type: 'operation_progress',
           operationNodeId,
@@ -66,7 +62,6 @@ class WebSocketService {
           stepId
         });
       });
-      console.log('✅ WebSocketService: Successfully registered listener for MasterAgent operationProgress events.');
     } catch (err) {
       console.error('❌ WebSocketService: Failed to bind MasterAgent events:', err.message);
     }
@@ -78,7 +73,6 @@ class WebSocketService {
       return;
     }
     
-    console.log(`📡 WebSocketService: Broadcasting "${event.type}" to ${clients.size} clients of project "${projectId}"`);
     const message = JSON.stringify(event);
     for (const ws of clients) {
       if (ws.readyState === WebSocket.OPEN) {

@@ -1,3 +1,4 @@
+// Canvas Sync Service - Manages synchronization between canvas nodes and project data
 const db = require('../db');
 
 class CanvasSyncService {
@@ -9,80 +10,72 @@ class CanvasSyncService {
     this.eventEmitter = emitter;
   }
 
-  // ─────────────────────────────────────────────────────────
-  // 节点操作
-  // ─────────────────────────────────────────────────────────
-
-  async createNode(projectId, nodeType, nodeData, position, style = {}, customNodeId = null) {
-    const nodeId = customNodeId || `node_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
+  // Node CRUD
+  async createNode(projectId, nodeType, data, position = { x: 0, y: 0 }) {
+    const id = `${nodeType}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    
     db.prepare(`
-      INSERT INTO canvas_nodes
-      (id, project_id, node_type, node_data, position_x, position_y, style)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      nodeId,
-      projectId,
-      nodeType,
-      JSON.stringify(nodeData),
-      position.x,
-      position.y,
-      JSON.stringify(style)
-    );
+      INSERT INTO canvas_nodes (id, project_id, node_type, node_data, position_x, position_y, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, projectId, nodeType, JSON.stringify(data), position.x, position.y, new Date().toISOString(), new Date().toISOString());
 
-    const node = {
-      id: nodeId,
-      projectId,
-      type: nodeType,
-      data: nodeData,
-      position,
-      style
-    };
-
+    const node = await this.getNode(id);
     this.broadcast(projectId, {
       type: 'node_created',
-      node
+      node,
+      projectId
     });
-
     return node;
+  }
+
+  async getNode(nodeId) {
+    let row = db.prepare('SELECT * FROM canvas_nodes WHERE id = ?').get(nodeId);
+    if (!row) return null;
+    return this.parseNode(row);
+  }
+
+  async getNodes(projectId, nodeType = null) {
+    let query = 'SELECT * FROM canvas_nodes WHERE project_id = ?';
+    const params = [projectId];
+    
+    if (nodeType) {
+      query += ' AND node_type = ?';
+      params.push(nodeType);
+    }
+    
+    const rows = db.prepare(query).all(...params);
+    return rows.map(row => this.parseNode(row));
+  }
+
+  parseNode(row) {
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      type: row.node_type,
+      data: JSON.parse(row.node_data),
+      position: { x: row.position_x, y: row.position_y },
+      width: row.width,
+      height: row.height,
+      style: row.style ? JSON.parse(row.style) : null,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   }
 
   async updateNode(projectId, nodeId, updates) {
     const node = await this.getNode(nodeId);
-    if (!node) {
-      throw new Error(`节点不存在: ${nodeId}`);
-    }
+    if (!node) return null;
 
-    // Filter out columns from data updates if they are stored in columns
-    const { position, size, style, metadata, ...dataUpdates } = updates;
-    const newData = { ...node.data, ...dataUpdates };
+    const newData = { ...node.data, ...updates };
+    
+    db.prepare(`
+      UPDATE canvas_nodes 
+      SET node_data = ?, updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(newData), new Date().toISOString(), nodeId);
 
-    let query = 'UPDATE canvas_nodes SET node_data = ?, updated_at = ?';
-    const params = [JSON.stringify(newData), new Date().toISOString()];
-
-    if (position) {
-      query += ', position_x = ?, position_y = ?';
-      params.push(position.x, position.y);
-    }
-    if (size) {
-      query += ', width = ?, height = ?';
-      params.push(size.width, size.height);
-    }
-    if (style) {
-      query += ', style = ?';
-      params.push(JSON.stringify(style));
-    }
-    if (metadata) {
-      query += ', metadata = ?';
-      params.push(JSON.stringify(metadata));
-    }
-
-    query += ' WHERE id = ?';
-    params.push(node.id);
-
-    db.prepare(query).run(...params);
-
-    // If it's a scene node, sync back to projects.script.scenes
+    // Sync scene updates back to projects.script
     if (node.type === 'scene' && node.data.id) {
       try {
         const projectModel = require('../models/project');
@@ -94,7 +87,6 @@ class CanvasSyncService {
             if (idx >= 0) {
               script.scenes[idx] = { ...script.scenes[idx], ...updates };
               await projectModel.update(projectId, { script });
-              console.log(`✅ Synced Canvas SceneNode ${node.data.id} update back to projects.script!`);
             }
           }
         }
@@ -140,7 +132,6 @@ class CanvasSyncService {
               if (s.sceneId) s.sceneId = index + 1;
             });
             await projectModel.update(projectId, { script });
-            console.log(`✅ Synced Canvas SceneNode ${node.data.id} deletion and re-indexing back to projects.script!`);
           }
         }
       } catch (err) {
@@ -156,28 +147,6 @@ class CanvasSyncService {
     return true;
   }
 
-  async getNode(nodeId) {
-    let row = db.prepare('SELECT * FROM canvas_nodes WHERE id = ?').get(nodeId);
-    if (!row && typeof nodeId === 'string' && nodeId.startsWith('scene_')) {
-      const sceneIdVal = parseInt(nodeId.split('_')[1], 10);
-      if (!isNaN(sceneIdVal)) {
-        // Search by scene id in node_data
-        const rows = db.prepare("SELECT * FROM canvas_nodes WHERE node_type = 'scene'").all();
-        row = rows.find(r => {
-          try {
-            const data = JSON.parse(r.node_data);
-            return data.id === sceneIdVal || data.sceneId === sceneIdVal;
-          } catch {
-            return false;
-          }
-        });
-      }
-    }
-    if (!row) return null;
-
-    return this.parseNode(row);
-  }
-
   async ensureCanvasInitialized(projectId) {
     try {
       const countRow = db.prepare(
@@ -187,73 +156,26 @@ class CanvasSyncService {
       if (countRow && countRow.count > 0) {
         return; // Already initialized
       }
-
-      const projectModel = require('../models/project');
-      const project = await projectModel.getById(projectId);
-      if (project && project.script && project.script.scenes && project.script.scenes.length > 0) {
-        console.log(`🤖 Auto-initializing canvas nodes from project script for project: ${projectId}`);
-        await this.syncScriptToCanvas(projectId, project.script);
-      }
     } catch (err) {
-      console.error('⚠️ Failed to auto-initialize canvas nodes:', err.message);
+      console.error('⚠️ Failed to check canvas initialization:', err.message);
     }
   }
 
-  async getNodes(projectId, skipInit = false) {
-    if (!skipInit) {
-      await this.ensureCanvasInitialized(projectId);
-    }
-    const rows = db.prepare(
-      'SELECT * FROM canvas_nodes WHERE project_id = ? ORDER BY created_at'
-    ).all(projectId);
-
-    return rows.map(row => this.parseNode(row));
-  }
-
-  parseNode(row) {
-    return {
-      id: row.id,
-      projectId: row.project_id,
-      type: row.node_type,
-      data: JSON.parse(row.node_data),
-      position: { x: row.position_x, y: row.position_y },
-      size: { width: row.width, height: row.height },
-      style: row.style ? JSON.parse(row.style) : {},
-      metadata: row.metadata ? JSON.parse(row.metadata) : {},
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
-    };
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // 连接线操作
-  // ─────────────────────────────────────────────────────────
-
-  async createConnection(projectId, sourceNodeId, targetNodeId, connectionType, options = {}) {
-    const connectionId = `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
+  // Connections
+  async createConnection(projectId, sourceNodeId, targetNodeId, connectionType = 'dependency') {
+    const connId = `conn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    
     db.prepare(`
-      INSERT INTO canvas_connections
-      (id, project_id, source_node_id, target_node_id, connection_type, label, style)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      connectionId,
-      projectId,
-      sourceNodeId,
-      targetNodeId,
-      connectionType,
-      options.label || null,
-      JSON.stringify(options.style || {})
-    );
+      INSERT INTO canvas_connections (id, project_id, source_node_id, target_node_id, connection_type, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(connId, projectId, sourceNodeId, targetNodeId, connectionType, new Date().toISOString());
 
     const connection = {
-      id: connectionId,
+      id: connId,
       projectId,
       sourceNodeId,
       targetNodeId,
-      connectionType,
-      label: options.label,
-      style: options.style
+      type: connectionType
     };
 
     this.broadcast(projectId, {
@@ -264,182 +186,108 @@ class CanvasSyncService {
     return connection;
   }
 
-  async getConnections(projectId, skipInit = false) {
-    if (!skipInit) {
-      await this.ensureCanvasInitialized(projectId);
-    }
-    const rows = db.prepare(
-      'SELECT * FROM canvas_connections WHERE project_id = ?'
-    ).all(projectId);
-
+  async getConnections(projectId) {
+    const rows = db.prepare(`
+      SELECT * FROM canvas_connections 
+      WHERE project_id = ?
+    `).all(projectId);
+    
     return rows.map(row => ({
       id: row.id,
       projectId: row.project_id,
       sourceNodeId: row.source_node_id,
       targetNodeId: row.target_node_id,
-      connectionType: row.connection_type,
+      type: row.connection_type,
       label: row.label,
-      style: row.style ? JSON.parse(row.style) : {}
+      style: row.style ? JSON.parse(row.style) : null,
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
+      createdAt: row.created_at
     }));
   }
 
-  // ─────────────────────────────────────────────────────────
-  // Agent 特定操作
-  // ─────────────────────────────────────────────────────────
+  async deleteConnection(projectId, connectionId) {
+    db.prepare('DELETE FROM canvas_connections WHERE id = ?').run(connectionId);
 
-  async createIntentAndPlan(projectId, intent, plan, sessionId) {
-    // 根据用户需求：intent 和 plan 不再显示在画布上
-    // Agent 内部理解用户意图并生成执行计划，但不创建节点
-    // 只返回计划信息供 Agent 内部使用
-    
-    console.log(`🤖 Agent 理解用户意图: ${intent.primaryIntent}`);
-    console.log(`📋 Agent 生成执行计划: ${plan.steps.length} 个步骤`);
+    this.broadcast(projectId, {
+      type: 'connection_deleted',
+      connectionId
+    });
 
-    return {
-      intentNodeId: null,
-      planNodeId: null,
-      operationNodeIds: []
-    };
+    return true;
   }
 
-  async updatePlanStatus(planNodeId, status) {
-    // 不再更新画布上的 plan 节点
-    console.log(`📋 Plan status updated (internal): ${status}`);
-  }
-
-  async updateStepStatus(planNodeId, stepId, status, result = null, error = null) {
-    // 不再更新画布上的 step 状态
-    console.log(`📋 Step ${stepId} status: ${status}`);
-  }
-
-  async createOperationNode(projectId, step, parentPlanId) {
-    // 不再创建 operation 节点到画布
-    console.log(`⚙️ Operation node would be created (not displayed): ${step.type}`);
-    return null;
-  }
-
-  async updateOperationNode(operationNodeId, updates) {
-    // 不再更新画布上的 operation 节点
-    console.log(`⚙️ Operation node updated (internal):`, updates);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // 业务表同步
-  // ─────────────────────────────────────────────────────────
-
+  // Sync Script to Canvas
   async syncScriptToCanvas(projectId, script) {
-    const existingNodes = await this.getNodes(projectId, true);
-    const existingScriptNodes = existingNodes.filter(n => n.type === 'script');
+    if (!script || !script.scenes) return;
 
-    let scriptNodeId;
+    const existingNodes = await this.getNodes(projectId, 'scene');
+    const existingIds = new Set(existingNodes.map(n => n.data.id));
+    const scriptSceneIds = new Set(script.scenes.map(s => s.id));
 
-    if (existingScriptNodes.length > 0) {
-      scriptNodeId = existingScriptNodes[0].id;
-      await this.updateNode(projectId, scriptNodeId, script);
-    } else {
-      const scriptNode = await this.createNode(
-        projectId,
-        'script',
-        script,
-        { x: 50, y: 50 }
-      );
-      scriptNodeId = scriptNode.id;
-    }
+    // Add new scenes
+    for (const scene of script.scenes) {
+      if (!existingIds.has(scene.id)) {
+        const yPos = 100 + (scene.id - 1) * 180;
+        await this.createNode(projectId, 'scene', {
+          id: scene.id,
+          title: `分镜 ${scene.id}`,
+          description: scene.description || '',
+          voiceover: scene.voiceover || '',
+          duration: scene.duration || 5,
+          shot_type: scene.shot_type || '中景',
+          status: scene.status || 'idle'
+        }, { x: 400, y: yPos });
 
-    const existingSceneNodes = existingNodes.filter(n => n.type === 'scene');
-
-    for (let i = 0; i < script.scenes.length; i++) {
-      const scene = script.scenes[i];
-      const sceneNodeId = `scene_${scene.id}`;
-
-      const existingNode = existingSceneNodes.find(n => 
-        n.id === sceneNodeId || n.data.id === scene.id || n.data.sceneId === scene.id
-      );
-
-      if (existingNode) {
-        await this.updateNode(projectId, existingNode.id, scene);
-      } else {
-        const sceneNode = await this.createNode(
-          projectId,
-          'scene',
-          scene,
-          { x: 350, y: 50 + i * 180 },
-          {},
-          sceneNodeId
-        );
-
-        await this.createConnection(
-          projectId,
-          scriptNodeId,
-          sceneNode.id,
-          'timeline'
-        );
+        // Connect to script node if exists
+        const scriptNode = await this.getNodes(projectId, 'script');
+        if (scriptNode.length > 0) {
+          await this.createConnection(projectId, scriptNode[0].id, `scene_${scene.id}`, 'timeline');
+        }
       }
     }
 
-    const existingVideoNodes = existingNodes.filter(n => n.type === 'video');
-    let videoNodeId;
+    // Ensure video node exists
+    const videoNodes = await this.getNodes(projectId, 'video');
+    if (videoNodes.length === 0) {
+      await this.createNode(projectId, 'video', {
+        title: '最终成片',
+        description: '将所有分镜视频与背景音乐合成最终商业短视频',
+        status: 'idle',
+        videoUrl: null
+      }, { x: 680, y: 50 });
 
-    if (existingVideoNodes.length === 0) {
-      const videoNode = await this.createNode(
-        projectId,
-        'video',
-        {
-          title: '最终合成成片',
-          description: '将所有分镜视频与背景音乐合成最终商业短视频',
-          status: 'idle',
-          videoUrl: null
-        },
-        { x: 680, y: 50 }
-      );
-      videoNodeId = videoNode.id;
-
-      for (let i = 0; i < script.scenes.length; i++) {
-        const resolvedSceneNode = await this.getNode(`scene_${script.scenes[i].id}`);
-        const actualSceneNodeId = resolvedSceneNode ? resolvedSceneNode.id : `scene_${script.scenes[i].id}`;
-        await this.createConnection(
-          projectId,
-          actualSceneNodeId,
-          videoNodeId,
-          'dependency'
-        );
+      // Connect all scenes to video node
+      const sceneNodes = await this.getNodes(projectId, 'scene');
+      const videoNode = (await this.getNodes(projectId, 'video'))[0];
+      if (videoNode) {
+        for (const sceneNode of sceneNodes) {
+          await this.createConnection(projectId, sceneNode.id, videoNode.id, 'dependency');
+        }
       }
-    } else {
-      videoNodeId = existingVideoNodes[0].id;
     }
-
-    return scriptNodeId;
   }
 
-  // ─────────────────────────────────────────────────────────
-  // 实时推送
-  // ─────────────────────────────────────────────────────────
-
+  // Broadcast events
   broadcast(projectId, event) {
     try {
       const webSocketService = require('./webSocketService');
       webSocketService.broadcast(projectId, event);
     } catch (wsErr) {
-      console.warn('⚠️ WebSocket Broadcast error:', wsErr.message);
+      // WebSocket service not available, ignore
     }
 
     if (this.eventEmitter) {
       try {
         if (typeof this.eventEmitter.to === 'function') {
           this.eventEmitter.to(`canvas:${projectId}`).emit('canvasEvent', event);
-        } else {
-          console.log('📡 Broadcast (Socket.io not configured):', event.type, projectId);
         }
       } catch (error) {
-        console.error('Broadcast error:', error);
+        // Socket.io not configured, ignore
       }
     }
   }
 
-  // ─────────────────────────────────────────────────────────
-  // 聊天会话管理
-  // ─────────────────────────────────────────────────────────
-
+  // Chat Session Management
   async createChatSession(projectId, title = '新会话') {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
@@ -466,85 +314,42 @@ class CanvasSyncService {
       JSON.stringify(metadata)
     );
 
-    // Broadcast chat message created event
-    try {
-      const session = db.prepare('SELECT project_id FROM chat_sessions WHERE id = ?').get(sessionId);
-      if (session) {
-        const projectId = session.project_id;
-        const message = {
-          id: messageId,
-          role,
-          messageType,
-          content,
-          metadata,
-          createdAt: Date.now()
-        };
-        this.broadcast(projectId, {
-          type: 'chat_message_created',
-          message
-        });
-      }
-    } catch (broadcastErr) {
-      console.warn('⚠️ Failed to broadcast chat message over WebSocket:', broadcastErr.message);
-    }
-
     return messageId;
   }
 
-  async getChatHistory(sessionId) {
+  async getChatMessages(sessionId) {
     const rows = db.prepare(`
-      SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC
+      SELECT * FROM chat_messages 
+      WHERE session_id = ?
+      ORDER BY created_at ASC
     `).all(sessionId);
-
+    
     return rows.map(row => ({
       id: row.id,
+      sessionId: row.session_id,
       role: row.role,
-      messageType: row.message_type,
+      type: row.message_type,
       content: row.content,
-      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      metadata: row.metadata ? JSON.parse(row.metadata) : null,
       createdAt: row.created_at
     }));
   }
 
-  async createSceneNodeDirectly(projectId, sceneData, position) {
-    const projectModel = require('../models/project');
-    const project = await projectModel.getById(projectId);
-    let script = project.script || { title: '未命名剧本', scenes: [] };
-    if (!script.scenes) script.scenes = [];
-
-    const newSceneId = script.scenes.length + 1;
-    const newScene = {
-      id: newSceneId,
-      sceneId: newSceneId,
-      description: sceneData.description || '新分镜描述',
-      voiceover: sceneData.voiceover || '新旁白文案',
-      duration: Number(sceneData.duration) || 3,
-      shot_type: sceneData.shot_type || '中景',
-      emotion: sceneData.emotion || '积极',
-      transition: sceneData.transition || 'fade',
-      status: 'idle',
-      videoUrl: null,
-      audioUrl: null
-    };
-
-    script.scenes.push(newScene);
-    await projectModel.update(projectId, { script });
-
-    const sceneNode = await this.createNode(
-      projectId,
-      'scene',
-      newScene,
-      position || { x: 350, y: 50 + (newSceneId - 1) * 180 },
-      {},
-      `scene_${newSceneId}`
-    );
-
-    const scriptNode = (await this.getNodes(projectId)).find(n => n.type === 'script');
-    if (scriptNode) {
-      await this.createConnection(projectId, scriptNode.id, sceneNode.id, 'timeline');
-    }
-
-    return sceneNode;
+  async getChatSessions(projectId) {
+    const rows = db.prepare(`
+      SELECT * FROM chat_sessions 
+      WHERE project_id = ?
+      ORDER BY created_at DESC
+    `).all(projectId);
+    
+    return rows.map(row => ({
+      id: row.id,
+      projectId: row.project_id,
+      title: row.title,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
   }
 }
 

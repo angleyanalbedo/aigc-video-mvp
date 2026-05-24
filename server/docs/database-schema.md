@@ -9,6 +9,161 @@
 
 ---
 
+## 🔗 E-R 关系图
+
+```mermaid
+erDiagram
+    PROJECTS ||--o{ SCENES : "包含"
+    PROJECTS ||--o{ MATERIALS : "拥有"
+    PROJECTS ||--o{ CANVAS_NODES : "包含"
+    PROJECTS ||--o{ CANVAS_CONNECTIONS : "包含"
+    PROJECTS ||--o{ CHAT_SESSIONS : "包含"
+    PROJECTS ||--o{ TASKS : "拥有"
+    PROJECTS ||--o{ REVIEWS : "拥有"
+    PROJECTS ||--o{ AB_EXPERIMENTS : "拥有"
+    
+    SCENES ||--o{ CANVAS_NODES : "同步到"
+    
+    CANVAS_NODES ||--o{ CANVAS_CONNECTIONS : "source"
+    CANVAS_NODES ||--o{ CANVAS_CONNECTIONS : "target"
+    
+    CHAT_SESSIONS ||--o{ CHAT_MESSAGES : "包含"
+
+    PROJECTS {
+        string id PK
+        string name
+        string description
+        string status
+        string product_info
+        string script
+        string settings
+        string video_url
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCENES {
+        string id PK
+        string project_id FK
+        int scene_order
+        string description
+        string voiceover
+        string narration
+        string subtitle
+        string shot_type
+        string emotion
+        string transition
+        string music_mood
+        string ai_prompt
+        string first_frame_url
+        string last_frame_url
+        string source_video_url
+        string reference_image_id
+        string reference_image_url
+        string image_url
+        int duration
+        string status
+        int rendering
+        int progress
+        string error_message
+        string video_url
+        string audio_url
+        int tts_est_duration
+        datetime generated_at
+        datetime created_at
+        datetime updated_at
+    }
+
+    MATERIALS {
+        string id PK
+        string project_id FK
+        string filename
+        string url
+        string type
+        string tags
+        string embedding
+        string content
+        datetime created_at
+    }
+
+    CANVAS_NODES {
+        string id PK
+        string project_id FK
+        string node_type
+        string node_data
+        float position_x
+        float position_y
+        float width
+        float height
+        string style
+        string metadata
+        datetime created_at
+        datetime updated_at
+    }
+
+    CANVAS_CONNECTIONS {
+        string id PK
+        string project_id FK
+        string source_node_id FK
+        string target_node_id FK
+        string connection_type
+        string label
+        string style
+        string metadata
+        datetime created_at
+    }
+
+    CHAT_SESSIONS {
+        string id PK
+        string project_id FK
+        string title
+        string status
+        datetime created_at
+        datetime updated_at
+    }
+
+    CHAT_MESSAGES {
+        string id PK
+        string session_id FK
+        string role
+        string message_type
+        string content
+        string metadata
+        datetime created_at
+    }
+
+    TASKS {
+        string id PK
+        string project_id FK
+        string type
+        string status
+        int progress
+        string result
+        string error
+        string trace
+        datetime created_at
+        datetime updated_at
+    }
+```
+
+### 关系说明
+
+| 关系 | 说明 | 基数 |
+|------|------|------|
+| `PROJECTS → SCENES` | 项目包含多个分镜 | 1:N |
+| `PROJECTS → MATERIALS` | 项目拥有多个素材 | 1:N |
+| `PROJECTS → CANVAS_NODES` | 项目包含多个画布节点 | 1:N |
+| `PROJECTS → CANVAS_CONNECTIONS` | 项目包含多个连接 | 1:N |
+| `PROJECTS → CHAT_SESSIONS` | 项目包含多个会话 | 1:N |
+| `PROJECTS → TASKS` | 项目拥有多个任务 | 1:N |
+| `PROJECTS → REVIEWS` | 项目拥有多个审核 | 1:N |
+| `PROJECTS → AB_EXPERIMENTS` | 项目包含多个实验 | 1:N |
+| `SCENES → CANVAS_NODES` | 分镜同步到画布节点 | 1:1 |
+| `CANVAS_NODES → CANVAS_CONNECTIONS` | 节点参与多个连接 | 1:N |
+| `CHAT_SESSIONS → CHAT_MESSAGES` | 会话包含多条消息 | 1:N |
+
+---
+
 ## 📊 表清单
 
 | 表名 | 说明 | 核心字段数 |
@@ -214,7 +369,6 @@ CREATE TABLE scenes (
 CREATE INDEX idx_scenes_project ON scenes(project_id);
 CREATE INDEX idx_scenes_order ON scenes(project_id, scene_order);
 CREATE INDEX idx_scenes_status ON scenes(status);
-CREATE INDEX idx_scenes_project_status ON scenes(project_id, status);
 ```
 
 ---
@@ -416,23 +570,31 @@ CREATE TABLE chat_messages (
 └──────┬───────┘
        │
        │ 1:N
-       ├──────────┐
-       │          │
-       ▼          ▼
-┌──────────┐  ┌──────────────┐
-│ scenes   │  │ materials    │
-│──────────│  │──────────────│
-│ id (PK)  │  │ id (PK)      │
-│ project_  │  │ project_id   │
-│ id (FK)  │  │ filename     │
-│ scene_order│  │ url         │
-│ description│  │ type        │
-│ voiceover │  │ tags        │
-│ first_frame│  └──────────────┘
-│ last_frame │
-│ video_url  │
-│ status     │
-└────────────┘
+       ├──────────┬────────────┬────────────┐
+       │          │            │            │
+       ▼          ▼            ▼            ▼
+┌──────────┐  ┌────────┐  ┌──────────┐  ┌──────────────┐
+│ scenes   │  │materials│ │canvas_nodes│ │chat_sessions │
+│──────────│  │────────│  │──────────│  │──────────────│
+│ id (PK)  │  │ id(PK) │  │ id (PK)  │  │ id (PK)      │
+│ project_  │  │project │  │ project_  │  │ project_id   │
+│ id (FK)  │  │_id(FK) │  │ id (FK)  │  │ id (FK)      │
+│ scene_order│  │filename │  │ node_type │  │ title        │
+│ description│  │url      │  │ node_data │  │ status       │
+│ voiceover │  │type     │  │ position  │  └──────────────┘
+│ first_frame│  │tags     │  └─────┬──────┘
+│ last_frame │  └────────┘        │
+│ video_url  │                   │ 1:N
+│ status     │                   ▼
+└────────────┘          ┌───────────────┐
+                        │canvas_       │
+                        │connections   │
+                        │──────────────│
+                        │ id (PK)      │
+                        │ source_node  │
+                        │ target_node  │
+                        │ type         │
+                        └───────────────┘
 ```
 
 ---
@@ -473,4 +635,4 @@ CREATE TABLE chat_messages (
 
 ---
 
-**文档版本**: v1.0
+**文档版本**: v1.1
