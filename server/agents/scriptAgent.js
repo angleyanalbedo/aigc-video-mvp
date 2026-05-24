@@ -111,13 +111,10 @@ class ScriptAgent {
     }
 
     try {
-      const script = await generateTextWithStructuredOutput({
-        model: llmProvider.getModel(),
+      const script = await generateStructuredText({
         system: this.getSystemPrompt(),
         prompt: prompt,
-        schema: SCRIPT_SCHEMA,
-        tools: this.tools,
-        maxSteps: 10
+        schema: this.getSchema()
       });
 
       await memoryManager.addShortTerm({
@@ -269,13 +266,10 @@ ${memoryContext ? `## 跨会话记忆上下文\n${memoryContext}\n` : ''}## 任�
 请返回修改后的完整剧本（JSON格式）。`;
 
     try {
-      const refined = await generateTextWithStructuredOutput({
-        model: llmProvider.getModel(),
+      const refined = await generateStructuredText({
         system: this.getSystemPrompt(),
         prompt: prompt,
-        schema: SCRIPT_SCHEMA,
-        tools: this.tools,
-        maxSteps: 10
+        schema: this.getSchema()
       });
 
       await memoryManager.addShortTerm({

@@ -22,27 +22,6 @@ class AssetAgent {
     return skillPrompt || FALLBACK_PROMPT;
   }
 
-  async execute(prompt, options = {}) {
-    const { maxSteps = 5 } = options;
-    try {
-      const result = await aiGenerateText({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        tools: this.tools,
-        maxSteps: maxSteps
-      });
-      return {
-        text: result.text,
-        toolResults: result.toolResults,
-        finishReason: result.finishReason
-      };
-    } catch (error) {
-      console.error('❌ AssetAgent execute 失败:', error);
-      throw error;
-    }
-  }
-
   async callSkill(params, options = {}) {
     const schema = {
       type: "object",

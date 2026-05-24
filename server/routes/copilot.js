@@ -6,7 +6,7 @@ const canvasSyncService = require('../services/canvasSyncService');
 const projectModel = require('../models/project');
 
 router.post('/chat', async (req, res) => {
-  const { message, projectId, sessionId } = req.body;
+  const { message, projectId, sessionId, metadata } = req.body;
 
   if (!message) {
     return res.status(400).json({ success: false, error: 'Message is required' });
@@ -22,7 +22,7 @@ router.post('/chat', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Project not found' });
     }
 
-    const result = await masterAgent.processMessage(message, projectId, { sessionId });
+    const result = await masterAgent.processMessage(message, projectId, { sessionId, metadata });
 
     res.json({ success: true, ...result });
   } catch (error) {

@@ -5,6 +5,7 @@ const ToolExecutor = require('./executor/toolExecutor');
 const canvasSyncService = require('../services/canvasSyncService');
 const projectModel = require('../models/project');
 const agentChatService = require('../services/agentChatService');
+const { llmProvider } = require('../services/providers');
 const skillLoader = require('./skills/skillLoader');
 const { getToolsForAgent } = require('./tools/agentTools');
 const scriptAgent = require('./scriptAgent');
@@ -61,46 +62,7 @@ class MasterAgent extends EventEmitter {
     return skillPrompt || FALLBACK_PROMPT;
   }
 
-  async execute(prompt, options = {}) {
-    const { maxSteps = 15, tools = this.tools } = options;
-    
-    try {
-      const result = await aiGenerateText({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        tools: tools,
-        maxSteps: maxSteps
-      });
-      
-      return {
-        text: result.text,
-        toolResults: result.toolResults,
-        finishReason: result.finishReason
-      };
-    } catch (error) {
-      console.error('❌ MasterAgent execute 失败:', error);
-      throw error;
-    }
-  }
 
-  async executeWithAgents(prompt, options = {}) {
-    const { maxSteps = 15 } = options;
-    
-    const subAgentTools = {};
-    for (const [name, agent] of Object.entries(this.subAgents)) {
-      if (agent.tools) {
-        for (const [toolName, tool] of Object.entries(agent.tools)) {
-          subAgentTools[`${name}_${toolName}`] = tool;
-        }
-      }
-    }
-
-    return this.execute(prompt, {
-      maxSteps,
-      tools: { ...this.tools, ...subAgentTools }
-    });
-  }
 
   async callSkill(params, options = {}) {
     const result = await skillLoader.callSkill(this.skillId, {
@@ -136,7 +98,8 @@ class MasterAgent extends EventEmitter {
       sessionId,
       'user',
       'text',
-      message
+      message,
+      context.metadata || {}
     );
 
     const intent = await this.intentParser.parse(message, sessionContext);
