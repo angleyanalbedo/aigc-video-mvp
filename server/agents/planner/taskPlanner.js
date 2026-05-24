@@ -21,6 +21,10 @@ class TaskPlanner {
         await this.planGenerateVideo(intent, project, plan);
         break;
 
+      case 'add_scene':
+        await this.planAddScene(intent, project, plan);
+        break;
+
       case 'edit_scene':
         await this.planEditScene(intent, project, plan);
         break;
@@ -35,6 +39,38 @@ class TaskPlanner {
 
       case 'query_status':
         await this.planQueryStatus(intent, project, plan);
+        break;
+
+      case 'edit_script':
+        await this.planEditScript(intent, project, plan);
+        break;
+
+      case 'reorder':
+        await this.planReorder(intent, project, plan);
+        break;
+
+      case 'add_material':
+        await this.planAddMaterial(intent, project, plan);
+        break;
+
+      case 'search_material':
+        await this.planSearchMaterial(intent, project, plan);
+        break;
+
+      case 'add_audio':
+        await this.planAddAudio(intent, project, plan);
+        break;
+
+      case 'explain':
+        await this.planExplain(intent, project, plan);
+        break;
+
+      case 'delete':
+        await this.planDelete(intent, project, plan);
+        break;
+
+      case 'generate_image':
+        await this.planGenerateImage(intent, project, plan);
         break;
 
       default:
@@ -97,6 +133,187 @@ class TaskPlanner {
       }));
       plan.estimatedDuration += 60;
     }
+  }
+
+  async planAddScene(intent, project, plan) {
+    const script = project.script;
+
+    plan.description = '添加分镜';
+    plan.requiresConfirmation = false;
+
+    const newSceneId = script?.scenes ? script.scenes.length + 1 : 1;
+
+    plan.steps.push(this.createStep({
+      type: 'add_scene',
+      agent: 'MasterAgent',
+      description: '添加新分镜',
+      params: {
+        sceneId: newSceneId,
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planAddScene(intent, project, plan) {
+    const script = project.script;
+
+    plan.description = '添加分镜';
+    plan.requiresConfirmation = false;
+
+    const newSceneId = script?.scenes ? script.scenes.length + 1 : 1;
+
+    plan.steps.push(this.createStep({
+      type: 'add_scene',
+      agent: 'MasterAgent',
+      description: '添加新分镜',
+      params: {
+        sceneId: newSceneId,
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planEditScript(intent, project, plan) {
+    plan.description = '编辑剧本';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'edit_script',
+      agent: 'MasterAgent',
+      description: '更新剧本内容',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planReorder(intent, project, plan) {
+    plan.description = '调整分镜顺序';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'reorder',
+      agent: 'MasterAgent',
+      description: '重新排列分镜顺序',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planAddMaterial(intent, project, plan) {
+    plan.description = '添加素材';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'add_material',
+      agent: 'MasterAgent',
+      description: '添加新素材节点',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planSearchMaterial(intent, project, plan) {
+    plan.description = '搜索素材';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'search_material',
+      agent: 'MasterAgent',
+      description: '在素材库中搜索',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planAddAudio(intent, project, plan) {
+    plan.description = '添加音频';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'add_audio',
+      agent: 'MasterAgent',
+      description: '添加背景音乐或音效',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planExplain(intent, project, plan) {
+    plan.description = '解释说明';
+    plan.requiresConfirmation = false;
+
+    plan.steps.push(this.createStep({
+      type: 'explain',
+      agent: 'MasterAgent',
+      description: '回答用户问题',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planDelete(intent, project, plan) {
+    plan.description = '删除操作';
+    plan.requiresConfirmation = true;
+
+    plan.steps.push(this.createStep({
+      type: 'delete',
+      agent: 'MasterAgent',
+      description: '删除指定内容',
+      params: {
+        message: intent.originalMessage,
+        entities: intent.entities
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 1;
+  }
+
+  async planGenerateImage(intent, project, plan) {
+    plan.description = '生成图片';
+    plan.requiresConfirmation = true;
+
+    plan.steps.push(this.createStep({
+      type: 'generate_image',
+      agent: 'MasterAgent',
+      description: '生成关键帧图片',
+      params: {
+        message: intent.originalMessage
+      },
+      critical: false
+    }));
+
+    plan.estimatedDuration = 30;
   }
 
   async planEditScene(intent, project, plan) {

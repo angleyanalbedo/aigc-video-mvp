@@ -36,6 +36,19 @@ class IntentParser {
         weight: 1.0,
         requiresConfirmation: true
       },
+      'add_scene': {
+        patterns: [
+          /增加.*分镜/i,
+          /添加.*分镜/i,
+          /再加.*分镜/i,
+          /新.*分镜/i,
+          /加.*分镜/i,
+          /多.*分镜/i,
+          /新增.*分镜/i
+        ],
+        weight: 1.0,
+        requiresConfirmation: false
+      },
       'edit_scene': {
         patterns: [
           /修改.*分镜/i,
@@ -249,6 +262,7 @@ class IntentParser {
       'generate_video': '生成视频',
       'generate_image': '生成图片',
       'generate_script': '生成剧本',
+      'add_scene': '添加分镜',
       'edit_scene': '编辑分镜',
       'edit_script': '编辑剧本',
       'reorder': '调整顺序',
