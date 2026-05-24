@@ -40,21 +40,22 @@ class ScriptAgent {
 
   async generate(productInfo, projectId = null) {
     console.log('📝 ScriptAgent: 开始生成剧本...');
+    const prod = productInfo || {};
 
     const sessionId = projectId || `session_${Date.now()}`;
 
     await memoryManager.addShortTerm({
       agentName: this.agentName,
       sessionId,
-      content: `用户请求生成剧本，商品: ${productInfo.title || '未知商品'}`,
-      metadata: { role: 'user', productInfo },
+      content: `用户请求生成剧本，商品: ${prod.title || '未知商品'}`,
+      metadata: { role: 'user', productInfo: prod },
       importance: 0.6
     });
 
     let searchResultContext = '';
     try {
       const { webSearch } = require('./tools/searchAPI');
-      const searchQuery = productInfo.title || '爆款电商产品';
+      const searchQuery = prod.title || '爆款电商产品';
       searchResultContext = await webSearch(searchQuery);
     } catch (err) {
       console.error('⚠️ ScriptAgent: 调用网络搜索工具失败:', err);
@@ -72,11 +73,11 @@ class ScriptAgent {
     const memories = await memoryManager.recall({
       agentName: this.agentName,
       sessionId,
-      query: `${productInfo.title} ${productInfo.sellingPoints || ''} 剧本创作`
+      query: `${prod.title || ''} ${prod.sellingPoints || ''} 剧本创作`
     });
     const memoryContext = memoryManager.buildContextString(memories);
 
-    let prompt = this.buildPrompt(productInfo);
+    let prompt = this.buildPrompt(prod);
     if (searchResultContext) {
       prompt += `\n\n## 联网流行爆款参考词库/痛点（请融入你的剧本创意）:\n${searchResultContext}`;
     }
@@ -103,7 +104,7 @@ class ScriptAgent {
       return this.formatOutput(script);
     } catch (error) {
       console.error('❌ ScriptAgent: 生成失败，使用默认剧本', error);
-      return this.getFallbackScript(productInfo);
+      return this.getFallbackScript(prod);
     }
   }
 

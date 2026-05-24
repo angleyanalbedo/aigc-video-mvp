@@ -54,6 +54,9 @@ class TaskPlanner {
         type: 'generate_script',
         agent: 'ScriptAgent',
         description: '生成剧本和分镜',
+        params: {
+          productInfo: project.product_info
+        },
         critical: true
       }));
       plan.estimatedDuration += 30;
