@@ -5,8 +5,6 @@
  * 调用文生图/图生图大模型，为每个分镜生成高清、一致的关键帧视觉效果图。
  */
 
-const { generateText: aiGenerateText } = require('ai');
-const { llmProvider } = require('../services/providers');
 const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
@@ -46,27 +44,6 @@ class ImageAgent {
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
-  }
-
-  async execute(prompt, options = {}) {
-    const { maxSteps = 5 } = options;
-    try {
-      const result = await aiGenerateText({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        tools: this.tools,
-        maxSteps: maxSteps
-      });
-      return {
-        text: result.text,
-        toolResults: result.toolResults,
-        finishReason: result.finishReason
-      };
-    } catch (error) {
-      console.error('❌ ImageAgent execute 失败:', error);
-      throw error;
-    }
   }
 
   async callSkill(params, options = {}) {

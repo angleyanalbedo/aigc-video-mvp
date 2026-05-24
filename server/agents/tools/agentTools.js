@@ -1,10 +1,9 @@
 /**
- * Agent Tools - Vercel AI SDK 工具定义
+ * Agent Tools - 工具定义
  * 
  * 统一的工具系统，所有 Agent 都可以使用这些工具来执行操作
  */
 
-const { createTool } = require('ai');
 const { z } = require('zod');
 const projectModel = require('../../models/project');
 const { updateSceneAsset } = require('./workbenchAPI');
@@ -14,8 +13,8 @@ const ttsAPI = require('./ttsAPI');
 /**
  * 工具：更新分镜资产
  */
-const updateSceneTool = createTool({
-  toolName: 'updateScene',
+const updateSceneTool = {
+  name: 'updateScene',
   description: '更新分镜的内容和属性，包括描述、旁白、时长等',
   parameters: z.object({
     projectId: z.string().describe('项目ID'),
@@ -34,13 +33,13 @@ const updateSceneTool = createTool({
       return `❌ 更新失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 工具：获取项目信息
  */
-const getProjectTool = createTool({
-  toolName: 'getProject',
+const getProjectTool = {
+  name: 'getProject',
   description: '获取项目详情，包括素材、剧本、商品信息等',
   parameters: z.object({
     projectId: z.string().describe('项目ID')
@@ -63,13 +62,13 @@ const getProjectTool = createTool({
       return `❌ 获取项目失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 工具：获取分镜列表
  */
-const getScenesTool = createTool({
-  toolName: 'getScenes',
+const getScenesTool = {
+  name: 'getScenes',
   description: '获取剧本的所有分镜列表及其当前状态',
   parameters: z.object({
     projectId: z.string().describe('项目ID')
@@ -85,13 +84,13 @@ const getScenesTool = createTool({
       return `❌ 获取分镜失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 工具：保存剧本
  */
-const saveScriptTool = createTool({
-  toolName: 'saveScript',
+const saveScriptTool = {
+  name: 'saveScript',
   description: '保存完整的剧本到项目',
   parameters: z.object({
     projectId: z.string().describe('项目ID'),
@@ -108,13 +107,13 @@ const saveScriptTool = createTool({
       return `❌ 保存剧本失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 工具：生成视频
  */
-const generateVideoTool = createTool({
-  toolName: 'generateVideo',
+const generateVideoTool = {
+  name: 'generateVideo',
   description: '调用视频生成API生成分镜视频',
   parameters: z.object({
     prompt: z.string().describe('视频生成提示词'),
@@ -140,13 +139,13 @@ const generateVideoTool = createTool({
       return `❌ 视频生成失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 工具：生成配音
  */
-const generateTTSTool = createTool({
-  toolName: 'generateTTS',
+const generateTTSTool = {
+  name: 'generateTTS',
   description: '生成文本转语音配音',
   parameters: z.object({
     text: z.string().describe('要转换的文本'),
@@ -167,13 +166,13 @@ const generateTTSTool = createTool({
       return `❌ 配音生成失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
- * 工具：搜索素材库
+ * 工具：搜索素材
  */
-const searchMaterialsTool = createTool({
-  toolName: 'searchMaterials',
+const searchMaterialsTool = {
+  name: 'searchMaterials',
   description: '搜索商品素材库获取相关素材',
   parameters: z.object({
     projectId: z.string().describe('项目ID'),
@@ -199,7 +198,7 @@ const searchMaterialsTool = createTool({
       return `❌ 搜索素材失败: ${error.message}`;
     }
   }
-});
+};
 
 /**
  * 获取所有工具

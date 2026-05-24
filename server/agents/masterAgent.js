@@ -5,10 +5,7 @@ const ToolExecutor = require('./executor/toolExecutor');
 const canvasSyncService = require('../services/canvasSyncService');
 const projectModel = require('../models/project');
 const agentChatService = require('../services/agentChatService');
-const { llmProvider } = require('../services/providers');
 const skillLoader = require('./skills/skillLoader');
-const { generateText: aiGenerateText } = require('ai');
-const { createAgent } = require('ai');
 const { getToolsForAgent } = require('./tools/agentTools');
 const scriptAgent = require('./scriptAgent');
 const videoAgent = require('./videoAgent');
@@ -16,7 +13,6 @@ const imageAgent = require('./imageAgent');
 const clipAgent = require('./clipAgent');
 const assetAgent = require('./assetAgent');
 const reviewAgent = require('./reviewAgent');
-const { z } = require('zod');
 
 const FALLBACK_PROMPT = `你是 Copilot Master Agent，负责协调所有子 Agent 完成复杂任务。
 

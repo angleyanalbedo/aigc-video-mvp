@@ -6,8 +6,6 @@
  * 仅当评分 < 60 时，才由 Orchestrator 触发 ScriptAgent.refine() 进行 LLM 修复。
  */
 
-const { generateText: aiGenerateText } = require('ai');
-const { llmProvider } = require('../services/providers');
 const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
