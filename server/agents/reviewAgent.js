@@ -6,6 +6,9 @@
  * 仅当评分 < 60 时，才由 Orchestrator 触发 ScriptAgent.refine() 进行 LLM 修复。
  */
 
+const { generateText: aiGenerateText } = require('ai');
+const { llmProvider } = require('../services/providers');
+const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
 const FALLBACK_PROMPT = `你是带货视频剧本质量审核专家，负责对生成的剧本进行规则校验。
@@ -49,6 +52,7 @@ class ReviewAgent {
     this.agentName = 'ReviewAgent';
     this.layer = '监督层';
     this.skillId = 'ReviewAgent_check';
+    this.tools = getToolsForAgent('ReviewAgent');
   }
 
   getSystemPrompt() {
@@ -176,6 +180,27 @@ class ReviewAgent {
       return { valid: false, reason: '旁白不能为空' };
     }
     return { valid: true };
+  }
+
+  async execute(prompt, options = {}) {
+    const { maxSteps = 5 } = options;
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: this.tools,
+        maxSteps: maxSteps
+      });
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ ReviewAgent execute 失败:', error);
+      throw error;
+    }
   }
 }
 

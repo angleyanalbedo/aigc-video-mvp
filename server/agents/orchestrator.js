@@ -2,6 +2,7 @@ const scriptAgent = require('./scriptAgent');
 const videoAgent = require('./videoAgent');
 const clipAgent = require('./clipAgent');
 const reviewAgent = require('./reviewAgent');
+const masterAgent = require('./masterAgent');
 
 const STATES = {
   IDLE: 'idle',
@@ -28,6 +29,13 @@ class VideoOrchestrator {
     this.state = STATES.IDLE;
     this.history = [];
     this.maxHistory = 10;
+    this.agents = {
+      script: scriptAgent,
+      video: videoAgent,
+      clip: clipAgent,
+      review: reviewAgent,
+      master: masterAgent
+    };
   }
 
   async execute(productInfo, options = {}, onProgress) {
@@ -44,7 +52,6 @@ class VideoOrchestrator {
       options,
       startTime,
       steps: [],
-      // 三层 Agent 工作流节点（供前端 Header 步骤条消费）
       workflowNodes: [
         { id: 'script', name: '剧本生成', agent: 'ScriptAgent', layer: '决策层', status: 'pending', output: null },
         { id: 'review', name: '质量审核', agent: 'ReviewAgent', layer: '监督层', status: 'pending', output: null },
@@ -56,7 +63,7 @@ class VideoOrchestrator {
 
     try {
       // ─────────────────────────────────────────────────────────
-      // 决策层：ScriptAgent 生成剧本
+      // 决策层：ScriptAgent 生成剧本（支持 Tool 调用）
       // ─────────────────────────────────────────────────────────
       this.state = STATES.GENERATING_SCRIPT;
       this._updateNode(result, 'script', 'running');
@@ -67,7 +74,35 @@ class VideoOrchestrator {
         workflowNodes: result.workflowNodes
       });
 
-      let script = await scriptAgent.generate(productInfo, options.projectId || null);
+      const scriptPrompt = scriptAgent.buildPrompt(productInfo);
+      const scriptResult = await scriptAgent.execute(scriptPrompt, { maxSteps: 10 });
+      
+      let script = null;
+      if (scriptResult.toolResults) {
+        const savedScript = scriptResult.toolResults.find(r => r.toolName === 'saveScript');
+        if (savedScript) {
+          try {
+            const parsed = JSON.parse(savedScript.result);
+            if (parsed.script) {
+              script = scriptAgent.formatOutput(parsed.script);
+            }
+          } catch (e) {}
+        }
+      }
+      
+      if (!script && scriptResult.text) {
+        try {
+          const parsed = JSON.parse(scriptResult.text.match(/\{[\s\S]*\}/)?.[0] || '{}');
+          if (parsed.scenes) {
+            script = scriptAgent.formatOutput(parsed);
+          }
+        } catch (e) {}
+      }
+      
+      if (!script) {
+        script = scriptAgent.getFallbackScript(productInfo);
+      }
+      
       result.script = script;
       result.steps.push({
         name: '剧本生成',
@@ -95,7 +130,6 @@ class VideoOrchestrator {
       const reviewStart = Date.now();
       const reviewResult = reviewAgent.reviewScript(script);
 
-      // 仅当评分严重不足时才触发 LLM 二次修复（避免不必要延迟）
       if (!reviewResult.passed && reviewResult.score < 60) {
         console.log(`⚠️ 剧本评分 ${reviewResult.score}/100，触发 LLM 修复...`);
         this.emitProgress(onProgress, {
@@ -121,7 +155,7 @@ class VideoOrchestrator {
       });
 
       // ─────────────────────────────────────────────────────────
-      // 执行层：VideoAgent 分镜渲染
+      // 执行层：VideoAgent 分镜渲染（支持 Tool 调用）
       // ─────────────────────────────────────────────────────────
       this.state = STATES.GENERATING_VIDEOS;
       this._updateNode(result, 'video', 'running');
@@ -208,7 +242,6 @@ class VideoOrchestrator {
       result.endTime = Date.now();
       result.totalDuration = result.endTime - result.startTime;
 
-      // 标记当前运行中的节点为失败
       result.workflowNodes.forEach(node => {
         if (node.status === 'running') node.status = 'failed';
       });
@@ -223,6 +256,33 @@ class VideoOrchestrator {
         error: error.message
       });
 
+      throw error;
+    }
+  }
+
+  async executeWithAgentic(productInfo, options = {}, onProgress) {
+    console.log('🚀 VideoOrchestrator: 以 Agent 模式执行...');
+    
+    const masterPrompt = `请为以下商品生成带货视频：
+商品信息: ${JSON.stringify(productInfo)}
+
+请按以下步骤执行：
+1. 使用 ScriptAgent 生成剧本
+2. 使用 ReviewAgent 审核剧本
+3. 使用 VideoAgent 渲染分镜
+4. 使用 ClipAgent 剪辑合成
+
+每个步骤完成后，请总结结果。`;
+
+    try {
+      const result = await masterAgent.executeWithAgents(masterPrompt, { maxSteps: 20 });
+      return {
+        success: true,
+        result: result.text,
+        toolResults: result.toolResults
+      };
+    } catch (error) {
+      console.error('❌ Agentic 执行失败:', error);
       throw error;
     }
   }
@@ -267,8 +327,6 @@ class VideoOrchestrator {
 
     return await this.execute(productInfo, options, onProgress);
   }
-
-  // ─── 内部工具方法 ─────────────────────────────────────────────
 
   _updateNode(result, nodeId, status, output = null) {
     const node = result.workflowNodes.find(n => n.id === nodeId);

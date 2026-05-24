@@ -1,5 +1,8 @@
 const { createVideoTask, getVideoStatus, waitForVideo } = require('./tools/videoAPI');
 const skillLoader = require('./skills/skillLoader');
+const { generateText: aiGenerateText } = require('ai');
+const { llmProvider } = require('../services/providers');
+const { getToolsForAgent } = require('./tools/agentTools');
 
 const FALLBACK_PROMPT = `你是电商视频分镜渲染专家，负责将剧本分镜转化为视频片段。
 
@@ -31,11 +34,33 @@ class VideoAgent {
     this.agentName = 'VideoAgent';
     this.skillId = 'VideoAgent_generation';
     this.maxRetries = 2;
+    this.tools = getToolsForAgent('VideoAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async execute(prompt, options = {}) {
+    const { maxSteps = 5 } = options;
+    try {
+      const result = await aiGenerateText({
+        model: llmProvider.getModel(),
+        system: this.getSystemPrompt(),
+        prompt: prompt,
+        tools: this.tools,
+        maxSteps: maxSteps
+      });
+      return {
+        text: result.text,
+        toolResults: result.toolResults,
+        finishReason: result.finishReason
+      };
+    } catch (error) {
+      console.error('❌ VideoAgent execute 失败:', error);
+      throw error;
+    }
   }
 
   async callSkill(params, options = {}) {

@@ -1,5 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const { createTool } = require('ai');
+const { z } = require('zod');
+const { llmProvider } = require('../../services/providers');
 
 const SKILLS_DIR = path.join(__dirname, '../../skills');
 const DEFAULT_TIMEOUT = 60000;
@@ -9,6 +12,7 @@ class SkillLoader {
   constructor() {
     this._cache = new Map();
     this._watchers = new Map();
+    this._toolsCache = new Map();
   }
 
   async execute(skillId, context = {}, options = {}) {
@@ -55,6 +59,51 @@ class SkillLoader {
     }
   }
 
+  async executeWithTools(skillId, context = {}, tools = {}, options = {}) {
+    const { generateText: aiGenerateText } = require('ai');
+    const skill = this.load(skillId);
+    if (!skill) {
+      throw new Error(`Skill "${skillId}" not found`);
+    }
+
+    const prompt = this._injectContext(skill.prompt, context);
+    const { maxSteps = 10, timeout = DEFAULT_TIMEOUT } = options;
+
+    try {
+      const result = await Promise.race([
+        aiGenerateText({
+          model: llmProvider.getModel(),
+          system: prompt,
+          prompt: context.prompt || '',
+          tools: tools,
+          maxSteps: maxSteps
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error(`Skill "${skillId}" execution timeout after ${timeout}ms`)), timeout)
+        )
+      ]);
+
+      return {
+        success: true,
+        skillId,
+        result: {
+          text: result.text,
+          toolResults: result.toolResults,
+          finishReason: result.finishReason
+        },
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      console.error(`⚠️ Skill "${skillId}" executeWithTools failed:`, error.message);
+      return {
+        success: false,
+        skillId,
+        error: error.message,
+        timestamp: Date.now()
+      };
+    }
+  }
+
   async _executeSkill(skillId, prompt, context) {
     const llm = this._getLLM();
     
@@ -73,8 +122,14 @@ class SkillLoader {
   }
 
   _getLLM() {
-    const { generateText, generateStructuredText } = require('../tools/llm');
-    return { generateText, generateStructuredText };
+    return {
+      generateText: async ({ system, prompt }) => {
+        return llmProvider.generateText({ system, prompt });
+      },
+      generateStructuredText: async ({ system, prompt, schema }) => {
+        return llmProvider.generateStructuredText({ system, prompt, schema });
+      }
+    };
   }
 
   _injectContext(prompt, context) {
@@ -106,6 +161,40 @@ class SkillLoader {
 
   async callSkill(skillId, params = {}, options = {}) {
     return this.execute(skillId, { params, prompt: params.prompt || '', schema: params.schema }, options);
+  }
+
+  async callSkillWithTools(skillId, params = {}, tools = {}, options = {}) {
+    return this.executeWithTools(skillId, { params, prompt: params.prompt || '' }, tools, options);
+  }
+
+  getToolsForSkill(skillId) {
+    if (this._toolsCache.has(skillId)) {
+      return this._toolsCache.get(skillId);
+    }
+
+    const skill = this.load(skillId);
+    if (!skill || !skill.metadata || !skill.metadata.tools) {
+      return {};
+    }
+
+    const tools = {};
+    const toolDefs = skill.metadata.tools;
+    
+    for (const [name, def] of Object.entries(toolDefs)) {
+      if (typeof def === 'object' && def.description) {
+        tools[name] = createTool({
+          toolName: name,
+          description: def.description,
+          parameters: def.parameters || z.object({}).catchall(z.any()),
+          execute: async (params) => {
+            return def.execute ? await def.execute(params) : `Tool ${name} executed`;
+          }
+        });
+      }
+    }
+
+    this._toolsCache.set(skillId, tools);
+    return tools;
   }
 
   getSkillForAgent(agentName) {
