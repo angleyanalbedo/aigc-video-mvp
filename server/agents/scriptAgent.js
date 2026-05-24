@@ -1,9 +1,7 @@
-const { generateText: aiGenerateText, generateTextWithStructuredOutput } = require('ai');
-const { llmProvider } = require('../services/providers');
+const { generateStructuredText } = require('./tools/llm');
 const { memoryManager } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
 const { getToolsForAgent } = require('./tools/agentTools');
-const { z } = require('zod');
 
 const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 
@@ -28,17 +26,6 @@ const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 - 15秒视频：3-4个分镜
 - 总时长控制在15秒以内`;
 
-const SCRIPT_SCHEMA = z.object({
-  title: z.string(),
-  scenes: z.array(z.object({
-    id: z.number(),
-    description: z.string(),
-    voiceover: z.string(),
-    duration: z.number(),
-    shot: z.string().optional()
-  }))
-});
-
 class ScriptAgent {
   constructor() {
     this.name = '剧本生成 Agent';
@@ -51,47 +38,6 @@ class ScriptAgent {
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
-  }
-
-  async execute(prompt, options = {}) {
-    const { projectId, maxSteps = 10 } = options;
-    
-    try {
-      const result = await aiGenerateText({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        tools: this.tools,
-        maxSteps: maxSteps
-      });
-      
-      return {
-        text: result.text,
-        toolResults: result.toolResults,
-        finishReason: result.finishReason
-      };
-    } catch (error) {
-      console.error('❌ ScriptAgent execute 失败:', error);
-      throw error;
-    }
-  }
-
-  async generateStructured(prompt, schema = SCRIPT_SCHEMA) {
-    try {
-      const result = await generateTextWithStructuredOutput({
-        model: llmProvider.getModel(),
-        system: this.getSystemPrompt(),
-        prompt: prompt,
-        schema: schema,
-        tools: this.tools,
-        maxSteps: 10
-      });
-      
-      return result;
-    } catch (error) {
-      console.error('❌ ScriptAgent generateStructured 失败:', error);
-      throw error;
-    }
   }
 
   async callSkill(params, options = {}) {

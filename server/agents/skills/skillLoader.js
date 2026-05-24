@@ -1,8 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { createTool } = require('ai');
-const { z } = require('zod');
-const { llmProvider } = require('../../services/providers');
 
 const SKILLS_DIR = path.join(__dirname, '../../skills');
 const DEFAULT_TIMEOUT = 60000;
@@ -12,7 +9,6 @@ class SkillLoader {
   constructor() {
     this._cache = new Map();
     this._watchers = new Map();
-    this._toolsCache = new Map();
   }
 
   async execute(skillId, context = {}, options = {}) {
@@ -59,77 +55,21 @@ class SkillLoader {
     }
   }
 
-  async executeWithTools(skillId, context = {}, tools = {}, options = {}) {
-    const { generateText: aiGenerateText } = require('ai');
-    const skill = this.load(skillId);
-    if (!skill) {
-      throw new Error(`Skill "${skillId}" not found`);
-    }
-
-    const prompt = this._injectContext(skill.prompt, context);
-    const { maxSteps = 10, timeout = DEFAULT_TIMEOUT } = options;
-
-    try {
-      const result = await Promise.race([
-        aiGenerateText({
-          model: llmProvider.getModel(),
-          system: prompt,
-          prompt: context.prompt || '',
-          tools: tools,
-          maxSteps: maxSteps
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`Skill "${skillId}" execution timeout after ${timeout}ms`)), timeout)
-        )
-      ]);
-
-      return {
-        success: true,
-        skillId,
-        result: {
-          text: result.text,
-          toolResults: result.toolResults,
-          finishReason: result.finishReason
-        },
-        timestamp: Date.now()
-      };
-    } catch (error) {
-      console.error(`⚠️ Skill "${skillId}" executeWithTools failed:`, error.message);
-      return {
-        success: false,
-        skillId,
-        error: error.message,
-        timestamp: Date.now()
-      };
-    }
-  }
-
   async _executeSkill(skillId, prompt, context) {
-    const llm = this._getLLM();
+    const { generateText, generateStructuredText } = require('../tools/llm');
     
     if (context.schema) {
-      return await llm.generateStructuredText({
+      return await generateStructuredText({
         system: prompt,
         prompt: context.prompt || '',
         schema: context.schema
       });
     }
     
-    return await llm.generateText({
+    return await generateText({
       system: prompt,
       prompt: context.prompt || ''
     });
-  }
-
-  _getLLM() {
-    return {
-      generateText: async ({ system, prompt }) => {
-        return llmProvider.generateText({ system, prompt });
-      },
-      generateStructuredText: async ({ system, prompt, schema }) => {
-        return llmProvider.generateStructuredText({ system, prompt, schema });
-      }
-    };
   }
 
   _injectContext(prompt, context) {
@@ -163,209 +103,58 @@ class SkillLoader {
     return this.execute(skillId, { params, prompt: params.prompt || '', schema: params.schema }, options);
   }
 
-  async callSkillWithTools(skillId, params = {}, tools = {}, options = {}) {
-    return this.executeWithTools(skillId, { params, prompt: params.prompt || '' }, tools, options);
-  }
-
-  getToolsForSkill(skillId) {
-    if (this._toolsCache.has(skillId)) {
-      return this._toolsCache.get(skillId);
-    }
-
-    const skill = this.load(skillId);
-    if (!skill || !skill.metadata || !skill.metadata.tools) {
-      return {};
-    }
-
-    const tools = {};
-    const toolDefs = skill.metadata.tools;
-    
-    for (const [name, def] of Object.entries(toolDefs)) {
-      if (typeof def === 'object' && def.description) {
-        tools[name] = createTool({
-          toolName: name,
-          description: def.description,
-          parameters: def.parameters || z.object({}).catchall(z.any()),
-          execute: async (params) => {
-            return def.execute ? await def.execute(params) : `Tool ${name} executed`;
-          }
-        });
-      }
-    }
-
-    this._toolsCache.set(skillId, tools);
-    return tools;
-  }
-
-  getSkillForAgent(agentName) {
-    const allSkills = this.list();
-    const matched = allSkills.filter(s => s.agentName === agentName);
-    if (matched.length === 0) return null;
-    return this.load(matched[0].id);
-  }
-
-  loadPromptForAgent(agentName) {
-    const skill = this.getSkillForAgent(agentName);
-    return skill ? skill.prompt : null;
-  }
-
-  list() {
-    if (!fs.existsSync(SKILLS_DIR)) {
-      fs.mkdirSync(SKILLS_DIR, { recursive: true });
-      return [];
-    }
-
-    const files = fs.readdirSync(SKILLS_DIR).filter(f => f.endsWith('.md'));
-    return files.map(filename => {
-      const filePath = path.join(SKILLS_DIR, filename);
-      const stat = fs.statSync(filePath);
-      const parsed = this._parseFilename(filename);
-      return {
-        filename,
-        id: parsed.id,
-        agentName: parsed.agentName,
-        skillName: parsed.skillName,
-        size: stat.size,
-        modifiedAt: stat.mtime.toISOString()
-      };
-    });
-  }
-
   load(skillId) {
     if (this._cache.has(skillId)) {
-      const cached = this._cache.get(skillId);
-      return cached;
+      return this._cache.get(skillId);
     }
 
-    const filename = this._findFile(skillId);
-    if (!filename) return null;
-
-    const filePath = path.join(SKILLS_DIR, filename);
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const parsed = this._parseContent(content);
-
-    const result = {
-      id: skillId,
-      filename,
-      ...parsed,
-      rawContent: content
-    };
-
-    this._cache.set(skillId, result);
-    return result;
-  }
-
-  loadPrompt(skillId) {
-    const skill = this.load(skillId);
-    if (!skill) return null;
-    return skill.prompt;
-  }
-
-  save(skillId, content) {
-    const filename = this._findFile(skillId) || `${skillId}.md`;
-    const filePath = path.join(SKILLS_DIR, filename);
-
-    if (!fs.existsSync(SKILLS_DIR)) {
-      fs.mkdirSync(SKILLS_DIR, { recursive: true });
+    const skillPath = path.join(SKILLS_DIR, `${skillId}.md`);
+    if (!fs.existsSync(skillPath)) {
+      return null;
     }
 
-    fs.writeFileSync(filePath, content, 'utf-8');
-    this._cache.delete(skillId);
+    const content = fs.readFileSync(skillPath, 'utf8');
+    const skill = this._parseSkillContent(content, skillId);
+    
+    this._cache.set(skillId, skill);
+    this._setupWatcher(skillId, skillPath);
 
-    return {
-      id: skillId,
-      filename,
-      size: Buffer.byteLength(content),
-      modifiedAt: new Date().toISOString()
-    };
+    return skill;
   }
 
-  watch(skillId, callback) {
-    const filename = this._findFile(skillId);
-    if (!filename) return;
-
-    const filePath = path.join(SKILLS_DIR, filename);
-
-    if (this._watchers.has(skillId)) {
-      this._watchers.get(skillId).close();
-    }
-
-    const watcher = fs.watch(filePath, (eventType) => {
-      if (eventType === 'change') {
-        this._cache.delete(skillId);
-        const updated = this.load(skillId);
-        if (callback) callback(updated);
-      }
-    });
-
-    this._watchers.set(skillId, watcher);
-  }
-
-  stopWatch(skillId) {
-    if (this._watchers.has(skillId)) {
-      this._watchers.get(skillId).close();
-      this._watchers.delete(skillId);
-    }
-  }
-
-  stopAllWatches() {
-    for (const [id] of this._watchers) {
-      this.stopWatch(id);
-    }
-  }
-
-  _parseFilename(filename) {
-    const baseName = filename.replace('.md', '');
-    const parts = baseName.split('_');
-
-    if (parts.length >= 2) {
-      return {
-        id: baseName,
-        agentName: parts[0],
-        skillName: parts.slice(1).join('_')
-      };
-    }
-
-    return {
-      id: baseName,
-      agentName: baseName,
-      skillName: baseName
-    };
-  }
-
-  _parseContent(content) {
-    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
-    let metadata = {};
+  _parseSkillContent(content, skillId) {
+    let frontMatter = {};
     let prompt = content;
 
-    if (frontmatterMatch) {
-      metadata = this._parseFrontmatter(frontmatterMatch[1]);
-      prompt = content.slice(frontmatterMatch[0].length);
+    if (content.startsWith('---')) {
+      const frontMatterEnd = content.indexOf('---', 3);
+      if (frontMatterEnd !== -1) {
+        const frontMatterContent = content.slice(3, frontMatterEnd).trim();
+        prompt = content.slice(frontMatterEnd + 3).trim();
+        
+        frontMatter = this._parseFrontMatter(frontMatterContent);
+      }
     }
 
     return {
-      metadata,
-      prompt: prompt.trim()
+      id: skillId,
+      prompt,
+      metadata: frontMatter
     };
   }
 
-  _parseFrontmatter(text) {
+  _parseFrontMatter(content) {
     const metadata = {};
-    const lines = text.split('\n');
-
+    const lines = content.split('\n');
+    
     for (const line of lines) {
-      const match = line.match(/^(\w+):\s*(.*)$/);
-      if (match) {
-        const key = match[1];
-        const value = match[2].trim();
+      const colonIndex = line.indexOf(':');
+      if (colonIndex !== -1) {
+        const key = line.slice(0, colonIndex).trim();
+        const value = line.slice(colonIndex + 1).trim();
+        
         if (value.startsWith('[') && value.endsWith(']')) {
-          metadata[key] = value.slice(1, -1).split(',').map(s => s.trim());
-        } else if (value === 'true') {
-          metadata[key] = true;
-        } else if (value === 'false') {
-          metadata[key] = false;
-        } else if (!isNaN(value)) {
-          metadata[key] = Number(value);
+          metadata[key] = JSON.parse(value);
         } else {
           metadata[key] = value;
         }
@@ -375,17 +164,52 @@ class SkillLoader {
     return metadata;
   }
 
-  _findFile(skillId) {
-    if (!fs.existsSync(SKILLS_DIR)) return null;
+  _setupWatcher(skillId, skillPath) {
+    if (this._watchers.has(skillId)) {
+      return;
+    }
 
-    const files = fs.readdirSync(SKILLS_DIR);
-    const exactMatch = files.find(f => f === `${skillId}.md`);
-    if (exactMatch) return exactMatch;
+    const watcher = fs.watch(skillPath, (eventType) => {
+      if (eventType === 'change') {
+        this._cache.delete(skillId);
+        console.log(`🔄 Skill "${skillId}" reloaded`);
+      }
+    });
 
-    const partialMatch = files.find(f => f.replace('.md', '') === skillId);
-    if (partialMatch) return partialMatch;
+    this._watchers.set(skillId, watcher);
+  }
 
+  list() {
+    if (!fs.existsSync(SKILLS_DIR)) {
+      return [];
+    }
+
+    return fs.readdirSync(SKILLS_DIR)
+      .filter(file => file.endsWith('.md'))
+      .map(file => file.slice(0, -3));
+  }
+
+  getSkillForAgent(agentName) {
+    const skills = this.list();
+    const agentLower = agentName.toLowerCase();
+    
+    for (const skillId of skills) {
+      const skill = this.load(skillId);
+      if (skill && skill.metadata) {
+        if (skill.metadata.agent && skill.metadata.agent.toLowerCase() === agentLower) {
+          return skill;
+        }
+        if (skillId.toLowerCase().includes(agentLower)) {
+          return skill;
+        }
+      }
+    }
     return null;
+  }
+
+  loadPrompt(skillId) {
+    const skill = this.load(skillId);
+    return skill ? skill.prompt : null;
   }
 }
 
