@@ -234,12 +234,19 @@ class CanvasSyncService {
     const scriptSceneIds = new Set(script.scenes.map(s => s.id));
 
     // Add new scenes
+    let idx = 0;
     for (const scene of script.scenes) {
-      if (!existingIds.has(scene.id)) {
-        const yPos = 100 + (scene.id - 1) * 180;
-        await this.createNode(projectId, 'scene', {
-          id: scene.id,
-          title: `分镜 ${scene.id}`,
+      idx++;
+      let numericId = parseInt(scene.id, 10);
+      if (isNaN(numericId)) {
+        numericId = idx;
+      }
+
+      if (!existingIds.has(numericId)) {
+        const yPos = 100 + (numericId - 1) * 180;
+        const newNode = await this.createNode(projectId, 'scene', {
+          id: numericId,
+          title: `分镜 ${numericId}`,
           description: scene.description || '',
           voiceover: scene.voiceover || '',
           duration: scene.duration || 5,
@@ -249,8 +256,8 @@ class CanvasSyncService {
 
         // Connect to script node if exists
         const scriptNode = await this.getNodes(projectId, 'script');
-        if (scriptNode.length > 0) {
-          await this.createConnection(projectId, scriptNode[0].id, `scene_${scene.id}`, 'timeline');
+        if (scriptNode.length > 0 && newNode) {
+          await this.createConnection(projectId, scriptNode[0].id, newNode.id, 'timeline');
         }
       }
     }

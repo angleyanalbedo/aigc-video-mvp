@@ -54,6 +54,15 @@ router.get('/:id', (req, res) => {
     if (!project) {
       return res.status(404).json({ success: false, error: 'Project not found' });
     }
+
+    // Auto-heal/sync canvas scenes if they are out of sync with script scenes
+    if (project.script) {
+      const canvasSyncService = require('../services/canvasSyncService');
+      canvasSyncService.syncScriptToCanvas(req.params.id, project.script).catch(err => {
+        console.error('⚠️ GET project auto-sync canvas failed:', err.message);
+      });
+    }
+
     res.json({ success: true, data: project });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
