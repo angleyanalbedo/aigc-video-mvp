@@ -357,7 +357,26 @@ class VideoFactorService {
     query += ' ORDER BY vf.created_at DESC';
 
     const records = db.prepare(query).all(...params);
-    return records;
+    
+    // 将字段名转换为 camelCase 格式
+    return records.map(record => ({
+      id: record.video_id,
+      projectId: record.project_id,
+      openingStyle: record.opening_style,
+      bgmStyle: record.bgm_style,
+      voiceoverStyle: record.voiceover_style,
+      colorTone: record.color_tone,
+      subtitleStyle: record.subtitle_style,
+      aspectRatio: record.aspect_ratio,
+      duration: record.duration,
+      sceneCount: record.scene_count,
+      productName: record.product_name,
+      createdAt: record.created_at,
+      views: record.views,
+      completionRate: record.completion_rate,
+      clickThroughRate: record.click_through_rate,
+      conversionRate: record.conversion_rate
+    }));
   }
 
   /**

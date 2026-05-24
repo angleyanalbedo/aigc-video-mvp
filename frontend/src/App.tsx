@@ -12,6 +12,7 @@ import WorkbenchPage from './pages/Workbench';
 import CopilotPage from './pages/Copilot';
 import Dashboard from './Dashboard';
 import StatusPage from './pages/Status';
+import SettingsPage from './pages/Settings';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
@@ -42,6 +43,7 @@ function App() {
           <Route path="/observability" element={<DashboardWrapper><ObservabilityPage /></DashboardWrapper>} />
           <Route path="/compliance" element={<DashboardWrapper><CompliancePage /></DashboardWrapper>} />
           <Route path="/status" element={<DashboardWrapper><StatusPage /></DashboardWrapper>} />
+          <Route path="/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
           <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </Router>
