@@ -75,7 +75,7 @@ class CanvasSyncService {
       WHERE id = ?
     `).run(JSON.stringify(newData), new Date().toISOString(), nodeId);
 
-    // Sync scene updates back to projects.script
+    // Sync scene updates back to projects.script and scenes table
     if (node.type === 'scene' && node.data.id) {
       try {
         const projectModel = require('../models/project');
@@ -92,6 +92,15 @@ class CanvasSyncService {
         }
       } catch (err) {
         console.error('⚠️ Failed to sync SceneNode update to projects:', err.message);
+      }
+      
+      // Also update the scenes table
+      try {
+        const SceneModel = require('../models/scene');
+        const sceneId = `scene_${projectId}_${node.data.id}`;
+        await SceneModel.update(sceneId, updates);
+      } catch (err) {
+        console.error('⚠️ Failed to sync SceneNode update to scenes table:', err.message);
       }
     }
 

@@ -1,5 +1,7 @@
 // server/services/attributionService.js
 
+const videoFactorService = require('./videoFactorService');
+
 class AttributionService {
   constructor() {
     this.factors = this.initializeFactors();
@@ -123,16 +125,34 @@ class AttributionService {
   }
 
   analyzeAttribution(filters = {}) {
-    let data = [...this.mockVideoData];
+    // 优先从数据库获取真实的视频数据
+    let data = [];
+    try {
+      data = videoFactorService.getAllVideoDataForAttribution(filters);
+      console.log(`📊 [Attribution] 从数据库获取到 ${data.length} 条真实视频数据`);
+      
+      // 如果数据库没有数据，回退到Mock数据
+      if (data.length === 0) {
+        console.log('📊 [Attribution] 数据库无数据，回退到Mock数据');
+        data = [...this.mockVideoData];
+      }
+    } catch (err) {
+      console.warn('⚠️ 获取真实视频数据失败，使用Mock数据:', err.message);
+      data = [...this.mockVideoData];
+    }
 
     if (filters.startDate) {
-      data = data.filter(v => new Date(v.createdAt) >= new Date(filters.startDate));
+      data = data.filter(v => new Date(v.created_at || v.createdAt) >= new Date(filters.startDate));
     }
     if (filters.endDate) {
-      data = data.filter(v => new Date(v.createdAt) <= new Date(filters.endDate));
+      data = data.filter(v => new Date(v.created_at || v.createdAt) <= new Date(filters.endDate));
     }
     if (filters.productName) {
-      data = data.filter(v => v.productName.includes(filters.productName));
+      const searchName = filters.productName.toLowerCase();
+      data = data.filter(v => {
+        const name = (v.product_name || v.productName || '').toLowerCase();
+        return name.includes(searchName);
+      });
     }
 
     const factorAnalysis = {};
@@ -193,11 +213,29 @@ class AttributionService {
     for (const video of data) {
       let groupKey;
 
+      // 处理不同的字段名格式（数据库格式 vs Mock格式）
+      const videoData = {
+        opening_style: video.opening_style || video.openingStyle,
+        bgm_style: video.bgm_style || video.bgmStyle,
+        voiceover_style: video.voiceover_style || video.voiceoverStyle,
+        color_tone: video.color_tone || video.colorTone,
+        subtitle_style: video.subtitle_style || video.subtitleStyle,
+        aspect_ratio: video.aspect_ratio || video.aspectRatio,
+        duration: video.duration || video.videoLength,
+        scene_count: video.scene_count || video.sceneCount,
+        views: video.views || video.totalViews || 0,
+        completion_rate: video.completion_rate || video.completionRate,
+        click_through_rate: video.click_through_rate || video.clickThroughRate,
+        conversion_rate: video.conversion_rate || video.conversionRate
+      };
+
       if (factorInfo.type === 'categorical') {
-        groupKey = video[factorKey];
+        groupKey = videoData[factorKey];
       } else if (factorInfo.type === 'range') {
-        groupKey = this.getRangeLabel(video[factorKey], factorInfo.options);
+        groupKey = this.getRangeLabel(videoData[factorKey], factorInfo.options);
       }
+
+      if (!groupKey) continue;
 
       if (!groups[groupKey]) {
         groups[groupKey] = {
@@ -210,7 +248,7 @@ class AttributionService {
       }
 
       groups[groupKey].videos.push(video);
-      groups[groupKey].totalViews += video.views;
+      groups[groupKey].totalViews += videoData.views;
     }
 
     const results = [];
@@ -221,9 +259,25 @@ class AttributionService {
 
       if (count === 0) continue;
 
-      const avgCompletionRate = videos.reduce((sum, v) => sum + v.completionRate, 0) / count;
-      const avgClickThroughRate = videos.reduce((sum, v) => sum + v.clickThroughRate, 0) / count;
-      const avgConversionRate = videos.reduce((sum, v) => sum + v.conversionRate, 0) / count;
+      // 统一计算各指标
+      let totalCompletionRate = 0;
+      let totalClickRate = 0;
+      let totalConversionRate = 0;
+
+      for (const video of videos) {
+        const videoData = {
+          completion_rate: video.completion_rate || video.completionRate,
+          click_through_rate: video.click_through_rate || video.clickThroughRate,
+          conversion_rate: video.conversion_rate || video.conversionRate
+        };
+        totalCompletionRate += videoData.completion_rate || 0;
+        totalClickRate += videoData.click_through_rate || 0;
+        totalConversionRate += videoData.conversion_rate || 0;
+      }
+
+      const avgCompletionRate = totalCompletionRate / count;
+      const avgClickThroughRate = totalClickRate / count;
+      const avgConversionRate = totalConversionRate / count;
 
       results.push({
         factorName: factorInfo.name,
@@ -262,15 +316,27 @@ class AttributionService {
       };
     }
 
-    const totalViews = data.reduce((sum, v) => sum + v.views, 0);
-    const avgCompletionRate = data.reduce((sum, v) => sum + v.completionRate, 0) / data.length;
-    const avgClickThroughRate = data.reduce((sum, v) => sum + v.clickThroughRate, 0) / data.length;
-    const avgConversionRate = data.reduce((sum, v) => sum + v.conversionRate, 0) / data.length;
+    let totalViews = 0;
+    let totalCompletionRate = 0;
+    let totalClickRate = 0;
+    let totalConversionRate = 0;
+
+    for (const video of data) {
+      totalViews += video.views || video.totalViews || 0;
+      totalCompletionRate += video.completion_rate || video.completionRate || 0;
+      totalClickRate += video.click_through_rate || video.clickThroughRate || 0;
+      totalConversionRate += video.conversion_rate || video.conversionRate || 0;
+    }
+
+    const count = data.length;
+    const avgCompletionRate = totalCompletionRate / count;
+    const avgClickThroughRate = totalClickRate / count;
+    const avgConversionRate = totalConversionRate / count;
 
     return {
-      totalVideos: data.length,
+      totalVideos: count,
       totalViews: totalViews,
-      avgViews: Math.round(totalViews / data.length),
+      avgViews: Math.round(totalViews / count),
       avgCompletionRate: Math.round(avgCompletionRate * 1000) / 1000,
       avgClickThroughRate: Math.round(avgClickThroughRate * 1000) / 1000,
       avgConversionRate: Math.round(avgConversionRate * 1000) / 1000
@@ -342,31 +408,54 @@ class AttributionService {
   }
 
   getVideoList(filters = {}, page = 1, limit = 20) {
-    let data = [...this.mockVideoData];
+    // 优先从数据库获取真实的视频数据
+    let data = [];
+    try {
+      data = videoFactorService.getAllVideoDataForAttribution(filters);
+      
+      if (data.length === 0) {
+        data = [...this.mockVideoData];
+      }
+    } catch (err) {
+      console.warn('⚠️ 获取真实视频数据失败，使用Mock数据:', err.message);
+      data = [...this.mockVideoData];
+    }
 
-    if (filters.startDate) {
-      data = data.filter(v => new Date(v.createdAt) >= new Date(filters.startDate));
-    }
-    if (filters.endDate) {
-      data = data.filter(v => new Date(v.createdAt) <= new Date(filters.endDate));
-    }
-    if (filters.productName) {
-      data = data.filter(v => v.productName.includes(filters.productName));
-    }
     if (filters.factor) {
       const factorKey = filters.factor;
       const factorValue = filters.value;
       if (this.factors[factorKey] && this.factors[factorKey].type === 'categorical') {
-        data = data.filter(v => v[factorKey] === factorValue);
+        data = data.filter(v => {
+          const videoValue = v[factorKey] || v[this.toCamelCase(factorKey)];
+          return videoValue === factorValue;
+        });
       }
     }
 
-    data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    // 统一数据格式用于排序和分页
+    const formattedData = data.map(v => ({
+      id: v.video_id || v.id,
+      productName: v.product_name || v.productName || '未知商品',
+      videoLength: v.duration || v.videoLength || 0,
+      openingStyle: v.opening_style || v.openingStyle,
+      bgmStyle: v.bgm_style || v.bgmStyle,
+      voiceoverStyle: v.voiceover_style || v.voiceoverStyle,
+      colorTone: v.color_tone || v.colorTone,
+      subtitleStyle: v.subtitle_style || v.subtitleStyle,
+      aspectRatio: v.aspect_ratio || v.aspectRatio,
+      views: v.views || 0,
+      completionRate: v.completion_rate || v.completionRate || 0,
+      clickThroughRate: v.click_through_rate || v.clickThroughRate || 0,
+      conversionRate: v.conversion_rate || v.conversionRate || 0,
+      createdAt: v.created_at || v.createdAt
+    }));
 
-    const total = data.length;
+    formattedData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const total = formattedData.length;
     const start = (page - 1) * limit;
     const end = start + limit;
-    const paginatedData = data.slice(start, end);
+    const paginatedData = formattedData.slice(start, end);
 
     return {
       videos: paginatedData,
@@ -375,6 +464,10 @@ class AttributionService {
       limit: limit,
       totalPages: Math.ceil(total / limit)
     };
+  }
+
+  toCamelCase(str) {
+    return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
   }
 }
 

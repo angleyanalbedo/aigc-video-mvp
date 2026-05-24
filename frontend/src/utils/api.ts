@@ -134,3 +134,99 @@ export async function apiDelete<T = any>(
 }
 
 export { API_BASE };
+
+// 视频因子相关API
+export interface VideoFactor {
+  id: string;
+  projectId: string;
+  openingStyle?: string;
+  bgmStyle?: string;
+  bgmVolume?: number;
+  voiceoverStyle?: string;
+  voiceoverGender?: string;
+  colorTone?: string;
+  saturation?: string;
+  subtitleStyle?: string;
+  subtitlePosition?: string;
+  aspectRatio?: string;
+  duration?: number;
+  sceneCount?: number;
+  resolution?: string;
+  productName?: string;
+  productCategory?: string;
+  createdAt: string;
+}
+
+export interface PublishingRecord {
+  id: string;
+  projectId: string;
+  videoFactorId?: string;
+  platform: string;
+  publishedAt: string;
+  status: string;
+  mockViews: number;
+  mockCompletionRate: number;
+  mockClickRate: number;
+  mockConversionRate: number;
+  mockLikes: number;
+  mockComments: number;
+  mockShares: number;
+  experimentId?: string;
+  variantId?: string;
+  openingStyle?: string;
+  bgmStyle?: string;
+  voiceoverStyle?: string;
+  colorTone?: string;
+  aspectRatio?: string;
+  duration?: number;
+  sceneCount?: number;
+}
+
+export async function recordVideoFactors(
+  projectId: string,
+  factors: Partial<VideoFactor>
+): Promise<ApiResponse<VideoFactor>> {
+  return apiPost('/api/video-factors/factors', { projectId, ...factors });
+}
+
+export async function getVideoFactorsByProject(
+  projectId: string
+): Promise<ApiResponse<VideoFactor[]>> {
+  return apiGet(`/api/video-factors/factors/project/${projectId}`);
+}
+
+export async function publishVideo(
+  projectId: string,
+  options?: {
+    platform?: string;
+    productName?: string;
+    experimentId?: string;
+    variantId?: string;
+  }
+): Promise<ApiResponse<PublishingRecord>> {
+  return apiPost('/api/video-factors/publish', { projectId, ...options });
+}
+
+export async function getPublishingRecordsByProject(
+  projectId: string
+): Promise<ApiResponse<PublishingRecord[]>> {
+  return apiGet(`/api/video-factors/publish/project/${projectId}`);
+}
+
+export async function getPublishingRecordsByExperiment(
+  experimentId: string
+): Promise<ApiResponse<PublishingRecord[]>> {
+  return apiGet(`/api/video-factors/publish/experiment/${experimentId}`);
+}
+
+export async function getVideoFactorStats(): Promise<
+  ApiResponse<{
+    totalVideos: number;
+    totalPublished: number;
+    totalViews: number;
+    avgCompletionRate: number;
+    avgConversionRate: number;
+  }>
+> {
+  return apiGet('/api/video-factors/stats');
+}
