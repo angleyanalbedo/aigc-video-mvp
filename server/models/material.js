@@ -39,7 +39,7 @@ const materialModel = {
   },
 
   create(data) {
-    const id = generateId('mat');
+    const id = data.id || generateId('mat');
     db.prepare(`
       INSERT INTO materials (id, project_id, filename, url, type, tags, embedding, content, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

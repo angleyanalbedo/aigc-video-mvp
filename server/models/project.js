@@ -114,7 +114,7 @@ const projectModel = {
   },
 
   create(data) {
-    const id = generateId('proj');
+    const id = data.id || generateId('proj');
     const now = new Date().toISOString();
     
     const defaultScript = data.script || {

@@ -1,18 +1,14 @@
-const db = require('../db');
 const { llmProvider } = require('./providers');
-
-function parseJSON(value) {
-  if (!value) return null;
-  try { return JSON.parse(value); } catch { return null; }
-}
+const SceneModel = require('../models/scene');
+const ProjectModel = require('../models/project');
 
 class ScriptInterventionService {
-  async refineWithPrompt(scriptId, prompt) {
-    const scriptRow = db.prepare('SELECT * FROM scripts WHERE id = ?').get(scriptId);
-    if (!scriptRow) throw new Error('剧本不存在');
+  async refineWithPrompt(projectId, prompt) {
+    const scenes = SceneModel.getByProjectId(projectId);
+    if (!scenes || scenes.length === 0) throw new Error('项目没有分镜');
 
-    const script = parseJSON(scriptRow.content);
-    const productInfo = parseJSON(scriptRow.product_info);
+    const project = ProjectModel.getById(projectId);
+    const productInfo = project ? project.product_info : null;
 
     const refined = await llmProvider.generateStructuredText({
       system: `你是电商带货视频剧本优化专家。根据用户的修改要求，对现有剧本进行优化调整。
@@ -22,8 +18,8 @@ class ScriptInterventionService {
 2. 保持其他分镜不变
 3. 确保修改后整体叙事仍然连贯
 4. 总时长仍控制在15秒以内`,
-      prompt: `## 原始剧本
-${JSON.stringify(script, null, 2)}
+      prompt: `## 原始分镜
+${JSON.stringify(scenes, null, 2)}
 
 ## 商品信息
 ${JSON.stringify(productInfo, null, 2)}
@@ -31,72 +27,46 @@ ${JSON.stringify(productInfo, null, 2)}
 ## 用户修改要求
 ${prompt}
 
-请返回修改后的完整剧本。`,
+请返回修改后的完整分镜列表。`,
       schema: {
-        title: 'string',
         scenes: [{
           id: 'number',
           description: 'string',
           voiceover: 'string',
           duration: 'number',
-          shot: 'string',
+          shot_type: 'string',
           emotion: 'string',
-          transition: 'string'
+          transition: 'string',
+          subtitle: 'string',
+          reference_image_url: 'string'
         }]
       }
     });
 
-    const totalDuration = (refined.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
-    const newContent = {
-      title: refined.title || script.title,
-      scenes: (refined.scenes || []).map((scene, index) => ({
-        id: index + 1,
-        description: scene.description,
-        voiceover: scene.voiceover,
-        duration: scene.duration || 3,
-        shot_type: scene.shot || '中景',
-        emotion: scene.emotion || '积极',
-        transition: scene.transition || 'fade',
-        status: 'idle',
-        videoUrl: null
-      })),
-      totalDuration,
-      createdAt: Date.now()
-    };
+    refined.scenes.forEach((sceneData, index) => {
+      if (scenes[index]) {
+        SceneModel.update(scenes[index].id, {
+          description: sceneData.description,
+          voiceover: sceneData.voiceover,
+          duration: sceneData.duration,
+          shot_type: sceneData.shot_type,
+          emotion: sceneData.emotion,
+          transition: sceneData.transition,
+          subtitle: sceneData.subtitle,
+          reference_image_url: sceneData.reference_image_url
+        });
+      }
+    });
 
-    const newId = `script_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    db.prepare(`
-      INSERT INTO scripts (id, project_id, title, content, generation_mode, template_id, reference_video_id,
-        factors_used, product_info, constraint_rules, status, version, parent_script_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      newId,
-      scriptRow.project_id,
-      newContent.title,
-      JSON.stringify(newContent),
-      'prompt_refine',
-      scriptRow.template_id,
-      scriptRow.reference_video_id,
-      scriptRow.factors_used,
-      scriptRow.product_info,
-      scriptRow.constraint_rules,
-      'draft',
-      (scriptRow.version || 1) + 1,
-      scriptId
-    );
-
-    return { id: newId, ...newContent };
+    return SceneModel.getByProjectId(projectId);
   }
 
-  async replaceFactor(scriptId, factorType, newValue) {
-    const scriptRow = db.prepare('SELECT * FROM scripts WHERE id = ?').get(scriptId);
-    if (!scriptRow) throw new Error('剧本不存在');
+  async replaceFactor(projectId, factorType, newValue) {
+    const scenes = SceneModel.getByProjectId(projectId);
+    if (!scenes || scenes.length === 0) throw new Error('项目没有分镜');
 
-    const script = parseJSON(scriptRow.content);
-    const productInfo = parseJSON(scriptRow.product_info);
-    const factorsUsed = parseJSON(scriptRow.factors_used) || {};
-
-    factorsUsed[factorType] = newValue;
+    const project = ProjectModel.getById(projectId);
+    const productInfo = project ? project.product_info : null;
 
     const factorDescriptions = {
       opening: '开场风格',
@@ -115,140 +85,71 @@ ${prompt}
 - 新值：${newValue}
 
 请保持其他因子不变，只调整与替换因子相关的部分。`,
-      prompt: `## 原始剧本
-${JSON.stringify(script, null, 2)}
+      prompt: `## 原始分镜
+${JSON.stringify(scenes, null, 2)}
 
 ## 商品信息
 ${JSON.stringify(productInfo, null, 2)}
 
-## 当前因子
-${JSON.stringify(factorsUsed, null, 2)}
-
-请根据因子替换要求重新生成剧本。`,
+请根据因子替换要求重新生成分镜。`,
       schema: {
-        title: 'string',
         scenes: [{
           id: 'number',
           description: 'string',
           voiceover: 'string',
           duration: 'number',
-          shot: 'string',
+          shot_type: 'string',
           emotion: 'string',
-          transition: 'string'
+          transition: 'string',
+          subtitle: 'string'
         }]
       }
     });
 
-    const totalDuration = (refined.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
-    const newContent = {
-      title: refined.title || script.title,
-      scenes: (refined.scenes || []).map((scene, index) => ({
-        id: index + 1,
-        description: scene.description,
-        voiceover: scene.voiceover,
-        duration: scene.duration || 3,
-        shot_type: scene.shot || '中景',
-        emotion: scene.emotion || '积极',
-        transition: scene.transition || 'fade',
-        status: 'idle',
-        videoUrl: null
-      })),
-      totalDuration,
-      createdAt: Date.now()
-    };
+    refined.scenes.forEach((sceneData, index) => {
+      if (scenes[index]) {
+        SceneModel.update(scenes[index].id, {
+          description: sceneData.description,
+          voiceover: sceneData.voiceover,
+          duration: sceneData.duration,
+          shot_type: sceneData.shot_type,
+          emotion: sceneData.emotion,
+          transition: sceneData.transition,
+          subtitle: sceneData.subtitle
+        });
+      }
+    });
 
-    const newId = `script_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    db.prepare(`
-      INSERT INTO scripts (id, project_id, title, content, generation_mode, template_id, reference_video_id,
-        factors_used, product_info, constraint_rules, status, version, parent_script_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      newId,
-      scriptRow.project_id,
-      newContent.title,
-      JSON.stringify(newContent),
-      'factor_replace',
-      scriptRow.template_id,
-      scriptRow.reference_video_id,
-      JSON.stringify(factorsUsed),
-      scriptRow.product_info,
-      scriptRow.constraint_rules,
-      'draft',
-      (scriptRow.version || 1) + 1,
-      scriptId
-    );
-
-    return { id: newId, ...newContent, factorsUsed };
+    return SceneModel.getByProjectId(projectId);
   }
 
-  async modifyScene(scriptId, sceneIndex, modifications) {
-    const scriptRow = db.prepare('SELECT * FROM scripts WHERE id = ?').get(scriptId);
-    if (!scriptRow) throw new Error('剧本不存在');
+  async modifyScene(sceneId, modifications) {
+    const scene = SceneModel.getById(sceneId);
+    if (!scene) throw new Error('分镜不存在');
 
-    const script = parseJSON(scriptRow.content);
-    if (!script.scenes || sceneIndex >= script.scenes.length) {
-      throw new Error('分镜索引越界');
-    }
+    const validFields = [
+      'description', 'voiceover', 'narration', 'subtitle',
+      'shot_type', 'emotion', 'transition', 'music_mood',
+      'ai_prompt', 'reference_image_id', 'reference_image_url',
+      'image_url', 'duration', 'status'
+    ];
 
-    const modifiedScenes = [...script.scenes];
-    modifiedScenes[sceneIndex] = {
-      ...modifiedScenes[sceneIndex],
-      ...modifications,
-      status: 'idle',
-      videoUrl: null
-    };
+    const filteredModifications = {};
+    Object.keys(modifications).forEach(key => {
+      if (validFields.includes(key)) {
+        filteredModifications[key] = modifications[key];
+      }
+    });
 
-    const totalDuration = modifiedScenes.reduce((sum, s) => sum + (s.duration || 3), 0);
-    const newContent = {
-      ...script,
-      scenes: modifiedScenes,
-      totalDuration,
-      createdAt: Date.now()
-    };
-
-    const newId = `script_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    db.prepare(`
-      INSERT INTO scripts (id, project_id, title, content, generation_mode, template_id, reference_video_id,
-        factors_used, product_info, constraint_rules, status, version, parent_script_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      newId,
-      scriptRow.project_id,
-      newContent.title,
-      JSON.stringify(newContent),
-      'scene_modify',
-      scriptRow.template_id,
-      scriptRow.reference_video_id,
-      scriptRow.factors_used,
-      scriptRow.product_info,
-      scriptRow.constraint_rules,
-      'draft',
-      (scriptRow.version || 1) + 1,
-      scriptId
-    );
-
-    return { id: newId, ...newContent };
+    return SceneModel.update(sceneId, filteredModifications);
   }
 
-  getScriptHistory(scriptId) {
-    const versions = [];
-    let current = scriptId;
+  async addScene(projectId, sceneData) {
+    return SceneModel.create(projectId, sceneData);
+  }
 
-    while (current) {
-      const row = db.prepare('SELECT * FROM scripts WHERE id = ?').get(current);
-      if (!row) break;
-      versions.push({
-        id: row.id,
-        title: row.title,
-        generationMode: row.generation_mode,
-        version: row.version,
-        status: row.status,
-        createdAt: row.created_at
-      });
-      current = row.parent_script_id;
-    }
-
-    return versions.reverse();
+  async deleteScene(sceneId) {
+    return SceneModel.delete(sceneId);
   }
 }
 
