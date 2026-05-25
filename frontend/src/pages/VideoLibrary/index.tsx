@@ -23,7 +23,7 @@ import {
   LikeOutlined,
   FireOutlined,
 } from '@ant-design/icons';
-import { VideoLibraryService, VideoLibraryItem, VideoLibraryStats } from '../services/videoLibrary';
+import { VideoLibraryService, VideoLibraryItem, VideoLibraryStats } from '../../services/videoLibrary';
 import { useNavigate } from 'react-router-dom';
 
 const { Option } = Select;

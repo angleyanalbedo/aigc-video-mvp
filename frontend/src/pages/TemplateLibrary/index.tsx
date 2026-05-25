@@ -20,7 +20,7 @@ import {
   LikeOutlined,
   StarOutlined,
 } from '@ant-design/icons';
-import { TemplateService, InspirationTemplate } from '../services/template';
+import { TemplateService, InspirationTemplate } from '../../services/template';
 import { useNavigate } from 'react-router-dom';
 
 const { Option } = Select;
