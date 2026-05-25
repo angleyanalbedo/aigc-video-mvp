@@ -11,6 +11,7 @@ class VectorStore {
     const embeddingBuffer = embeddingService.vectorToBuffer(embedding);
 
     const memId = id || `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const cleanSessionId = (typeof sessionId === 'string' && sessionId.trim() !== '') ? sessionId : null;
 
     const stmt = db.prepare(`
       INSERT OR REPLACE INTO agent_memory
@@ -21,7 +22,7 @@ class VectorStore {
     stmt.run(
       memId,
       agentName,
-      sessionId || null,
+      cleanSessionId,
       memoryType,
       content,
       embeddingBuffer,
@@ -44,9 +45,10 @@ class VectorStore {
       params.push(memoryType);
     }
 
-    if (sessionId) {
+    const cleanSessionId = (typeof sessionId === 'string' && sessionId.trim() !== '') ? sessionId : null;
+    if (cleanSessionId) {
       sql += ' AND (session_id = ? OR session_id IS NULL)';
-      params.push(sessionId);
+      params.push(cleanSessionId);
     }
 
     sql += " AND (expires_at IS NULL OR expires_at > datetime('now'))";
@@ -83,9 +85,10 @@ class VectorStore {
     let sql = 'SELECT * FROM agent_memory WHERE agent_name = ?';
     const params = [agentName];
 
-    if (sessionId) {
+    const cleanSessionId = (typeof sessionId === 'string' && sessionId.trim() !== '') ? sessionId : null;
+    if (cleanSessionId) {
       sql += ' AND session_id = ?';
-      params.push(sessionId);
+      params.push(cleanSessionId);
     }
 
     if (memoryType) {

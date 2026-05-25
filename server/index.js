@@ -174,7 +174,7 @@ app.post('/api/script/generate', async (req, res) => {
   try {
     console.log('📝 使用 ScriptAgent 生成剧本...');
 
-    const script = await scriptAgent.generate(productInfo, materials || []);
+    const script = await scriptAgent.generate(productInfo, req.body.projectId || null);
 
     console.log('✅ 剧本生成完成');
     res.json({ success: true, script });
