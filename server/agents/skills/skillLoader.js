@@ -154,7 +154,11 @@ class SkillLoader {
         const value = line.slice(colonIndex + 1).trim();
         
         if (value.startsWith('[') && value.endsWith(']')) {
-          metadata[key] = JSON.parse(value);
+          try {
+            metadata[key] = JSON.parse(value);
+          } catch {
+            metadata[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+          }
         } else {
           metadata[key] = value;
         }
