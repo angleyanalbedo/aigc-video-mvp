@@ -620,7 +620,7 @@ app.post('/api/video/compose', async (req, res) => {
           }
         }
       }
-
+ 
       if (!videoPath || !fs.existsSync(videoPath)) {
         throw new Error(`分镜 ${scene.sceneId || (i + 1)} 缺少有效的本地视频文件，请先在画布卡片上生成视频片段！`);
       }
