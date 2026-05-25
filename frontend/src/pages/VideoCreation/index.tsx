@@ -612,47 +612,72 @@ const VideoCreationPage: React.FC = () => {
           </div>
           {analysisResult ? (
             <div style={{ fontSize: 13, lineHeight: 1.8, color: '#e4e4e7' }}>
-              {analysisResult.productInfo && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4 }}>商品信息</div>
-                  <div style={{ color: '#a1a1aa', padding: 8, background: '#18181b', borderRadius: 6 }}>
-                    <div>名称: {analysisResult.productInfo.title || '-'}</div>
-                    <div style={{ marginTop: 4 }}>卖点: {analysisResult.productInfo.sellingPoints || '-'}</div>
-                  </div>
-                </div>
-              )}
-              {analysisResult.tags && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 6 }}>标签</div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {(Array.isArray(analysisResult.tags) ? analysisResult.tags : []).map((t: string, i: number) => (
-                      <Tag key={i} color="purple" style={{ borderRadius: 4, background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c084fc' }}>{t}</Tag>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {analysisResult.slices && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4 }}>切片</div>
-                  <div style={{ color: '#818cf8', fontWeight: 600 }}>{analysisResult.slices.length} 个镜头切片已结构化</div>
-                </div>
-              )}
-              <Button
-                size="small" type="primary"
-                style={{ marginTop: 12, borderRadius: 6, background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', border: 'none', width: '100%', height: 32 }}
-                onClick={() => {
-                  if (analysisResult.productInfo?.title) {
-                    setProductInfo(prev => ({
-                      ...prev,
-                      title: analysisResult.productInfo.title || prev.title,
-                      sellingPoints: analysisResult.productInfo.sellingPoints || prev.sellingPoints
-                    }))
-                    message.info('已将分析结果填入剧本模块')
-                  }
-                }}
-              >
-                填入剧本模块
-              </Button>
+              {(() => {
+                const info = analysisResult.data || analysisResult;
+                const title = info.category ? `${info.category}精选单品` : '智能带货单品';
+                const sellingPoints = info.summary || (info.product_tags ? info.product_tags.join('\n') : '');
+                const targetAudience = info.suitable_scenes ? info.suitable_scenes.join('、') : '都市年轻消费群体';
+                const tags = info.allTags || info.product_tags || [];
+
+                return (
+                  <>
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24' }} />
+                        智能提取商品信息
+                      </div>
+                      <div style={{ color: '#a1a1aa', padding: 12, background: '#18181b', borderRadius: 8, border: '1px solid #27272a' }}>
+                        <div><span style={{ color: '#71717a' }}>建议标题:</span> <strong style={{ color: '#f4f4f5' }}>{title}</strong></div>
+                        <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: '#71717a' }}>核心摘要:</span> <span style={{ color: '#e4e4e7' }}>{info.summary || '-'}</span></div>
+                        {info.category && <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: '#71717a' }}>推荐品类:</span> <Tag color="blue" style={{ borderRadius: 4, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', margin: '0 0 0 6px' }}>{info.category}</Tag></div>}
+                      </div>
+                    </div>
+
+                    {tags.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa' }} />
+                          三层标签画像
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {tags.slice(0, 8).map((t: string, i: number) => (
+                            <Tag key={i} color="purple" style={{ borderRadius: 4, margin: 0, background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c084fc' }}>{t}</Tag>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {info.suitable_scenes && info.suitable_scenes.length > 0 && (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8' }} />
+                          拟真消费场景
+                        </div>
+                        <div style={{ color: '#e4e4e7', fontSize: 12, padding: '8px 12px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 8 }}>
+                          {info.suitable_scenes.join(' ｜ ')}
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      size="middle" type="primary"
+                      icon={<ThunderboltOutlined />}
+                      style={{ marginTop: 12, borderRadius: 8, background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)', border: 'none', width: '100%', height: 38, fontWeight: 600, boxShadow: '0 4px 12px rgba(99,102,241,0.2)' }}
+                      onClick={() => {
+                        setProductInfo({
+                          title: title,
+                          sellingPoints: sellingPoints,
+                          targetAudience: targetAudience
+                        });
+                        setActiveModule('script'); // 自动、超平滑流转到剧本 Tab
+                        message.success('✨ 素材画像已智能贯注入剧本表单，已为您准备好 AI 剧本撰写！');
+                      }}
+                    >
+                      一键贯入剧本舱 →
+                    </Button>
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#71717a' }}>
