@@ -1,4 +1,6 @@
 const path = require('path');
+module.paths.push(path.join(__dirname, '../server/node_modules'));
+
 const dotenvPath = path.join(__dirname, '../server/.env');
 require('dotenv').config({ path: dotenvPath });
 

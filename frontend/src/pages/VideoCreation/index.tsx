@@ -11,9 +11,10 @@ import {
   DeleteOutlined, PlusOutlined, ReloadOutlined,
   AppstoreOutlined, ScissorOutlined, BulbOutlined,
   CaretRightOutlined, PauseOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  LoadingOutlined, DownloadOutlined
+  LoadingOutlined, DownloadOutlined, RobotOutlined
 } from '@ant-design/icons'
 import axios from 'axios'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const API_BASE = window.location.hostname.includes('trae.cn')
   ? 'http://localhost:3001'
@@ -94,6 +95,9 @@ const MODULE_CONFIG: Record<ModuleKey, {
 }
 
 const VideoCreationPage: React.FC = () => {
+  const location = useLocation()
+  const navigate = useNavigate()
+
   const [activeModule, setActiveModule] = useState<ModuleKey>('material')
 
   const [materials, setMaterials] = useState<MaterialItem[]>([])
@@ -111,6 +115,8 @@ const VideoCreationPage: React.FC = () => {
   const [scriptLoading, setScriptLoading] = useState(false)
   const [refinePrompt, setRefinePrompt] = useState('')
   const [refineLoading, setRefineLoading] = useState(false)
+  const [incomingTemplate, setIncomingTemplate] = useState<any>(location.state?.template || null)
+  const [incomingReferenceVideo, setIncomingReferenceVideo] = useState<any>(location.state?.referenceVideo || null)
 
   const [videoStatus, setVideoStatus] = useState<TaskStatus>('idle')
   const [videoProgress, setVideoProgress] = useState(0)
@@ -207,6 +213,63 @@ const VideoCreationPage: React.FC = () => {
     if (!materials.find(m => m.url === item.url)) {
       setMaterials(prev => [...prev, { url: item.url, filename: item.filename, type: item.type, tags: item.tags }])
     }
+  }
+
+  const applyTemplate = async () => {
+    if (!incomingTemplate?.id) return
+    setScriptLoading(true)
+    setErrorMsg('')
+    if (productInfo.title) {
+      try {
+        const res = await axios.post(`${API_BASE}/api/templates/${incomingTemplate.id}/generate-script`, {
+          productInfo,
+          projectId: 'proj-' + Date.now()
+        })
+        if (res.data.success !== false) {
+          const data = res.data.data || res.data
+          if (data.scenes) {
+            setScript({
+              title: data.title || productInfo.title,
+              scenes: data.scenes.map((s: any, i: number) => ({
+                id: i + 1,
+                description: s.description || s.ai_prompt || '',
+                voiceover: s.voiceover || '',
+                duration: s.duration || s.tts_est_duration || 3,
+                shot: s.shot_type || s.shot || '中景',
+                emotion: s.emotion || '积极',
+                transition: s.transition || 'fade'
+              })),
+              totalDuration: data.totalDuration || data.scenes.reduce((sum: number, s: any) => sum + (s.duration || 3), 0)
+            })
+            message.success('基于模板的剧本生成成功！')
+            setActiveModule('script')
+            return
+          }
+        }
+      } catch { /* fall through to normal generation */ }
+    }
+    message.info('请先填写商品标题，然后点击「AI 生成剧本」')
+    setActiveModule('script')
+    setScriptLoading(false)
+  }
+
+  const applyReferenceVideo = () => {
+    if (incomingReferenceVideo?.analysis || incomingReferenceVideo?.hookTechnique) {
+      const ref = incomingReferenceVideo
+      if (ref.sellingPoints && !productInfo.sellingPoints) {
+        setProductInfo(prev => ({ ...prev, sellingPoints: ref.sellingPoints }))
+      }
+      message.info('已将参考视频的卖点信息填入剧本模块')
+      setActiveModule('script')
+    } else {
+      message.warning('该视频尚未分析，无法提取参考信息')
+    }
+  }
+
+  const clearIncomingData = () => {
+    setIncomingTemplate(null)
+    setIncomingReferenceVideo(null)
+    navigate('.', { replace: true })
   }
 
   const generateScript = async () => {
@@ -1409,6 +1472,65 @@ const VideoCreationPage: React.FC = () => {
             )
           })}
         </div>
+
+        {(incomingTemplate || incomingReferenceVideo) && (
+          <div style={{
+            marginTop: 12, padding: '12px 16px', borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(114,46,209,0.15) 0%, rgba(139,92,246,0.1) 100%)',
+            border: '1px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', gap: 12
+          }}>
+            <RobotOutlined style={{ color: '#a78bfa', fontSize: 18 }} />
+            <div style={{ flex: 1 }}>
+              {incomingTemplate && (
+                <div style={{ fontSize: 13, color: '#e4e4e7' }}>
+                  <span style={{ color: '#a78bfa', fontWeight: 600 }}>灵感模板</span>
+                  {' '}「{incomingTemplate.name}」- 策略：{incomingTemplate.strategy?.slice(0, 60)}...
+                </div>
+              )}
+              {incomingReferenceVideo && (
+                <div style={{ fontSize: 13, color: '#e4e4e7', marginTop: incomingTemplate ? 4 : 0 }}>
+                  <span style={{ color: '#f97316', fontWeight: 600 }}>参考视频</span>
+                  {' '}「{incomingReferenceVideo.title}」
+                  {incomingReferenceVideo.hookTechnique && (
+                    <span style={{ color: '#71717a', marginLeft: 8 }}>Hook: {incomingReferenceVideo.hookTechnique?.slice(0, 40)}...</span>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {incomingTemplate && (
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<ThunderboltOutlined />}
+                  onClick={applyTemplate}
+                  loading={scriptLoading}
+                  style={{ borderRadius: 6, background: '#8b5cf6', border: 'none', fontSize: 12 }}
+                >
+                  基于模板生成剧本
+                </Button>
+              )}
+              {incomingReferenceVideo && (
+                <Button
+                  size="small"
+                  icon={<BulbOutlined />}
+                  onClick={applyReferenceVideo}
+                  style={{ borderRadius: 6, background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.3)', fontSize: 12 }}
+                >
+                  提取卖点
+                </Button>
+              )}
+              <Button
+                size="small"
+                type="text"
+                onClick={clearIncomingData}
+                style={{ color: '#71717a', fontSize: 12 }}
+              >
+                忽略
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{
