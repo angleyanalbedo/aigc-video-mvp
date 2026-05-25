@@ -25,7 +25,40 @@ class MockLLMProvider extends BaseLLMProvider {
       }
       return JSON.parse(response);
     } catch {
-      console.error('JSON 解析失败:', response);
+      console.warn('JSON 解析失败，尝试解析 XML 格式...');
+      return this._parseXmlToJson(response);
+    }
+  }
+
+  _parseXmlToJson(xmlString) {
+    try {
+      const titleMatch = xmlString.match(/<title>([^<]+)<\/title>/);
+      const title = titleMatch ? titleMatch[1] : '未命名剧本';
+      
+      const sceneMatches = xmlString.match(/<scene[^>]*>[\s\S]*?<\/scene>/g);
+      const scenes = sceneMatches ? sceneMatches.map((sceneXml, index) => {
+        const idMatch = sceneXml.match(/id=["']([^"']+)["']/);
+        const descMatch = sceneXml.match(/<description>([^<]+)<\/description>/);
+        const durationMatch = sceneXml.match(/<duration>([^<]+)<\/duration>/);
+        const voiceoverMatch = sceneXml.match(/<voiceover>([^<]+)<\/voiceover>/);
+        const shotMatch = sceneXml.match(/<shot>([^<]+)<\/shot>/);
+        const emotionMatch = sceneXml.match(/<emotion>([^<]+)<\/emotion>/);
+        const transitionMatch = sceneXml.match(/<transition>([^<]+)<\/transition>/);
+        
+        return {
+          id: idMatch ? parseInt(idMatch[1]) : index + 1,
+          description: descMatch ? descMatch[1] : '',
+          duration: durationMatch ? parseInt(durationMatch[1]) : 3,
+          voiceover: voiceoverMatch ? voiceoverMatch[1] : '',
+          shot: shotMatch ? shotMatch[1] : '中景',
+          emotion: emotionMatch ? emotionMatch[1] : '积极',
+          transition: transitionMatch ? transitionMatch[1] : 'cut'
+        };
+      }) : [];
+      
+      return { title, scenes };
+    } catch (error) {
+      console.error('XML 解析失败:', error.message);
       throw new Error('LLM 返回格式错误');
     }
   }
