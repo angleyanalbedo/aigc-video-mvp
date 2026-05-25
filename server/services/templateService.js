@@ -1,5 +1,7 @@
 const db = require('../db');
 const { llmProvider } = require('./providers');
+const SceneModel = require('../models/scene');
+const ProjectModel = require('../models/project');
 
 function generateId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -193,7 +195,7 @@ ${JSON.stringify(videoSummaries, null, 2)}
     return template;
   }
 
-  async generateScriptFromTemplate(templateId, productInfo) {
+  async generateScriptFromTemplate(templateId, productInfo, projectId) {
     const template = this.getById(templateId);
     if (!template) throw new Error('模板不存在');
 
@@ -229,20 +231,58 @@ ${JSON.stringify(videoSummaries, null, 2)}
       }
     });
 
-    const totalDuration = (script.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
+    const sceneData = (script.scenes || []).map((scene, index) => ({
+      description: scene.description,
+      voiceover: scene.voiceover,
+      duration: scene.duration || 3,
+      shot_type: scene.shot || '中景',
+      emotion: scene.emotion || '积极',
+      transition: scene.transition || 'fade',
+      order: index,
+      ai_prompt: `电商带货视频，${scene.description}，${scene.emotion}风格`
+    }));
+
+    if (projectId) {
+      console.log(`[DEBUG TemplateService] 开始保存分镜到项目 ${projectId}`);
+      console.log(`[DEBUG TemplateService] sceneData 数量: ${sceneData.length}`);
+      
+      try {
+        const existingProject = ProjectModel.getById(projectId);
+        console.log(`[DEBUG TemplateService] 项目存在: ${!!existingProject}`);
+        
+        if (!existingProject) {
+          console.log(`[DEBUG TemplateService] 创建新项目 ${projectId}`);
+          ProjectModel.create({
+            id: projectId,
+            name: productInfo.title || '未命名项目',
+            description: `使用模板 ${template.name} 生成`,
+            productInfo: productInfo
+          });
+          console.log(`[DEBUG TemplateService] 项目创建成功`);
+        }
+        
+        console.log(`[DEBUG TemplateService] 删除旧分镜...`);
+        SceneModel.deleteByProjectId(projectId);
+        console.log(`[DEBUG TemplateService] 旧分镜删除成功`);
+        
+        console.log(`[DEBUG TemplateService] 开始创建新分镜...`);
+        sceneData.forEach((data, index) => {
+          console.log(`[DEBUG TemplateService] 创建分镜 ${index + 1}`);
+          const result = SceneModel.create(projectId, data);
+          console.log(`[DEBUG TemplateService] 分镜创建结果: ${result ? '成功' : '失败'}`);
+        });
+        console.log(`[DEBUG TemplateService] 所有分镜创建完成`);
+        
+      } catch (error) {
+        console.error(`[ERROR TemplateService] 保存分镜失败:`, error.message);
+        console.error(error.stack);
+      }
+    }
+
+    const totalDuration = sceneData.reduce((sum, s) => sum + s.duration, 0);
     return {
       title: script.title || `${productInfo.title} - 带货视频`,
-      scenes: (script.scenes || []).map((scene, index) => ({
-        id: index + 1,
-        description: scene.description,
-        voiceover: scene.voiceover,
-        duration: scene.duration || 3,
-        shot_type: scene.shot || '中景',
-        emotion: scene.emotion || '积极',
-        transition: scene.transition || 'fade',
-        status: 'idle',
-        videoUrl: null
-      })),
+      scenes: SceneModel.getByProjectId(projectId) || sceneData.map((s, i) => ({ ...s, id: i + 1 })),
       totalDuration,
       templateId,
       templateName: template.name,

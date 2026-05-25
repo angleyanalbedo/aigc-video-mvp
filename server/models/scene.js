@@ -135,6 +135,12 @@ class SceneModel {
     return true;
   }
   
+  // 删除项目下所有分镜
+  static deleteByProjectId(projectId) {
+    db.prepare('DELETE FROM scenes WHERE project_id = ?').run(projectId);
+    return true;
+  }
+  
   // 批量创建分镜
   static createBatch(projectId, scenesData) {
     const createdScenes = [];

@@ -61,12 +61,12 @@ router.post('/extract', async (req, res) => {
 });
 
 router.post('/:id/generate-script', async (req, res) => {
-  const { productInfo } = req.body;
+  const { productInfo, projectId } = req.body;
   if (!productInfo || !productInfo.title) {
     return res.status(400).json({ success: false, error: '请提供商品信息' });
   }
   try {
-    const script = await templateService.generateScriptFromTemplate(req.params.id, productInfo);
+    const script = await templateService.generateScriptFromTemplate(req.params.id, productInfo, projectId);
     res.json({ success: true, data: script });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
