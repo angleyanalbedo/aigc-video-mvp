@@ -1290,6 +1290,13 @@ console.log('[DEBUG] videoFactorsRoutes loaded');
 // 引入 Copilot 路由
 const copilotRoutes = require('./routes/copilot');
 
+// 引入赛题核心模块路由
+const oneClickRoutes = require('./routes/oneClick');
+const videoLibraryRoutes = require('./routes/videoLibrary');
+const templateRoutes = require('./routes/template');
+const materialAnalysisRoutes = require('./routes/materialAnalysis');
+const scriptsRoutes = require('./routes/scripts');
+
 // 使用视频因子路由
 app.use('/api/video-factors', videoFactorsRoutes);
 
@@ -1323,8 +1330,16 @@ app.use('/api/skills', skillRoutes);
 // 使用 Copilot 路由
 app.use('/api/copilot', copilotRoutes);
 
+// 赛题核心模块路由
+app.use('/api/one-click', oneClickRoutes);
+app.use('/api/video-library', videoLibraryRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/material-analysis', materialAnalysisRoutes);
+app.use('/api/scripts', scriptsRoutes);
+
 console.log('[DEBUG] routes registered');
 console.log('✅ 新增 /api/copilot 智能对话和无限画布接口');
+console.log('✅ 新增赛题核心模块: /api/one-click, /api/video-library, /api/templates, /api/material-analysis, /api/scripts');
 
 console.log('[DEBUG] about to call app.listen...');
 // 启动服务器

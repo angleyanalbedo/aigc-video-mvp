@@ -323,3 +323,122 @@ CREATE INDEX IF NOT EXISTS idx_publishing_project ON video_publishing_records(pr
 CREATE INDEX IF NOT EXISTS idx_publishing_experiment ON video_publishing_records(experiment_id);
 CREATE INDEX IF NOT EXISTS idx_publishing_platform ON video_publishing_records(platform);
 CREATE INDEX IF NOT EXISTS idx_publishing_created ON video_publishing_records(created_at);
+
+-- ============================================================
+-- 赛题核心模块：素材 / 剧本 / 创作 三大模块表结构
+-- ============================================================
+
+-- 素材切片表 - 多颗粒度结构化资产（商品/视频/slice 三层标签）
+CREATE TABLE IF NOT EXISTS material_slices (
+  id TEXT PRIMARY KEY,
+  material_id TEXT NOT NULL,
+  slice_type TEXT NOT NULL DEFAULT 'frame',
+  slice_index INTEGER NOT NULL DEFAULT 0,
+  start_time REAL,
+  end_time REAL,
+  thumbnail_url TEXT,
+  slice_url TEXT,
+
+  product_tags TEXT,
+  video_tags TEXT,
+  slice_tags TEXT,
+
+  description TEXT,
+  embedding TEXT,
+  metadata TEXT,
+
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_slices_material ON material_slices(material_id);
+CREATE INDEX IF NOT EXISTS idx_slices_type ON material_slices(slice_type);
+
+-- 优质视频库 - 爆款视频结构化拆解
+CREATE TABLE IF NOT EXISTS video_library (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  source_url TEXT,
+  platform TEXT DEFAULT 'unknown',
+  category TEXT,
+  tags TEXT,
+  thumbnail_url TEXT,
+  video_url TEXT,
+
+  hook_technique TEXT,
+  selling_points TEXT,
+  shot_analysis TEXT,
+  style_analysis TEXT,
+  structure_analysis TEXT,
+  full_analysis TEXT,
+
+  duration REAL,
+  view_count INTEGER DEFAULT 0,
+  like_count INTEGER DEFAULT 0,
+  source_declaration TEXT,
+
+  status TEXT DEFAULT 'analyzed',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_videolib_category ON video_library(category);
+CREATE INDEX IF NOT EXISTS idx_videolib_platform ON video_library(platform);
+CREATE INDEX IF NOT EXISTS idx_videolib_status ON video_library(status);
+CREATE INDEX IF NOT EXISTS idx_videolib_created ON video_library(created_at);
+
+-- 灵感模板（方法论提炼）- 策略 + 因子
+CREATE TABLE IF NOT EXISTS inspiration_templates (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  category TEXT,
+  tags TEXT,
+
+  strategy TEXT NOT NULL,
+  factors TEXT NOT NULL,
+  constraint_rules TEXT,
+
+  source_video_ids TEXT,
+  usage_count INTEGER DEFAULT 0,
+  rating REAL DEFAULT 0,
+
+  thumbnail_url TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_templates_category ON inspiration_templates(category);
+CREATE INDEX IF NOT EXISTS idx_templates_usage ON inspiration_templates(usage_count);
+CREATE INDEX IF NOT EXISTS idx_templates_rating ON inspiration_templates(rating);
+
+-- 剧本表 - 持久化生成的剧本
+CREATE TABLE IF NOT EXISTS scripts (
+  id TEXT PRIMARY KEY,
+  project_id TEXT,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+
+  generation_mode TEXT DEFAULT 'auto',
+  template_id TEXT,
+  reference_video_id TEXT,
+  factors_used TEXT,
+
+  product_info TEXT,
+  constraint_rules TEXT,
+
+  status TEXT DEFAULT 'draft',
+  version INTEGER DEFAULT 1,
+  parent_script_id TEXT,
+
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL,
+  FOREIGN KEY (template_id) REFERENCES inspiration_templates(id) ON DELETE SET NULL,
+  FOREIGN KEY (reference_video_id) REFERENCES video_library(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_scripts_project ON scripts(project_id);
+CREATE INDEX IF NOT EXISTS idx_scripts_mode ON scripts(generation_mode);
+CREATE INDEX IF NOT EXISTS idx_scripts_status ON scripts(status);
+CREATE INDEX IF NOT EXISTS idx_scripts_template ON scripts(template_id);
