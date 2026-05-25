@@ -17,7 +17,6 @@ import {
   Tag,
   Modal,
   Result,
-  Link,
 } from 'antd';
 import {
   ThunderboltOutlined,
@@ -27,10 +26,10 @@ import {
   RocketOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { OneClickService, OneClickStatus } from '../services/oneClick';
-import { VideoLibraryService, VideoLibraryItem } from '../services/videoLibrary';
-import { TemplateService, InspirationTemplate } from '../services/template';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { OneClickService, OneClickStatus } from '../../services/oneClick';
+import { VideoLibraryService, VideoLibraryItem } from '../../services/videoLibrary';
+import { TemplateService, InspirationTemplate } from '../../services/template';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
