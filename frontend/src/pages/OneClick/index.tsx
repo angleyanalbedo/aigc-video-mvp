@@ -434,8 +434,19 @@ const OneClickPage: React.FC = () => {
 
               <Divider style={{ borderColor: '#1f1f23', margin: '20px 0' }} />
 
-              <Row gutter={24} style={{ marginBottom: 20 }}>
-                <Col span={8}>
+              <Row gutter={16} style={{ marginBottom: 20 }}>
+                <Col span={6}>
+                  <Form.Item name={['options', 'sceneCount']} label={<span style={{ color: '#71717a', fontSize: 12 }}>分镜数量</span>} initialValue={0}>
+                    <Select dropdownStyle={{ background: '#18181b' }}>
+                      <Option value={0}>🤖 AI 智能决定</Option>
+                      <Option value={3}>3 个分镜 (约12秒)</Option>
+                      <Option value={4}>4 个分镜 (约16秒)</Option>
+                      <Option value={5}>5 个分镜 (约20秒)</Option>
+                      <Option value={6}>6 个分镜 (约24秒)</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
                   <Form.Item name={['options', 'resolution']} label={<span style={{ color: '#71717a', fontSize: 12 }}>清晰度</span>} initialValue="720p">
                     <Select dropdownStyle={{ background: '#18181b' }}>
                       <Option value="480p">480p 流畅</Option>
@@ -444,21 +455,21 @@ const OneClickPage: React.FC = () => {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={6}>
                   <Form.Item name={['options', 'ratio']} label={<span style={{ color: '#71717a', fontSize: 12 }}>画幅</span>} initialValue="9:16">
                     <Select dropdownStyle={{ background: '#18181b' }}>
-                      <Option value="9:16">🎬 9:16 抖音/TikTok 竖屏</Option>
-                      <Option value="16:9">💻 16:9 横画幅短视频</Option>
-                      <Option value="1:1">📱 1:1 Instagram 极简方屏</Option>
+                      <Option value="9:16">🎬 9:16 抖音竖屏</Option>
+                      <Option value="16:9">💻 16:9 横画幅</Option>
+                      <Option value="1:1">📱 1:1 极简方屏</Option>
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={8}>
-                  <Form.Item name={['options', 'transition']} label={<span style={{ color: '#71717a', fontSize: 12 }}>拼接缝合转场</span>} initialValue="fade">
+                <Col span={6}>
+                  <Form.Item name={['options', 'transition']} label={<span style={{ color: '#71717a', fontSize: 12 }}>拼接转场</span>} initialValue="fade">
                     <Select dropdownStyle={{ background: '#18181b' }}>
-                      <Option value="fade">🎨 优雅淡入淡出 (Cross Fade)</Option>
-                      <Option value="dissolve">✨ 像素化溶解 (Dissolve)</Option>
-                      <Option value="cut">⚡ 动感硬切 (Direct Cut)</Option>
+                      <Option value="fade">🎨 优雅淡入淡出</Option>
+                      <Option value="dissolve">✨ 像素化溶解</Option>
+                      <Option value="cut">⚡ 动感硬切</Option>
                     </Select>
                   </Form.Item>
                 </Col>

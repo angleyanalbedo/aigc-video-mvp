@@ -5,6 +5,7 @@ export interface OneClickOptions {
   ratio?: string;
   enableTTS?: boolean;
   transition?: string;
+  sceneCount?: number;
 }
 
 export interface OneClickStatus {

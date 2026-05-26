@@ -105,6 +105,31 @@ class OneClickService {
       this.tasks.set(taskId, finalResult);
       if (onProgress) onProgress({ taskId, progress: 100, phase: 'completed', message: '一键成片完成！' });
 
+      // 将生成的最终视频自动录入素材库
+      try {
+        const materialService = require('./materialService');
+        const finalFilename = script.title ? `${script.title}.mp4` : `一键成片_${taskId}.mp4`;
+        const relativeUrl = `/outputs/${path.basename(composeResult.outputPath)}`;
+        
+        let fileStats = { size: 0 };
+        try {
+          fileStats = fs.statSync(composeResult.outputPath);
+        } catch (e) {}
+
+        const recordedMaterial = materialService.addMaterial({
+          filename: finalFilename,
+          url: relativeUrl,
+          type: 'video/mp4',
+          projectId: input.projectId || 'oneclick_' + taskId,
+          size: fileStats.size,
+          mimetype: 'video/mp4',
+          content: `一键成片全自动拼接生成的带货推广成品视频。商品名称：${productInfo?.title || '未命名'}。核心卖点：${productInfo?.sellingPoints || '暂无'}。`
+        });
+        console.log(`✅ [素材库自动录入] 一键成片视频已自动添加至素材管理，素材ID: ${recordedMaterial.id}`);
+      } catch (materialErr) {
+        console.warn('⚠️ [素材库自动录入] 失败:', materialErr.message);
+      }
+
       try {
         const factorData = {
           openingStyle: '痛点提问',
@@ -248,13 +273,23 @@ class OneClickService {
       ? await this._loadReferenceContext(input.referenceVideoId)
       : '';
 
+    const options = input.options || {};
+    const sceneCount = options.sceneCount ? parseInt(options.sceneCount, 10) : 0;
+    
+    let durationRequirement = "总时长控制在15秒以内（3-5个分镜）";
+    let targetSceneCountPrompt = "";
+    if (sceneCount > 0) {
+      durationRequirement = `总时长控制在 ${sceneCount * 4} 秒以内（必须生成正好 ${sceneCount} 个分镜，分镜数量不能多也不能少）`;
+      targetSceneCountPrompt = `\n⚠️ 重要要求：请确保严格生成正好 ${sceneCount} 个分镜。分镜数量必须是 ${sceneCount}，不可多也不可少。`;
+    }
+
     let systemPrompt = `你是电商带货视频剧本生成专家。根据商品信息生成高质量的带货视频剧本。
 
 ## 剧本要求
 1. 结构清晰：包含开场Hook、卖点展示、结尾行动号召
 2. 分镜详细：每个分镜包含画面描述、旁白、时长、镜头类型
 3. 符合电商规范：突出商品卖点，引导购买
-4. 总时长控制在15秒以内（3-5个分镜）
+4. ${durationRequirement}
 5. 画面描述要具体，适合AI视频生成
 
 ## 输出格式
@@ -283,7 +318,7 @@ JSON格式：
 ${materialContext}${templateContext}${referenceContext}
 
 ## 任务
-请根据以上信息生成一个15秒以内的带货视频剧本。`;
+请根据以上信息生成一个带货视频剧本。${targetSceneCountPrompt}`;
 
     try {
       const script = await llmProvider.generateStructuredText({
@@ -303,10 +338,13 @@ ${materialContext}${templateContext}${referenceContext}
         }
       });
 
-      const totalDuration = (script.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
+      // Filter and limit or warn if LLM didn't return exact number, but prompt should force it.
+      // In case LLM generated too many or too few scenes, we map them carefully.
+      const finalScenes = script.scenes || [];
+      const totalDuration = finalScenes.reduce((sum, s) => sum + (s.duration || 3), 0);
       return {
         title: script.title || `${productInfo.title} - 带货视频`,
-        scenes: (script.scenes || []).map((scene, index) => ({
+        scenes: finalScenes.map((scene, index) => ({
           id: index + 1,
           description: scene.description,
           voiceover: scene.voiceover,
@@ -322,7 +360,7 @@ ${materialContext}${templateContext}${referenceContext}
       };
     } catch (err) {
       console.warn('LLM 剧本生成失败，使用默认剧本:', err.message);
-      return this._getFallbackScript(productInfo);
+      return this._getFallbackScript(productInfo, sceneCount || 3);
     }
   }
 
@@ -494,47 +532,98 @@ ${materialContext}${templateContext}${referenceContext}
     fs.writeFileSync(destPath, Buffer.from(buffer));
   }
 
-  _getFallbackScript(productInfo) {
+  _getFallbackScript(productInfo, targetSceneCount = 3) {
     const title = productInfo.title || '商品';
     const sellingPoints = productInfo.sellingPoints || '优质商品';
+
+    const allPossibleScenes = [
+      {
+        id: 1,
+        description: `Professional product showcase of ${title}, clean white background, high-end commercial photography style, soft lighting`,
+        voiceover: `大家好，今天给大家推荐一款超棒的${title}`,
+        duration: 3,
+        shot_type: '特写',
+        emotion: '积极',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      },
+      {
+        id: 2,
+        description: `Close-up shot showing ${title} details, highlighting quality and features, warm lighting`,
+        voiceover: `${sellingPoints}，品质保证`,
+        duration: 5,
+        shot_type: '近景',
+        emotion: '温馨',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      },
+      {
+        id: 3,
+        description: `Close-up shot showing product core features and beautiful textures, commercial studio look`,
+        voiceover: `细节决定成败，真正的高性价比之选`,
+        duration: 4,
+        shot_type: '特写',
+        emotion: '专业',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      },
+      {
+        id: 4,
+        description: `Customer enjoying the ${title}, showing convenience and ease of use, natural daylight`,
+        voiceover: `日常使用超级方便，随时随地给您贴心陪伴`,
+        duration: 4,
+        shot_type: '中景',
+        emotion: '温馨',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      },
+      {
+        id: 5,
+        description: `Split comparison show of ${title} superior features vs traditional options, dynamic studio motion`,
+        voiceover: `买它绝对不后悔，赶紧入手体验一下吧`,
+        duration: 4,
+        shot_type: '特写',
+        emotion: '激动',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      },
+      {
+        id: 6,
+        description: `Lifestyle shot showing ${title} in use, happy customer experience, bright atmosphere`,
+        voiceover: '心动不如行动，赶紧点击下方链接下单吧！',
+        duration: 4,
+        shot_type: '中景',
+        emotion: '激动',
+        transition: 'fade',
+        status: 'idle',
+        videoUrl: null
+      }
+    ];
+
+    let fallbackScenes = [];
+    if (targetSceneCount <= 3) {
+      fallbackScenes = [allPossibleScenes[0], allPossibleScenes[1], allPossibleScenes[5]];
+    } else if (targetSceneCount === 4) {
+      fallbackScenes = [allPossibleScenes[0], allPossibleScenes[1], allPossibleScenes[3], allPossibleScenes[5]];
+    } else if (targetSceneCount === 5) {
+      fallbackScenes = [allPossibleScenes[0], allPossibleScenes[1], allPossibleScenes[2], allPossibleScenes[3], allPossibleScenes[5]];
+    } else {
+      fallbackScenes = allPossibleScenes.slice(0, targetSceneCount);
+    }
+
+    // Re-index scene IDs
+    fallbackScenes = fallbackScenes.map((s, idx) => ({ ...s, id: idx + 1 }));
+    const totalDuration = fallbackScenes.reduce((sum, s) => sum + s.duration, 0);
+
     return {
       title: `${title} - 带货视频`,
-      scenes: [
-        {
-          id: 1,
-          description: `Professional product showcase of ${title}, clean white background, high-end commercial photography style, soft lighting`,
-          voiceover: `大家好，今天给大家推荐一款超棒的${title}`,
-          duration: 3,
-          shot_type: '特写',
-          emotion: '积极',
-          transition: 'fade',
-          status: 'idle',
-          videoUrl: null
-        },
-        {
-          id: 2,
-          description: `Close-up shot showing ${title} details, highlighting quality and features, warm lighting`,
-          voiceover: `${sellingPoints}，品质保证`,
-          duration: 5,
-          shot_type: '近景',
-          emotion: '温馨',
-          transition: 'fade',
-          status: 'idle',
-          videoUrl: null
-        },
-        {
-          id: 3,
-          description: `Lifestyle shot showing ${title} in use, happy customer experience, bright atmosphere`,
-          voiceover: '赶紧下单吧！',
-          duration: 4,
-          shot_type: '中景',
-          emotion: '激动',
-          transition: 'fade',
-          status: 'idle',
-          videoUrl: null
-        }
-      ],
-      totalDuration: 12,
+      scenes: fallbackScenes,
+      totalDuration,
       createdAt: Date.now(),
       isFallback: true
     };
