@@ -1,0 +1,210 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      prerelease:
+        description: '是否为预发布版本'
+        type: boolean
+        required: false
+        default: false
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: ${{ secrets.DOCKER_HUB_USERNAME }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_TOKEN != '' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:${{ steps.version.outputs.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+
+          # 获取上一个 tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # 如果没有上一个 tag，获取所有提交
+            COMMITS=$(git log --pretty=format:"- %s" --no-merges)
+          else
+            # 获取两个 tag 之间的提交
+            COMMITS=$(git log --pretty=format:"- %s" --no-merges ${PREVIOUS_TAG}..HEAD)
+          fi
+
+          # 分类提交
+          FEATURES=$(echo "$COMMITS" | grep -E "^-\s*(feat|feature|新增|添加)" || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^-\s*(fix|修复|bugfix)" || true)
+          DOCS=$(echo "$COMMITS" | grep -E "^-\s*(docs|文档)" || true)
+          OTHERS=$(echo "$COMMITS" | grep -v -E "^-\s*(feat|feature|新增|添加|fix|修复|bugfix|docs|文档)" || true)
+
+          # 构建 changelog
+          CHANGELOG="## 🐳 Docker 镜像
+
+          ### Server
+          \`\`\`bash
+docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:${VERSION}
+\`\`\`
+
+          ### Frontend
+          \`\`\`bash
+docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:${VERSION}
+\`\`\`
+
+          ## 🚀 快速部署
+
+          \`\`\`bash
+          # 下载 docker-compose.yml
+          curl -O https://raw.githubusercontent.com/${{ github.repository }}/${VERSION}/docker-compose.yml
+
+          # 设置环境变量
+          export ***REMOVED***your_api_key
+          export LLM_EP=your_llm_endpoint
+          export VIDEO_EP=your_video_endpoint
+
+          # 启动服务
+          docker-compose up -d
+          \`\`\`
+
+          ## 📝 更新日志
+
+          "
+
+          if [ -n "$FEATURES" ]; then
+            CHANGELOG+="### ✨ 新功能
+
+$FEATURES
+
+"
+          fi
+
+          if [ -n "$FIXES" ]; then
+            CHANGELOG+="### 🐛 修复
+
+$FIXES
+
+"
+          fi
+
+          if [ -n "$DOCS" ]; then
+            CHANGELOG+="### 📚 文档
+
+$DOCS
+
+"
+          fi
+
+          if [ -n "$OTHERS" ]; then
+            CHANGELOG+="### 🔧 其他
+
+$OTHERS
+
+"
+          fi
+
+          # 保存到文件
+          echo "$CHANGELOG" > CHANGELOG.md
+
+          # 输出到 GitHub Actions
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body_path: CHANGELOG.md
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output release info
+        run: |
+          echo "✅ Release ${{ steps.version.outputs.VERSION }} 创建成功！"
+          echo ""
+          echo "📦 镜像地址:"
+          echo "   Server: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:${{ steps.version.outputs.VERSION }}"
+          echo "   Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:${{ steps.version.outputs.VERSION }}"

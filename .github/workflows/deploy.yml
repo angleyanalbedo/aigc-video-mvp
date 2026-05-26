@@ -1,79 +1,105 @@
-name: Deploy AIGC Video System
+name: Build and Push Docker Images
 
 on:
   push:
     branches:
       - main
       - master
-  pull_request:
-    branches:
-      - main
-      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '镜像标签 (默认: latest)'
+        required: false
+        default: 'latest'
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: ${{ secrets.DOCKER_HUB_USERNAME }}
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-    
+    # 只在配置了 Docker Hub 凭证时运行
+    if: ${{ secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_TOKEN != '' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: |
-            frontend/package-lock.json
-            server/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: ./frontend
-        run: npm run build
-
-      - name: Install backend dependencies
-        working-directory: ./server
-        run: npm ci
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub (optional)
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
-        if: github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != ''
 
-      - name: Build and push Docker images
+      - name: Extract metadata (tags, labels)
+        id: meta-server
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push server image
         uses: docker/build-push-action@v5
         with:
           context: ./server
           file: ./server/Dockerfile
-          push: ${{ github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != '' }}
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-server:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-server:${{ github.sha }}
-        if: secrets.DOCKER_HUB_USERNAME != ''
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Build frontend Docker image
+      - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          push: ${{ github.event_name == 'push' && secrets.DOCKER_HUB_USERNAME != '' }}
-          tags: |
-            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-frontend:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/aigc-video-frontend:${{ github.sha }}
-        if: secrets.DOCKER_HUB_USERNAME != ''
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Deploy to server (placeholder)
+      - name: Output image info
         run: |
-          echo "部署步骤："
-          echo "1. 配置 Docker Hub 密钥后，镜像会自动推送"
-          echo "2. 在目标服务器上使用 docker-compose 拉取并部署"
-          echo "3. 或者使用你的部署工具（如 ArgoCD、Rancher 等）"
+          echo "✅ 镜像构建完成！"
+          echo ""
+          echo "📦 Server 镜像:"
+          echo "   ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:${{ github.sha }}"
+          echo ""
+          echo "📦 Frontend 镜像:"
+          echo "   ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:${{ github.sha }}"
+          echo ""
+          echo "🚀 部署命令:"
+          echo "   docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-server:latest"
+          echo "   docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:latest"
