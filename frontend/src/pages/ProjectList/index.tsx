@@ -35,6 +35,22 @@ const { Option } = Select;
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
+// 安全的日期格式化函数
+const formatDate = (dateInput: any): string => {
+  if (!dateInput) return '暂无';
+  
+  try {
+    const date = new Date(dateInput);
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return '暂无';
+    }
+    return date.toLocaleDateString();
+  } catch (e) {
+    return '暂无';
+  }
+};
+
 const ProjectListPage: React.FC = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<any[]>([]);
@@ -224,7 +240,6 @@ const ProjectListPage: React.FC = () => {
                 <List.Item key={project.id}>
                   <Card
                     hoverable
-                    onClick={() => openProject(project.id)}
                     cover={
                       <div
                         style={{
@@ -233,51 +248,54 @@ const ProjectListPage: React.FC = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: 'white'
+                          color: 'white',
+                          cursor: 'pointer'
                         }}
+                        onClick={() => openProject(project.id)}
                       >
                         <FolderOutlined style={{ fontSize: 48, opacity: 0.8 }} />
                       </div>
                     }
                     actions={[
                       <Tooltip title="Copilot AI 助手" key="copilot">
-                        <RobotOutlined onClick={(e) => { e.stopPropagation(); openCopilot(project.id); }} />
+                        <RobotOutlined onClick={() => openCopilot(project.id)} />
                       </Tooltip>,
-                      <EditOutlined key="edit" onClick={(e) => { e.stopPropagation(); openProject(project.id); }} />,
-                      <CopyOutlined key="copy" onClick={(e) => { e.stopPropagation(); handleDuplicate(project.id); }} />,
+                      <EditOutlined key="edit" onClick={() => openProject(project.id)} />,
+                      <CopyOutlined key="copy" onClick={() => handleDuplicate(project.id)} />,
                       <Popconfirm
                         title="确定删除这个项目?"
                         onConfirm={() => handleDelete(project.id)}
-                        onCancel={(e) => e?.stopPropagation()}
                       >
-                        <DeleteOutlined key="delete" onClick={(e) => e.stopPropagation()} />
+                        <DeleteOutlined key="delete" />
                       </Popconfirm>
                     ]}
                   >
-                    <Card.Meta
-                      title={project.name}
-                      description={
-                        <>
-                          <Tag color={getStatusColor(project.status)} style={{ marginBottom: 8 }}>
-                            {getStatusText(project.status)}
-                          </Tag>
-                          <br />
-                          <Text type="secondary" ellipsis>
-                            {project.description || '暂无描述'}
-                          </Text>
-                          <br /><br />
-                          <Space direction="vertical" size="small" style={{ fontSize: 12 }}>
-                            <Text type="secondary">
-                              <CalendarOutlined /> 创建于 {new Date(project.createdAt).toLocaleDateString()}
-                            </Text>
+                    <div onClick={() => openProject(project.id)} style={{ cursor: 'pointer' }}>
+                      <Card.Meta
+                        title={project.name}
+                        description={
+                          <>
+                            <Tag color={getStatusColor(project.status)} style={{ marginBottom: 8 }}>
+                              {getStatusText(project.status)}
+                            </Tag>
                             <br />
-                            <Text type="secondary">
-                              更新于 {new Date(project.updatedAt).toLocaleDateString()}
+                            <Text type="secondary" ellipsis>
+                              {project.description || '暂无描述'}
                             </Text>
-                          </Space>
-                        </>
-                      }
-                    />
+                            <br /><br />
+                            <Space direction="vertical" size="small" style={{ fontSize: 12 }}>
+              <Text type="secondary">
+                <CalendarOutlined /> 创建于 {formatDate(project.createdAt || project.created_at)}
+              </Text>
+              <br />
+              <Text type="secondary">
+                更新于 {formatDate(project.updatedAt || project.updated_at)}
+              </Text>
+            </Space>
+                          </>
+                        }
+                      />
+                    </div>
                   </Card>
                 </List.Item>
               )}
@@ -328,6 +346,23 @@ const ProjectListPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                     {m.type && m.type.startsWith('image') ? (
                       <img src={m.url} alt={m.filename} style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4 }} />
+                    ) : m.type && m.type.startsWith('video') ? (
+                      <div style={{ width: 32, height: 32, position: 'relative', borderRadius: 4, overflow: 'hidden' }}>
+                        <video
+                          src={m.url}
+                          muted
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: 12,
+                          color: '#fff',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                        }}>🎥</div>
+                      </div>
                     ) : (
                       <div style={{ width: 32, height: 32, backgroundColor: '#eaeaea', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 4 }}>🎥</div>
                     )}

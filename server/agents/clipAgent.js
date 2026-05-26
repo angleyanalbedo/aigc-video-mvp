@@ -6,6 +6,7 @@ const execAsync = promisify(exec);
 const { generateStructuredText } = require('./tools/llm');
 const { generateTTS } = require('./tools/ttsAPI');
 const skillLoader = require('./skills/skillLoader');
+const { getToolsForAgent } = require('./tools/agentTools');
 
 const TASKS_DIR = path.join(__dirname, '../tasks');
 const OUTPUTS_DIR = path.join(__dirname, '../outputs');
@@ -27,14 +28,39 @@ const FALLBACK_PROMPT = `你是专业视频剪辑师，负责制定智能剪辑�
 class ClipAgent {
   constructor() {
     this.name = '智能剪辑 Agent';
+    this.agentName = 'ClipAgent';
     this.skillId = 'ClipAgent_planning';
     this.transitions = ['cut', 'fade', 'dissolve', 'wipe'];
     this.bgmStyles = ['欢快', '温馨', '动感', '舒缓', '激情'];
+    this.tools = getToolsForAgent('ClipAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async callSkill(params, options = {}) {
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt,
+      schema: this.getSchema()
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
   }
 
   async createClipPlan(script, materials = [], options = {}) {

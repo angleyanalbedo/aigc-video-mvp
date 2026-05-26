@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
-import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, SoundOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
@@ -161,7 +161,26 @@ const MaterialManagementPage = () => {
   const getIcon = (type) => {
     if (type && type.startsWith('image')) return <PictureOutlined />;
     if (type && type.startsWith('video')) return <VideoCameraOutlined />;
+    if (type && type.startsWith('audio')) return <SoundOutlined />;
+    // 根据文件名推断类型
+    if (type === null || type === undefined) return <PictureOutlined />;
     return <PictureOutlined />;
+  };
+
+  // 根据文件名推断 MIME 类型
+  const inferMediaType = (filename, type) => {
+    if (type && (type.startsWith('image') || type.startsWith('video') || type.startsWith('audio'))) {
+      return type;
+    }
+    const lowerFilename = (filename || '').toLowerCase();
+    if (lowerFilename.match(/\.(mp4|mov|avi|mkv|webm)$/)) {
+      return 'video/mp4';
+    } else if (lowerFilename.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/)) {
+      return 'audio/mpeg';
+    } else if (lowerFilename.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/)) {
+      return 'image/jpeg';
+    }
+    return type || 'image/jpeg';
   };
 
   return (
@@ -205,7 +224,7 @@ const MaterialManagementPage = () => {
         >
           <p className="ant-upload-drag-icon"><UploadOutlined /></p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-          <p className="ant-upload-hint">支持图片和视频文件</p>
+          <p className="ant-upload-hint">支持图片、视频和音频文件</p>
         </Upload.Dragger>
       </Card>
 
@@ -223,11 +242,40 @@ const MaterialManagementPage = () => {
                   hoverable
                   style={{ height: '100%', borderRadius: 12, overflow: 'hidden' }}
                   cover={
-                    item.type && item.type.startsWith('image') ? (
+                    inferMediaType(item.filename, item.type).startsWith('image') ? (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
-                    ) : item.type && item.type.startsWith('video') ? (
-                      <div style={{ height: 160, backgroundColor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <VideoCameraOutlined style={{ fontSize: 48, color: '#fff' }} />
+                    ) : inferMediaType(item.filename, item.type).startsWith('video') ? (
+                      <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
+                        <video
+                          src={item.url}
+                          muted
+                          loop
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onMouseEnter={(e) => e.currentTarget.play()}
+                          onMouseLeave={(e) => e.currentTarget.pause()}
+                        />
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          borderRadius: '50%',
+                          width: 48,
+                          height: 48,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <VideoCameraOutlined style={{ fontSize: 24, color: '#fff' }} />
+                        </div>
+                      </div>
+                    ) : inferMediaType(item.filename, item.type).startsWith('audio') ? (
+                      <div style={{ height: 160, backgroundColor: '#121214', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <SoundOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 8 }} />
+                        <div style={{ fontSize: 12, color: '#a1a1aa', textAlign: 'center', wordBreak: 'break-word', padding: '0 16px' }}>
+                          {item.filename}
+                        </div>
                       </div>
                     ) : (
                       <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
@@ -279,7 +327,9 @@ const MaterialManagementPage = () => {
             </Button>
           ]}
           width={800}
-          bodyStyle={{ background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }}
+          styles={{
+            body: { background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }
+          }}
           style={{ top: 40 }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -296,19 +346,29 @@ const MaterialManagementPage = () => {
               boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
               border: '1px solid #1f1f23'
             }}>
-              {selectedMaterial.type && selectedMaterial.type.startsWith('image') ? (
+              {inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('image') ? (
                 <img
                   src={selectedMaterial.url}
                   alt={selectedMaterial.filename}
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
-              ) : selectedMaterial.type && selectedMaterial.type.startsWith('video') ? (
+              ) : inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('video') ? (
                 <video
                   src={selectedMaterial.url}
                   controls
                   autoPlay
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
+              ) : inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('audio') ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <SoundOutlined style={{ fontSize: 80, color: '#818cf8', marginBottom: 24 }} />
+                  <audio
+                    src={selectedMaterial.url}
+                    controls
+                    autoPlay
+                    style={{ width: '100%', maxWidth: 400 }}
+                  />
+                </div>
               ) : (
                 <img
                   src={selectedMaterial.url}

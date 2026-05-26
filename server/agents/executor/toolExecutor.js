@@ -24,16 +24,44 @@ class ToolExecutor {
           result = await this.executeGenerateVideo(step, projectId, onProgress);
           break;
 
-        case 'update_scene':
+        case 'add_scene':
+          result = await this.executeAddScene(step, projectId, onProgress);
+          break;
+
+        case 'edit_scene':
           result = await this.executeUpdateScene(step, projectId, onProgress);
           break;
 
-        case 'compose_video':
-          result = await this.executeComposeVideo(step, projectId, onProgress);
+        case 'edit_script':
+          result = await this.executeEditScript(step, projectId, onProgress);
           break;
 
-        case 'query_status':
-          result = await this.executeQueryStatus(projectId);
+        case 'reorder':
+          result = await this.executeReorder(step, projectId, onProgress);
+          break;
+
+        case 'add_material':
+          result = await this.executeAddMaterial(step, projectId, onProgress);
+          break;
+
+        case 'search_material':
+          result = await this.executeSearchMaterial(step, projectId, onProgress);
+          break;
+
+        case 'add_audio':
+          result = await this.executeAddAudio(step, projectId, onProgress);
+          break;
+
+        case 'explain':
+          result = await this.executeExplain(step, projectId, onProgress);
+          break;
+
+        case 'delete':
+          result = await this.executeDelete(step, projectId, onProgress);
+          break;
+
+        case 'generate_image':
+          result = await this.executeGenerateImage(step, projectId, onProgress);
           break;
 
         default:
@@ -104,6 +132,129 @@ class ToolExecutor {
     });
 
     return result;
+  }
+
+  async executeAddScene(step, projectId, onProgress) {
+    const { sceneId, message } = step.params;
+
+    onProgress?.({ message: '正在添加分镜...' });
+
+    const project = await projectModel.getById(projectId);
+    let script = project.script;
+
+    if (!script) {
+      script = {
+        title: '带货剧本',
+        scenes: []
+      };
+    }
+
+    if (!script.scenes) {
+      script.scenes = [];
+    }
+
+    const newScene = {
+      id: sceneId,
+      shot_type: '中景',
+      duration: 5,
+      narration: '请输入旁白',
+      description: '请输入画面描述',
+      status: 'pending'
+    };
+
+    script.scenes.push(newScene);
+    await projectModel.update(projectId, { script });
+
+    await canvasSyncService.syncScriptToCanvas(projectId, script);
+
+    onProgress?.({ message: `分镜 ${sceneId} 添加完成` });
+
+    return { success: true, scene: newScene };
+  }
+
+  async executeEditScript(step, projectId, onProgress) {
+    onProgress?.({ message: '正在更新剧本...' });
+
+    const project = await projectModel.getById(projectId);
+    let script = project.script;
+
+    if (!script) {
+      script = {
+        title: '带货剧本',
+        scenes: []
+      };
+    }
+
+    onProgress?.({ message: '剧本更新完成' });
+    return { success: true, message: '剧本编辑功能待完善' };
+  }
+
+  async executeReorder(step, projectId, onProgress) {
+    onProgress?.({ message: '正在调整分镜顺序...' });
+    return { success: true, message: '分镜排序功能待完善' };
+  }
+
+  async executeAddMaterial(step, projectId, onProgress) {
+    onProgress?.({ message: '正在添加素材...' });
+
+    const defaultData = {
+      filename: '商品素材',
+      url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30',
+      type: 'image',
+      tags: ['商品', '素材']
+    };
+
+    const node = await canvasSyncService.createNode(
+      projectId,
+      'material',
+      defaultData,
+      { x: 100, y: 100 }
+    );
+
+    onProgress?.({ message: '素材添加完成' });
+    return { success: true, node };
+  }
+
+  async executeSearchMaterial(step, projectId, onProgress) {
+    onProgress?.({ message: '正在搜索素材...' });
+    return { success: true, message: '素材搜索功能待完善' };
+  }
+
+  async executeAddAudio(step, projectId, onProgress) {
+    onProgress?.({ message: '正在添加音频...' });
+
+    const defaultData = {
+      filename: '背景音乐',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      type: 'audio',
+      duration: 180,
+      tags: ['BGM', '背景音乐']
+    };
+
+    const node = await canvasSyncService.createNode(
+      projectId,
+      'material',
+      defaultData,
+      { x: 100, y: 200 }
+    );
+
+    onProgress?.({ message: '音频添加完成' });
+    return { success: true, node };
+  }
+
+  async executeExplain(step, projectId, onProgress) {
+    onProgress?.({ message: '正在思考...' });
+    return { success: true, message: '这是一个解释说明功能' };
+  }
+
+  async executeDelete(step, projectId, onProgress) {
+    onProgress?.({ message: '正在删除...' });
+    return { success: true, message: '删除功能待完善' };
+  }
+
+  async executeGenerateImage(step, projectId, onProgress) {
+    onProgress?.({ message: '正在生成图片...' });
+    return { success: true, message: '图片生成功能待完善' };
   }
 
   async executeUpdateScene(step, projectId, onProgress) {

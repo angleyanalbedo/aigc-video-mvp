@@ -44,7 +44,8 @@ export interface Plan {
 export async function sendMessage(
   projectId: string,
   message: string,
-  sessionId?: string
+  sessionId?: string,
+  metadata?: any
 ): Promise<{
   success: boolean;
   type: 'plan_confirmation' | 'completed' | 'error';
@@ -62,7 +63,8 @@ export async function sendMessage(
     body: JSON.stringify({
       message,
       projectId,
-      sessionId
+      sessionId,
+      metadata
     })
   });
   return response.json();
@@ -168,11 +170,76 @@ export async function createChatSession(projectId: string, title?: string): Prom
   return response.json();
 }
 
+export async function updateNodeData(
+  nodeId: string,
+  updates: any
+): Promise<{
+  success: boolean;
+  node?: Node;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/canvas/nodes/${nodeId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates })
+  });
+  return response.json();
+}
+
+export async function deleteNodeDirectly(
+  nodeId: string
+): Promise<{
+  success: boolean;
+  nodeId?: string;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/canvas/nodes/${nodeId}`, {
+    method: 'DELETE'
+  });
+  return response.json();
+}
+
+export async function createNodeDirectly(
+  projectId: string,
+  type: string,
+  data?: any,
+  position?: { x: number; y: number }
+): Promise<{
+  success: boolean;
+  node?: Node;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/canvas/nodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, type, data, position })
+  });
+  return response.json();
+}
+
+export async function generateSceneVideo(
+  projectId: string,
+  sceneId: number,
+  scene: any
+): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/canvas/generate-scene-video`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, sceneId, scene })
+  });
+  return response.json();
+}
+
 export function connectWebSocket(
   projectId: string,
   handlers: {
     onCanvasEvent?: (event: any) => void;
     onOperationProgress?: (progress: any) => void;
+    onChatMessage?: (message: Message) => void;
     onError?: (error: any) => void;
     onConnected?: () => void;
     onDisconnected?: () => void;
@@ -195,6 +262,8 @@ export function connectWebSocket(
         handlers.onCanvasEvent?.(data);
       } else if (data.type === 'operation_progress') {
         handlers.onOperationProgress?.(data);
+      } else if (data.type === 'chat_message_created' && data.message) {
+        handlers.onChatMessage?.(data.message);
       }
     } catch (e) {
       console.error('❌ WebSocket message parse error:', e);
@@ -212,4 +281,20 @@ export function connectWebSocket(
   };
 
   return ws;
+}
+
+export async function getChatSessions(projectId: string): Promise<{
+  success: boolean;
+  sessions: Array<{
+    id: string;
+    projectId: string;
+    title: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/chat/sessions/${projectId}`);
+  return response.json();
 }

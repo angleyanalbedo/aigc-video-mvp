@@ -16,6 +16,9 @@ import {
   ArrowLeftOutlined,
   VideoCameraOutlined,
   RocketOutlined,
+  FireOutlined,
+  ThunderboltOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ConnectionStatus from '../components/ConnectionStatus';
@@ -70,6 +73,24 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
       path: '/materials',
       icon: <FolderOutlined />,
       tooltip: '素材管理',
+    },
+    {
+      key: 'video-library',
+      path: '/video-library',
+      icon: <FireOutlined />,
+      tooltip: '优质视频库',
+    },
+    {
+      key: 'template-library',
+      path: '/template-library',
+      icon: <ThunderboltOutlined />,
+      tooltip: '灵感模板',
+    },
+    {
+      key: 'one-click',
+      path: '/one-click',
+      icon: <PlayCircleOutlined />,
+      tooltip: '一键成片',
     },
     {
       key: 'attribution',
@@ -134,7 +155,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   const footerItems: MenuItem[] = [
     {
       key: 'feedback',
-      path: 'https://github.com',
+      path: 'https://github.com/angleyanalbedo/aigc-video-mvp/issues',
       icon: <CustomerServiceOutlined />,
       tooltip: '反馈问题',
     },
@@ -146,7 +167,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
     },
     {
       key: 'github',
-      path: 'https://github.com',
+      path: 'https://github.com/angleyanalbedo/aigc-video-mvp',
       icon: <GithubOutlined />,
       tooltip: '访问 GitHub',
     },

@@ -1,307 +1,398 @@
-/**
- * ABTestService - A/B 测试服务
- * 管理 A/B 实验创建、指标追踪、结果统计
- */
+const videoFactorService = require('./videoFactorService');
+const projectModel = require('../models/project');
+
+const TEST_DIMENSIONS = {
+  bgm: {
+    label: '背景音乐',
+    options: [
+      { value: 'cheerful.mp3', label: '轻快' },
+      { value: 'energetic.mp3', label: '激情' },
+      { value: 'smooth_jazz.mp3', label: '温馨' },
+      { value: 'none', label: '无BGM' },
+    ]
+  },
+  voice: {
+    label: '配音类型',
+    options: [
+      { value: 'zh_female_story', label: '女声-故事' },
+      { value: 'zh_male_narrator', label: '男声-解说' },
+      { value: 'zh_male_technology', label: '男声-科技' },
+      { value: 'zh_female_chitchat', label: '女声-闲聊' },
+      { value: 'none', label: '无配音' },
+    ]
+  },
+  ratio: {
+    label: '画幅比例',
+    options: [
+      { value: '9:16', label: '竖屏 9:16' },
+      { value: '16:9', label: '横屏 16:9' },
+      { value: '1:1', label: '方形 1:1' },
+    ]
+  },
+  resolution: {
+    label: '分辨率',
+    options: [
+      { value: '720p', label: '720p 高清' },
+      { value: '480p', label: '480p 标清' },
+    ]
+  },
+  transition: {
+    label: '转场效果',
+    options: [
+      { value: 'fade', label: '淡入淡出' },
+      { value: 'cut', label: '硬切' },
+      { value: 'dissolve', label: '溶解' },
+      { value: 'wipe', label: '擦除' },
+    ]
+  },
+  promptStyle: {
+    label: '画面风格',
+    options: [
+      { value: 'photorealistic', label: '写实风格' },
+      { value: 'cinematic', label: '电影质感' },
+      { value: 'anime', label: '动漫风格' },
+      { value: 'commercial', label: '商业广告' },
+    ]
+  }
+};
 
 class ABTestService {
   constructor() {
-    // 内存存储，生产环境应使用数据库
     this.experiments = new Map();
-    this.metrics = new Map();
+    this.variantData = new Map();
   }
 
-  /**
-   * 创建新的 A/B 实验
-   * @param {object} experimentData - 实验数据
-   */
+  getTestDimensions() {
+    return TEST_DIMENSIONS;
+  }
+
   createExperiment(experimentData) {
     const id = `exp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = Date.now();
+
+    const dimension = experimentData.testDimension || 'bgm';
+    const dimensionConfig = TEST_DIMENSIONS[dimension];
+
+    let variants;
+    if (experimentData.variants && experimentData.variants.length >= 2) {
+      variants = experimentData.variants;
+    } else {
+      const opts = dimensionConfig.options;
+      variants = [
+        {
+          id: 'control',
+          name: '对照组',
+          description: `当前方案: ${opts[0]?.label || '默认'}`,
+          weight: 34,
+          isControl: true,
+          settings: { [dimension]: opts[0]?.value }
+        },
+        {
+          id: 'variant_a',
+          name: '变体A',
+          description: `${opts[1]?.label || '方案A'}`,
+          weight: 33,
+          isControl: false,
+          settings: { [dimension]: opts[1]?.value }
+        },
+        {
+          id: 'variant_b',
+          name: '变体B',
+          description: `${opts[2]?.label || '方案B'}`,
+          weight: 33,
+          isControl: false,
+          settings: { [dimension]: opts[2]?.value }
+        },
+      ];
+    }
 
     const experiment = {
       id,
       name: experimentData.name,
       description: experimentData.description || '',
-      status: 'draft', // draft, running, paused, completed
-      variants: experimentData.variants || [],
-      metrics: experimentData.metrics || [],
-      trafficAllocation: experimentData.trafficAllocation || 50,
-      startTime: experimentData.startTime || null,
-      endTime: experimentData.endTime || null,
+      projectId: experimentData.projectId || null,
+      testDimension: dimension,
+      dimensionLabel: dimensionConfig.label,
+      status: 'draft',
+      variants,
+      sampleSize: experimentData.sampleSize || 1000,
+      startTime: null,
+      endTime: null,
       createdAt: now,
       updatedAt: now,
-      createdBy: experimentData.createdBy || 'system'
     };
 
-    // 确保至少有两个变体（对照组和实验组）
-    if (experiment.variants.length < 2) {
-      experiment.variants = [
-        { id: 'control', name: '对照组', weight: 50, isControl: true },
-        { id: 'variant_a', name: '实验组A', weight: 50, isControl: false }
-      ];
-    }
-
-    // 初始化指标数据
     experiment.variants.forEach(variant => {
-      this.metrics.set(`${id}_${variant.id}`, {
-        views: 0,
-        conversions: 0,
-        events: {}
+      this.variantData.set(`${id}_${variant.id}`, {
+        status: 'pending',
+        videoUrl: null,
+        publishedAt: null,
+        metrics: null,
       });
     });
 
     this.experiments.set(id, experiment);
-    console.log(`🧪 [ABTest] 创建实验: ${id} - ${experiment.name}`);
+    console.log(`🧪 [ABTest] 创建实验: ${id} - ${experiment.name} (维度: ${dimensionConfig.label})`);
 
     return experiment;
   }
 
-  /**
-   * 获取实验列表
-   * @param {object} filters - 过滤条件
-   */
   getExperiments(filters = {}) {
     let experiments = Array.from(this.experiments.values());
-
     if (filters.status) {
       experiments = experiments.filter(e => e.status === filters.status);
     }
-
     experiments.sort((a, b) => b.createdAt - a.createdAt);
     return experiments;
   }
 
-  /**
-   * 获取单个实验详情
-   * @param {string} experimentId - 实验ID
-   */
   getExperiment(experimentId) {
     return this.experiments.get(experimentId) || null;
   }
 
-  /**
-   * 更新实验
-   * @param {string} experimentId - 实验ID
-   * @param {object} updates - 更新数据
-   */
   updateExperiment(experimentId, updates) {
     const experiment = this.experiments.get(experimentId);
     if (!experiment) return null;
-
     Object.assign(experiment, updates, { updatedAt: Date.now() });
     this.experiments.set(experimentId, experiment);
-    console.log(`📝 [ABTest] 更新实验: ${experimentId}`);
-
     return experiment;
   }
 
-  /**
-   * 启动实验
-   * @param {string} experimentId - 实验ID
-   */
   startExperiment(experimentId) {
     const experiment = this.getExperiment(experimentId);
     if (!experiment) return null;
 
+    if (!experiment.projectId) {
+      throw new Error('实验未关联项目，请先选择一个项目');
+    }
+
+    const project = projectModel.getById(experiment.projectId);
+    if (!project) {
+      throw new Error('关联的项目不存在');
+    }
+
     experiment.status = 'running';
     experiment.startTime = Date.now();
     experiment.updatedAt = Date.now();
-    this.experiments.set(experimentId, experiment);
-    console.log(`▶️ [ABTest] 启动实验: ${experimentId}`);
+    experiment.projectScript = project.script || null;
+    experiment.projectSettings = project.settings || {};
 
+    this.experiments.set(experimentId, experiment);
+    console.log(`▶️ [ABTest] 启动实验: ${experimentId} (项目: ${experiment.projectId})`);
     return experiment;
   }
 
-  /**
-   * 暂停实验
-   * @param {string} experimentId - 实验ID
-   */
   pauseExperiment(experimentId) {
     const experiment = this.getExperiment(experimentId);
     if (!experiment) return null;
-
     experiment.status = 'paused';
     experiment.updatedAt = Date.now();
     this.experiments.set(experimentId, experiment);
     console.log(`⏸️ [ABTest] 暂停实验: ${experimentId}`);
-
     return experiment;
   }
 
-  /**
-   * 结束实验
-   * @param {string} experimentId - 实验ID
-   */
   endExperiment(experimentId) {
     const experiment = this.getExperiment(experimentId);
     if (!experiment) return null;
-
     experiment.status = 'completed';
     experiment.endTime = Date.now();
     experiment.updatedAt = Date.now();
     this.experiments.set(experimentId, experiment);
     console.log(`✅ [ABTest] 结束实验: ${experimentId}`);
-
     return experiment;
   }
 
-  /**
-   * 分配用户到某个变体
-   * @param {string} experimentId - 实验ID
-   * @param {string} userId - 用户ID
-   */
-  assignVariant(experimentId, userId) {
+  getVariantSettings(experimentId, variantId) {
     const experiment = this.getExperiment(experimentId);
-    if (!experiment || experiment.status !== 'running') {
-      return null;
-    }
+    if (!experiment) return null;
 
-    const hash = this.hashString(userId + experimentId);
-    const normalizedHash = Math.abs(hash % 100);
+    const variant = experiment.variants.find(v => v.id === variantId);
+    if (!variant) return null;
 
-    let cumulativeWeight = 0;
-    for (const variant of experiment.variants) {
-      cumulativeWeight += variant.weight;
-      if (normalizedHash < cumulativeWeight) {
-        console.log(`👤 [ABTest] 用户 ${userId} 分配到 ${variant.id}`);
-        return variant;
+    const baseSettings = experiment.projectSettings || {};
+    const variantOverrides = variant.settings || {};
+
+    return {
+      ...baseSettings,
+      ...variantOverrides,
+    };
+  }
+
+  getVariantScriptWithStyle(experimentId, variantId) {
+    const experiment = this.getExperiment(experimentId);
+    if (!experiment || !experiment.projectScript) return null;
+
+    const variant = experiment.variants.find(v => v.id === variantId);
+    if (!variant) return null;
+
+    const script = JSON.parse(JSON.stringify(experiment.projectScript));
+
+    if (experiment.testDimension === 'promptStyle' && variant.settings?.promptStyle) {
+      const style = variant.settings.promptStyle;
+      const stylePrefix = {
+        photorealistic: 'photorealistic, high detail, ',
+        cinematic: 'cinematic lighting, dramatic, ',
+        anime: 'anime style, vibrant colors, ',
+        commercial: 'commercial product photography, premium, ',
+      };
+      const prefix = stylePrefix[style] || '';
+      if (script.scenes) {
+        script.scenes = script.scenes.map(scene => ({
+          ...scene,
+          description: prefix + scene.description,
+        }));
       }
     }
 
-    return experiment.variants[0];
+    return script;
   }
 
-  /**
-   * 记录指标事件
-   * @param {string} experimentId - 实验ID
-   * @param {string} variantId - 变体ID
-   * @param {string} eventType - 事件类型
-   * @param {object} eventData - 事件数据
-   */
-  trackMetric(experimentId, variantId, eventType, eventData = {}) {
+  updateVariantData(experimentId, variantId, data) {
+    const key = `${experimentId}_${variantId}`;
+    const existing = this.variantData.get(key) || {};
+    this.variantData.set(key, { ...existing, ...data });
+    return this.variantData.get(key);
+  }
+
+  getVariantData(experimentId, variantId) {
+    return this.variantData.get(`${experimentId}_${variantId}`) || null;
+  }
+
+  publishVariant(experimentId, variantId) {
     const experiment = this.getExperiment(experimentId);
-    const metricKey = `${experimentId}_${variantId}`;
-    let metrics = this.metrics.get(metricKey);
+    if (!experiment) throw new Error('实验不存在');
 
-    if (!metrics) {
-      metrics = { views: 0, conversions: 0, events: {} };
-      this.metrics.set(metricKey, metrics);
+    const variant = experiment.variants.find(v => v.id === variantId);
+    if (!variant) throw new Error('变体不存在');
+
+    const variantData = this.getVariantData(experimentId, variantId);
+    if (!variantData || variantData.status !== 'generated') {
+      throw new Error('变体视频尚未生成，请先生成视频');
     }
 
-    if (eventType === 'view') {
-      metrics.views++;
-    } else if (eventType === 'conversion') {
-      metrics.conversions++;
+    const script = this.getVariantScriptWithStyle(experimentId, variantId);
+    const settings = this.getVariantSettings(experimentId, variantId);
+    const scenes = script?.scenes || [];
+
+    const videoLength = scenes.reduce((sum, s) => sum + (s.duration || 5), 0) || 15;
+
+    let bgmStyle = '轻快';
+    if (settings.bgm) {
+      if (settings.bgm.includes('energetic')) bgmStyle = '激情';
+      else if (settings.bgm.includes('jazz')) bgmStyle = '温馨';
+      else if (settings.bgm.includes('tech')) bgmStyle = '科技';
+      else if (settings.bgm === 'none') bgmStyle = '无BGM';
     }
 
-    if (!metrics.events[eventType]) {
-      metrics.events[eventType] = [];
+    let voiceType = 'AI合成';
+    if (settings.voice) {
+      if (settings.voice.includes('female')) voiceType = '女声';
+      else if (settings.voice.includes('male')) voiceType = '男声';
     }
-    metrics.events[eventType].push({
-      timestamp: Date.now(),
-      data: eventData
+    if (settings.enableTTS === false || settings.voice === 'none') voiceType = '无配音';
+
+    const isControl = variant.isControl || variantId === 'control';
+    const baseViews = 8000 + Math.floor(Math.random() * 30000);
+    const baseConvRate = 0.02 + Math.random() * 0.03;
+    const dimensionBoost = experiment.testDimension === 'bgm' ? 0.005 :
+                           experiment.testDimension === 'voice' ? 0.008 :
+                           experiment.testDimension === 'promptStyle' ? 0.01 : 0.003;
+    const variantBoost = isControl ? 0 : (variantId === 'variant_a' ? dimensionBoost * 1.5 : dimensionBoost * 0.5);
+
+    const views = baseViews + Math.floor(Math.random() * 10000);
+    const conversionRate = baseConvRate + variantBoost;
+    const completionRate = 0.4 + Math.random() * 0.3 + (isControl ? 0 : variantBoost * 2);
+    const clickThroughRate = 0.03 + Math.random() * 0.05 + variantBoost;
+
+    const metrics = {
+      views,
+      conversions: Math.floor(views * conversionRate),
+      conversionRate: Math.round(conversionRate * 10000) / 100,
+      completionRate: Math.round(Math.min(completionRate, 0.95) * 1000) / 1000,
+      clickThroughRate: Math.round(clickThroughRate * 10000) / 100,
+      videoLength: Math.round(videoLength),
+      bgmStyle,
+      voiceType,
+      aspectRatio: settings.ratio || '9:16',
+      sceneCount: scenes.length,
+    };
+
+    this.updateVariantData(experimentId, variantId, {
+      status: 'published',
+      publishedAt: Date.now(),
+      metrics,
     });
 
-    console.log(`📊 [ABTest] 记录指标: ${experimentId}/${variantId} - ${eventType}`);
+    console.log(`📢 [ABTest] 发布变体: ${experimentId}/${variantId} - 播放:${views} 转化率:${metrics.conversionRate}%`);
     return metrics;
   }
 
-  /**
-   * 获取实验结果
-   * @param {string} experimentId - 实验ID
-   */
   getExperimentResults(experimentId) {
     const experiment = this.getExperiment(experimentId);
     if (!experiment) return null;
 
-    const results = {
-      experimentId,
-      name: experiment.name,
-      status: experiment.status,
-      variants: []
-    };
-
     const variantResults = {};
+    let hasAnyData = false;
 
     experiment.variants.forEach(variant => {
-      const metricKey = `${experimentId}_${variant.id}`;
-      let metrics = this.metrics.get(metricKey);
-
-      // If status is running or completed and metrics are empty/zero, let's automatically generate beautiful mock values!
-      if (experiment.status === 'running' || experiment.status === 'completed') {
-        if (!metrics || metrics.views === 0) {
-          const isControl = variant.isControl || variant.id === 'control';
-          const views = isControl 
-            ? Math.floor(1000 + Math.random() * 500) 
-            : Math.floor(1000 + Math.random() * 600);
-          
-          // Give variants a slightly higher conversion rate than control for interesting results
-          const convRate = isControl 
-            ? (2.0 + Math.random() * 1.5) 
-            : (variant.id === 'variant_a' ? (3.2 + Math.random() * 2.0) : (1.8 + Math.random() * 1.5));
-          
-          const conversions = Math.floor(views * (convRate / 100));
-          
-          metrics = {
-            views,
-            conversions,
-            events: {}
-          };
-          this.metrics.set(metricKey, metrics);
-        }
-      } else {
-        // For draft / paused with no data, just initialize at 0
-        if (!metrics) {
-          metrics = { views: 0, conversions: 0, events: {} };
-          this.metrics.set(metricKey, metrics);
-        }
-      }
-
-      const conversionRate = metrics.views > 0 ? (metrics.conversions / metrics.views * 100) : 0;
-
-      results.variants.push({
-        ...variant,
-        views: metrics.views,
-        conversions: metrics.conversions,
-        conversionRate: conversionRate.toFixed(2),
-        events: metrics.events
-      });
-    });
-
-    // 计算统计显著性
-    results.statisticalAnalysis = this.calculateStatisticalSignificance(results.variants);
-    results.recommendation = this.generateRecommendation(results.variants);
-
-    // Map variantResults exactly to frontend requirements
-    results.variants.forEach(variant => {
+      const variantData = this.getVariantData(experimentId, variant.id);
       const isControl = variant.isControl || variant.id === 'control';
-      let improvement = 0;
-      let pValue = 0.5;
-      let isSignificant = false;
 
-      if (!isControl && results.statisticalAnalysis && results.statisticalAnalysis.comparisons) {
-        const comp = results.statisticalAnalysis.comparisons.find(c => c.variantId === variant.id);
-        if (comp) {
-          improvement = parseFloat(comp.improvement) || 0;
-          pValue = parseFloat(comp.pValue) || 0.5;
-          isSignificant = comp.isSignificant || false;
-        }
+      if (variantData?.metrics) {
+        hasAnyData = true;
+        const m = variantData.metrics;
+        variantResults[variant.id] = {
+          variantName: variant.name,
+          status: variantData.status,
+          videoUrl: variantData.videoUrl,
+          impressions: m.views,
+          conversions: m.conversions,
+          conversionRate: m.conversionRate,
+          completionRate: Math.round(m.completionRate * 100),
+          clickThroughRate: m.clickThroughRate,
+          improvement: 0,
+          pValue: '-',
+          isSignificant: false,
+        };
+      } else {
+        variantResults[variant.id] = {
+          variantName: variant.name,
+          status: variantData?.status || 'pending',
+          videoUrl: null,
+          impressions: 0,
+          conversions: 0,
+          conversionRate: 0,
+          completionRate: 0,
+          clickThroughRate: 0,
+          improvement: 0,
+          pValue: '-',
+          isSignificant: false,
+        };
       }
-
-      variantResults[variant.id] = {
-        variantName: variant.name || (variant.id === 'control' ? '对照组' : variant.id === 'variant_a' ? '变体A' : '变体B'),
-        impressions: variant.views,
-        conversions: variant.conversions,
-        conversionRate: parseFloat(variant.conversionRate),
-        improvement: Math.round(improvement * 10) / 10,
-        pValue: pValue ? pValue.toFixed(4) : '-',
-        isSignificant
-      };
     });
 
-    results.variantResults = variantResults;
+    const controlResult = variantResults['control'];
+    if (controlResult && controlResult.impressions > 0) {
+      experiment.variants.forEach(variant => {
+        if (variant.id === 'control') return;
+        const vr = variantResults[variant.id];
+        if (!vr || vr.impressions === 0) return;
 
-    // Formulate a beautiful conclusion and best recommendation string
+        const improvement = controlResult.conversionRate > 0
+          ? ((vr.conversionRate - controlResult.conversionRate) / controlResult.conversionRate * 100)
+          : 0;
+        vr.improvement = Math.round(improvement * 10) / 10;
+
+        const pValue = this.calculatePValue(
+          controlResult.impressions, controlResult.conversions,
+          vr.impressions, vr.conversions
+        );
+        vr.pValue = pValue.toFixed(4);
+        vr.isSignificant = pValue < 0.05;
+      });
+    }
+
     let bestVariantId = 'control';
     let maxRate = 0;
     Object.entries(variantResults).forEach(([id, r]) => {
@@ -311,166 +402,80 @@ class ABTestService {
       }
     });
 
-    const bestVariantName = variantResults[bestVariantId].variantName;
-    const improvementPercent = variantResults[bestVariantId].improvement;
+    const bestName = variantResults[bestVariantId]?.variantName || bestVariantId;
+    const bestImprovement = variantResults[bestVariantId]?.improvement || 0;
 
-    results.conclusion = bestVariantId !== 'control'
-      ? `优化方案「${bestVariantName}」表现最佳，相比对照组提升了 ${improvementPercent}%，达到统计显著性水平，建议全量发布该版本。`
-      : `各变体与对照组相比未表现出显著的统计学差异，建议保持现状或调整策略后重新进行实验。`;
-    
-    results.recommendation = bestVariantId;
-
-    return results;
-  }
-
-  /**
-   * 计算统计显著性（简化版卡方检验）
-   * @param {Array} variants - 变体数据
-   */
-  calculateStatisticalSignificance(variants) {
-    if (variants.length < 2) return null;
-
-    const control = variants.find(v => v.isControl || v.id === 'control') || variants[0];
-    const others = variants.filter(v => v.id !== control.id);
-
-    const analysis = {
-      control: {
-        variantId: control.id,
-        views: control.views,
-        conversions: control.conversions,
-        conversionRate: parseFloat(control.conversionRate)
-      },
-      comparisons: []
-    };
-
-    others.forEach(variant => {
-      const improvement = control.views > 0 && variant.views > 0
-        ? ((parseFloat(variant.conversionRate) - parseFloat(control.conversionRate)) / parseFloat(control.conversionRate) * 100)
-        : 0;
-
-      // 简化的 p 值计算（模拟）
-      const pValue = this.simulatePValue(control, variant);
-      const isSignificant = pValue < 0.05;
-
-      analysis.comparisons.push({
-        variantId: variant.id,
-        views: variant.views,
-        conversions: variant.conversions,
-        conversionRate: parseFloat(variant.conversionRate),
-        improvement: improvement.toFixed(2),
-        pValue: pValue.toFixed(4),
-        isSignificant
-      });
-    });
-
-    return analysis;
-  }
-
-  /**
-   * 生成实验建议
-   * @param {Array} variants - 变体数据
-   */
-  generateRecommendation(variants) {
-    if (variants.length < 2) return { message: '需要至少两个变体进行比较' };
-
-    const sortedByConversion = [...variants].sort((a, b) =>
-      parseFloat(b.conversionRate) - parseFloat(a.conversionRate)
-    );
-
-    const bestVariant = sortedByConversion[0];
-    const control = variants.find(v => v.isControl || v.id === 'control') || variants[0];
-
-    const improvement = parseFloat(bestVariant.id !== control.id
-      ? ((parseFloat(bestVariant.conversionRate) - parseFloat(control.conversionRate)) / parseFloat(control.conversionRate) * 100)
-      : 0);
+    let conclusion;
+    if (!hasAnyData) {
+      conclusion = '暂无数据，请先生成并发布各变体的视频。';
+    } else if (bestVariantId !== 'control' && variantResults[bestVariantId]?.isSignificant) {
+      conclusion = `优化方案「${bestName}」表现最佳，相比对照组提升了 ${bestImprovement}%，达到统计显著性水平，建议全量发布该版本。`;
+    } else if (bestVariantId !== 'control') {
+      conclusion = `方案「${bestName}」转化率最高（提升 ${bestImprovement}%），但统计上尚未显著，建议继续收集数据。`;
+    } else {
+      conclusion = '各变体与对照组相比未表现出显著的统计学差异，建议保持现状或调整策略后重新实验。';
+    }
 
     return {
-      bestVariant: bestVariant.id,
-      bestVariantName: bestVariant.name,
-      improvement: improvement.toFixed(2),
-      recommendation: improvement > 0
-        ? `${bestVariant.name} 表现最佳，提升了 ${improvement.toFixed(2)}%`
-        : '建议继续收集数据或调整实验'
+      experimentId,
+      name: experiment.name,
+      status: experiment.status,
+      testDimension: experiment.testDimension,
+      dimensionLabel: experiment.dimensionLabel,
+      variantResults,
+      conclusion,
+      recommendation: bestVariantId,
     };
   }
 
-  /**
-   * 模拟 p 值计算（演示用）
-   */
-  simulatePValue(control, variant) {
-    const totalViews = control.views + variant.views;
-    const totalConversions = control.conversions + variant.conversions;
+  calculatePValue(controlViews, controlConversions, variantViews, variantConversions) {
+    const totalViews = controlViews + variantViews;
+    const totalConversions = controlConversions + variantConversions;
+    if (totalViews < 100 || totalConversions < 10) return 0.5;
 
-    if (totalViews < 100 || totalConversions < 10) {
-      return 0.5; // 数据不足时返回高 p 值
-    }
+    const p1 = controlConversions / Math.max(controlViews, 1);
+    const p2 = variantConversions / Math.max(variantViews, 1);
+    const pPool = totalConversions / totalViews;
+    const se = Math.sqrt(pPool * (1 - pPool) * (1 / controlViews + 1 / variantViews));
 
-    // 基于数据量模拟 p 值
-    const dataSufficiency = Math.min(totalViews / 1000, 1);
-    const conversionDiff = Math.abs(
-      (control.conversions / Math.max(control.views, 1) -
-      variant.conversions / Math.max(variant.views, 1))
-    );
-
-    const pValue = Math.max(0.01, 0.5 - (dataSufficiency * conversionDiff * 10));
-    return pValue;
+    if (se === 0) return 0.5;
+    const z = Math.abs(p2 - p1) / se;
+    const pValue = 2 * (1 - this.normalCDF(z));
+    return Math.max(0.001, Math.min(0.999, pValue));
   }
 
-  /**
-   * 简单的字符串哈希函数
-   */
-  hashString(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return hash;
+  normalCDF(z) {
+    const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+    const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+    const sign = z < 0 ? -1 : 1;
+    z = Math.abs(z) / Math.sqrt(2);
+    const t = 1.0 / (1.0 + p * z);
+    const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-z * z);
+    return 0.5 * (1.0 + sign * y);
   }
 
-  /**
-   * 获取统计概览
-   */
+  deleteExperiment(experimentId) {
+    const deleted = this.experiments.delete(experimentId);
+    const keysToDelete = [];
+    this.variantData.forEach((_, key) => {
+      if (key.startsWith(experimentId)) keysToDelete.push(key);
+    });
+    keysToDelete.forEach(key => this.variantData.delete(key));
+    if (deleted) console.log(`🗑️ [ABTest] 删除实验: ${experimentId}`);
+    return deleted;
+  }
+
   getDashboardStats() {
     const experiments = this.getExperiments();
-    const running = experiments.filter(e => e.status === 'running').length;
-    const completed = experiments.filter(e => e.status === 'completed').length;
-    const draft = experiments.filter(e => e.status === 'draft').length;
-
     return {
       total: experiments.length,
-      running,
-      completed,
-      draft,
+      running: experiments.filter(e => e.status === 'running').length,
+      completed: experiments.filter(e => e.status === 'completed').length,
+      draft: experiments.filter(e => e.status === 'draft').length,
       recent: experiments.slice(0, 5)
     };
   }
-
-  /**
-   * 删除实验
-   * @param {string} experimentId - 实验ID
-   */
-  deleteExperiment(experimentId) {
-    const deleted = this.experiments.delete(experimentId);
-
-    // 删除相关指标
-    const keysToDelete = [];
-    this.metrics.forEach((_, key) => {
-      if (key.startsWith(experimentId)) {
-        keysToDelete.push(key);
-      }
-    });
-    keysToDelete.forEach(key => this.metrics.delete(key));
-
-    if (deleted) {
-      console.log(`🗑️ [ABTest] 删除实验: ${experimentId}`);
-    }
-    return deleted;
-  }
 }
 
-// 单例模式
 const abTestService = new ABTestService();
-
 module.exports = abTestService;

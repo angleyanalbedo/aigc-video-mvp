@@ -98,17 +98,60 @@ class MaterialService {
     const tags = this.extractTags(material.filename, material.content || '');
     const embedding = this.generateEmbedding(material.filename + ' ' + (material.content || '') + ' ' + tags.join(' '));
 
+    let fileType = material.type;
+    if (!fileType) {
+      const lowerFilename = material.filename.toLowerCase();
+      if (lowerFilename.match(/\.(mp4|mov|avi|mkv|webm)$/)) {
+        fileType = 'video/mp4';
+      } else if (lowerFilename.match(/\.(mp3|wav|ogg|m4a|aac|flac)$/)) {
+        fileType = 'audio/mpeg';
+      } else if (lowerFilename.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/)) {
+        fileType = 'image/jpeg';
+      }
+    }
+
     const materialData = {
+      ...material,
       id,
       filename: material.filename,
       url: material.url,
+      type: fileType,
       tags,
       embedding,
-      createdAt: Date.now(),
-      ...material
+      createdAt: Date.now()
     };
 
     this.materials.set(id, materialData);
+
+    try {
+      const projectModel = require('../models/project');
+      const projectId = material.projectId || 'default_project';
+      
+      if (!projectModel.getById(projectId)) {
+        projectModel.create({
+          id: projectId,
+          name: projectId === 'default_project' ? '默认项目' : projectId,
+          description: '自动创建的项目'
+        });
+        console.log(`✅ 自动创建项目: ${projectId}`);
+      }
+
+      const materialModel = require('../models/material');
+      materialModel.create({
+        id,
+        projectId,
+        filename: material.filename,
+        url: material.url,
+        type: fileType,
+        tags,
+        embedding,
+        content: material.content
+      });
+      console.log(`✅ 素材已保存到 SQLite: ${id}`);
+    } catch (err) {
+      console.warn(`⚠️ 保存到 SQLite 失败:`, err.message);
+    }
+
     return materialData;
   }
 

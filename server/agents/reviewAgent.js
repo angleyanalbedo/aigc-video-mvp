@@ -6,10 +6,78 @@
  * 仅当评分 < 60 时，才由 Orchestrator 触发 ScriptAgent.refine() 进行 LLM 修复。
  */
 
+const { getToolsForAgent } = require('./tools/agentTools');
+const skillLoader = require('./skills/skillLoader');
+
+const FALLBACK_PROMPT = `你是带货视频剧本质量审核专家，负责对生成的剧本进行规则校验。
+
+## 审核维度
+
+### 视觉提示词质量
+- 必须包含英文内容（视频生成模型需要英文提示词）
+- 描述长度不少于 15 字
+- 需包含主体、动作、环境、光线等要素
+
+### 旁白质量
+- 旁白不能为空或过短（至少 5 字）
+- 口语化程度检查
+- 信息密度评估
+
+### 时长合理性
+- 单个分镜时长 2-10 秒
+- 总时长控制在 15 秒以内
+- 时长分配符合节奏要求
+
+### 场景数量
+- 带货视频建议 2-6 个分镜
+- 过少无法完整表达
+- 过多导致节奏过快
+
+## 评分规则
+- 每个维度问题扣 10-20 分
+- 总分 100 分
+- 60 分以上通过
+- 60 分以下需要修复
+
+## 修复建议
+- 针对每个问题给出具体修复方向
+- 建议要可操作、可执行
+- 保持原有创意方向不变`;
+
 class ReviewAgent {
   constructor() {
     this.name = '质量审核 Agent';
+    this.agentName = 'ReviewAgent';
     this.layer = '监督层';
+    this.skillId = 'ReviewAgent_check';
+    this.tools = getToolsForAgent('ReviewAgent');
+  }
+
+  getSystemPrompt() {
+    const skillPrompt = skillLoader.loadPrompt(this.skillId);
+    return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async callSkill(params, options = {}) {
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
   }
 
   /**

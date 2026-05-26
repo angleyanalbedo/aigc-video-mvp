@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const SKILLS_DIR = path.join(__dirname, '../../skills');
+const DEFAULT_TIMEOUT = 60000;
+const DEFAULT_MAX_RETRIES = 3;
 
 class SkillLoader {
   constructor() {
@@ -9,175 +11,154 @@ class SkillLoader {
     this._watchers = new Map();
   }
 
-  list() {
-    if (!fs.existsSync(SKILLS_DIR)) {
-      fs.mkdirSync(SKILLS_DIR, { recursive: true });
-      return [];
+  async execute(skillId, context = {}, options = {}) {
+    const { timeout = DEFAULT_TIMEOUT, maxRetries = DEFAULT_MAX_RETRIES } = options;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const skill = this.load(skillId);
+        if (!skill) {
+          throw new Error(`Skill "${skillId}" not found`);
+        }
+
+        const prompt = this._injectContext(skill.prompt, context);
+        
+        const result = await Promise.race([
+          this._executeSkill(skillId, prompt, context),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Skill "${skillId}" execution timeout after ${timeout}ms`)), timeout)
+          )
+        ]);
+
+        return {
+          success: true,
+          skillId,
+          result,
+          attempt,
+          timestamp: Date.now()
+        };
+      } catch (error) {
+        console.error(`⚠️ Skill "${skillId}" execution failed (attempt ${attempt}/${maxRetries}):`, error.message);
+        
+        if (attempt === maxRetries) {
+          return {
+            success: false,
+            skillId,
+            error: error.message,
+            attempt,
+            timestamp: Date.now()
+          };
+        }
+        
+        await this._delay(1000 * attempt);
+      }
+    }
+  }
+
+  async _executeSkill(skillId, prompt, context) {
+    const { generateText, generateStructuredText } = require('../tools/llm');
+    
+    if (context.schema) {
+      return await generateStructuredText({
+        system: prompt,
+        prompt: context.prompt || '',
+        schema: context.schema
+      });
+    }
+    
+    return await generateText({
+      system: prompt,
+      prompt: context.prompt || ''
+    });
+  }
+
+  _injectContext(prompt, context) {
+    if (!context.params || Object.keys(context.params).length === 0) {
+      return prompt;
     }
 
-    const files = fs.readdirSync(SKILLS_DIR).filter(f => f.endsWith('.md'));
-    return files.map(filename => {
-      const filePath = path.join(SKILLS_DIR, filename);
-      const stat = fs.statSync(filePath);
-      const parsed = this._parseFilename(filename);
-      return {
-        filename,
-        id: parsed.id,
-        agentName: parsed.agentName,
-        skillName: parsed.skillName,
-        size: stat.size,
-        modifiedAt: stat.mtime.toISOString()
-      };
-    });
+    let enhancedPrompt = prompt;
+    
+    for (const [key, value] of Object.entries(context.params)) {
+      const placeholder = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+      enhancedPrompt = enhancedPrompt.replace(placeholder, JSON.stringify(value));
+    }
+
+    return enhancedPrompt;
+  }
+
+  _delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async call(agentName, params = {}, options = {}) {
+    const skill = this.getSkillForAgent(agentName);
+    if (!skill) {
+      throw new Error(`No skill found for agent "${agentName}"`);
+    }
+    return this.execute(skill.id, { params, prompt: params.prompt || '', schema: params.schema }, options);
+  }
+
+  async callSkill(skillId, params = {}, options = {}) {
+    return this.execute(skillId, { params, prompt: params.prompt || '', schema: params.schema }, options);
   }
 
   load(skillId) {
     if (this._cache.has(skillId)) {
-      const cached = this._cache.get(skillId);
-      return cached;
+      return this._cache.get(skillId);
     }
 
-    const filename = this._findFile(skillId);
-    if (!filename) return null;
-
-    const filePath = path.join(SKILLS_DIR, filename);
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const parsed = this._parseContent(content);
-
-    const result = {
-      id: skillId,
-      filename,
-      ...parsed,
-      rawContent: content
-    };
-
-    this._cache.set(skillId, result);
-    return result;
-  }
-
-  loadPrompt(skillId) {
-    const skill = this.load(skillId);
-    if (!skill) return null;
-    return skill.prompt;
-  }
-
-  save(skillId, content) {
-    const filename = this._findFile(skillId) || `${skillId}.md`;
-    const filePath = path.join(SKILLS_DIR, filename);
-
-    if (!fs.existsSync(SKILLS_DIR)) {
-      fs.mkdirSync(SKILLS_DIR, { recursive: true });
+    const skillPath = path.join(SKILLS_DIR, `${skillId}.md`);
+    if (!fs.existsSync(skillPath)) {
+      return null;
     }
 
-    fs.writeFileSync(filePath, content, 'utf-8');
-    this._cache.delete(skillId);
+    const content = fs.readFileSync(skillPath, 'utf8');
+    const skill = this._parseSkillContent(content, skillId);
+    
+    this._cache.set(skillId, skill);
+    this._setupWatcher(skillId, skillPath);
 
-    return {
-      id: skillId,
-      filename,
-      size: Buffer.byteLength(content),
-      modifiedAt: new Date().toISOString()
-    };
+    return skill;
   }
 
-  getSkillForAgent(agentName) {
-    const allSkills = this.list();
-    const matched = allSkills.filter(s => s.agentName === agentName);
-    if (matched.length === 0) return null;
-    return this.load(matched[0].id);
-  }
-
-  loadPromptForAgent(agentName) {
-    const skill = this.getSkillForAgent(agentName);
-    return skill ? skill.prompt : null;
-  }
-
-  watch(skillId, callback) {
-    const filename = this._findFile(skillId);
-    if (!filename) return;
-
-    const filePath = path.join(SKILLS_DIR, filename);
-
-    if (this._watchers.has(skillId)) {
-      this._watchers.get(skillId).close();
-    }
-
-    const watcher = fs.watch(filePath, (eventType) => {
-      if (eventType === 'change') {
-        this._cache.delete(skillId);
-        const updated = this.load(skillId);
-        if (callback) callback(updated);
-      }
-    });
-
-    this._watchers.set(skillId, watcher);
-  }
-
-  stopWatch(skillId) {
-    if (this._watchers.has(skillId)) {
-      this._watchers.get(skillId).close();
-      this._watchers.delete(skillId);
-    }
-  }
-
-  stopAllWatches() {
-    for (const [id] of this._watchers) {
-      this.stopWatch(id);
-    }
-  }
-
-  _parseFilename(filename) {
-    const baseName = filename.replace('.md', '');
-    const parts = baseName.split('_');
-
-    if (parts.length >= 2) {
-      return {
-        id: baseName,
-        agentName: parts[0],
-        skillName: parts.slice(1).join('_')
-      };
-    }
-
-    return {
-      id: baseName,
-      agentName: baseName,
-      skillName: baseName
-    };
-  }
-
-  _parseContent(content) {
-    const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
-    let metadata = {};
+  _parseSkillContent(content, skillId) {
+    let frontMatter = {};
     let prompt = content;
 
-    if (frontmatterMatch) {
-      metadata = this._parseFrontmatter(frontmatterMatch[1]);
-      prompt = content.slice(frontmatterMatch[0].length);
+    if (content.startsWith('---')) {
+      const frontMatterEnd = content.indexOf('---', 3);
+      if (frontMatterEnd !== -1) {
+        const frontMatterContent = content.slice(3, frontMatterEnd).trim();
+        prompt = content.slice(frontMatterEnd + 3).trim();
+        
+        frontMatter = this._parseFrontMatter(frontMatterContent);
+      }
     }
 
     return {
-      metadata,
-      prompt: prompt.trim()
+      id: skillId,
+      prompt,
+      metadata: frontMatter
     };
   }
 
-  _parseFrontmatter(text) {
+  _parseFrontMatter(content) {
     const metadata = {};
-    const lines = text.split('\n');
-
+    const lines = content.split('\n');
+    
     for (const line of lines) {
-      const match = line.match(/^(\w+):\s*(.*)$/);
-      if (match) {
-        const key = match[1];
-        const value = match[2].trim();
+      const colonIndex = line.indexOf(':');
+      if (colonIndex !== -1) {
+        const key = line.slice(0, colonIndex).trim();
+        const value = line.slice(colonIndex + 1).trim();
+        
         if (value.startsWith('[') && value.endsWith(']')) {
-          metadata[key] = value.slice(1, -1).split(',').map(s => s.trim());
-        } else if (value === 'true') {
-          metadata[key] = true;
-        } else if (value === 'false') {
-          metadata[key] = false;
-        } else if (!isNaN(value)) {
-          metadata[key] = Number(value);
+          try {
+            metadata[key] = JSON.parse(value);
+          } catch {
+            metadata[key] = value.slice(1, -1).split(',').map(s => s.trim().replace(/^['"]|['"]$/g, ''));
+          }
         } else {
           metadata[key] = value;
         }
@@ -187,17 +168,52 @@ class SkillLoader {
     return metadata;
   }
 
-  _findFile(skillId) {
-    if (!fs.existsSync(SKILLS_DIR)) return null;
+  _setupWatcher(skillId, skillPath) {
+    if (this._watchers.has(skillId)) {
+      return;
+    }
 
-    const files = fs.readdirSync(SKILLS_DIR);
-    const exactMatch = files.find(f => f === `${skillId}.md`);
-    if (exactMatch) return exactMatch;
+    const watcher = fs.watch(skillPath, (eventType) => {
+      if (eventType === 'change') {
+        this._cache.delete(skillId);
+        console.log(`🔄 Skill "${skillId}" reloaded`);
+      }
+    });
 
-    const partialMatch = files.find(f => f.replace('.md', '') === skillId);
-    if (partialMatch) return partialMatch;
+    this._watchers.set(skillId, watcher);
+  }
 
+  list() {
+    if (!fs.existsSync(SKILLS_DIR)) {
+      return [];
+    }
+
+    return fs.readdirSync(SKILLS_DIR)
+      .filter(file => file.endsWith('.md'))
+      .map(file => file.slice(0, -3));
+  }
+
+  getSkillForAgent(agentName) {
+    const skills = this.list();
+    const agentLower = agentName.toLowerCase();
+    
+    for (const skillId of skills) {
+      const skill = this.load(skillId);
+      if (skill && skill.metadata) {
+        if (skill.metadata.agent && skill.metadata.agent.toLowerCase() === agentLower) {
+          return skill;
+        }
+        if (skillId.toLowerCase().includes(agentLower)) {
+          return skill;
+        }
+      }
+    }
     return null;
+  }
+
+  loadPrompt(skillId) {
+    const skill = this.load(skillId);
+    return skill ? skill.prompt : null;
   }
 }
 

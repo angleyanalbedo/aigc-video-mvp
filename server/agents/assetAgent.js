@@ -1,6 +1,7 @@
 const { generateStructuredText } = require('./tools/llm');
 const { memoryManager } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
+const { getToolsForAgent } = require('./tools/agentTools');
 
 const FALLBACK_PROMPT = `你是一个资深的电商 AIGC 视觉与文案分析专家。
 你的职责是智能解析用户上传/选中的商品图片、视频或描述性素材，提取出商品的卖点、目标受众、商品品类与价格区间，并为其量身定制带货视频的推荐风格和主打语调。
@@ -13,11 +14,47 @@ class AssetAgent {
     this.layer = '决策层';
     this.agentName = 'AssetAgent';
     this.skillId = 'AssetAgent_analysis';
+    this.tools = getToolsForAgent('AssetAgent');
   }
 
   getSystemPrompt() {
     const skillPrompt = skillLoader.loadPrompt(this.skillId);
     return skillPrompt || FALLBACK_PROMPT;
+  }
+
+  async callSkill(params, options = {}) {
+    const schema = {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "提取的商品名称或提炼的带货推荐标题" },
+        sellingPoints: { type: "string", description: "整理的商品 2-3 个核心卖点摘要，字数控制在 80 字以内" },
+        targetAudience: { type: "string", description: "精准的目标消费人群描述" },
+        style: { type: "string", description: "建议的短视频整体创意风格" },
+        price: { type: "string", description: "推测或提取的产品价格区间" }
+      },
+      required: ["title", "sellingPoints", "targetAudience", "style", "price"]
+    };
+    
+    const result = await skillLoader.callSkill(this.skillId, {
+      prompt: params.prompt,
+      schema
+    }, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Skill execution failed');
+    }
+    
+    return result.result;
+  }
+
+  async callOtherAgent(agentName, params, options = {}) {
+    const result = await skillLoader.call(agentName, params, options);
+    
+    if (!result.success) {
+      throw new Error(result.error || `Skill call to ${agentName} failed`);
+    }
+    
+    return result.result;
   }
 
   async analyze(materials) {

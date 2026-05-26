@@ -36,46 +36,53 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 10000px;
-  height: 10000px;
+  width: 1px;
+  height: 1px;
   pointer-events: none;
+  overflow: visible !important;
 }
 
 .canvas-node {
   position: absolute;
-  border: 2px solid #d9d9d9;
-  border-radius: 12px;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   cursor: grab;
-  transition: box-shadow 0.2s, transform 0.1s;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   user-select: none;
   overflow: hidden;
 }
 
 .canvas-node:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  z-index: 10;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px) scale(1.025);
+  z-index: 100;
 }
 
 .canvas-node.selected {
-  border-color: #1890ff !important;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.3) !important;
-  z-index: 100;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 3px #1890ff, 0 12px 28px rgba(24, 144, 255, 0.25) !important;
+  z-index: 200;
 }
 
 .canvas-node:active {
   cursor: grabbing;
+  transform: translateY(-2px) scale(1.01);
 }
 
 .node-header {
-  padding: 8px 12px;
+  padding: 10px 14px;
   color: white;
-  font-weight: bold;
+  font-weight: 600;
   font-size: 12px;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .node-title {
@@ -107,14 +114,23 @@
   position: absolute;
   bottom: 24px;
   left: 24px;
-  background: white;
-  padding: 12px 16px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 12px 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08), 0 2px 4px 0 rgba(0, 0, 0, 0.02);
   display: flex;
   align-items: center;
   gap: 12px;
   z-index: 1000;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.canvas-toolbar:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12), 0 4px 8px 0 rgba(0, 0, 0, 0.04);
 }
 
 .scale-slider {
@@ -127,19 +143,206 @@
   color: #8c8c8c;
   min-width: 40px;
   text-align: right;
+  font-family: 'Outfit', 'Inter', -apple-system, sans-serif;
+  font-weight: 500;
 }
 
 .mini-map {
   position: absolute;
   bottom: 24px;
   right: 24px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
   overflow: hidden;
   z-index: 1000;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.mini-map:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
 }
 
 .mini-map svg {
   display: block;
+}
+
+/* Floating Add Node toolbox styled with glassmorphism */
+.canvas-toolbox {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 14px 18px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  zIndex: 1000;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.canvas-toolbox:hover {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+}
+
+.canvas-toolbox .ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.canvas-toolbox .ant-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Delete button micro-animation inside node header */
+.node-delete-btn {
+  color: rgba(255, 255, 255, 0.75) !important;
+  cursor: pointer;
+  font-size: 13px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.node-delete-btn:hover {
+  color: #ff4d4f !important;
+  background: rgba(255, 77, 79, 0.15);
+  transform: scale(1.2);
+}
+
+/* Role-based node header gradients & borders */
+.canvas-node.script .node-header {
+  background: linear-gradient(135deg, #722ed1 0%, #9254de 100%) !important;
+}
+.canvas-node.script {
+  border-color: #9254de !important;
+}
+
+.canvas-node.scene .node-header {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
+}
+.canvas-node.scene {
+  border-color: #40a9ff !important;
+}
+
+.canvas-node.material .node-header {
+  background: linear-gradient(135deg, #fa8c16 0%, #ffa940 100%) !important;
+}
+.canvas-node.material {
+  border-color: #ffa940 !important;
+}
+
+.canvas-node.video .node-header {
+  background: linear-gradient(135deg, #eb2f96 0%, #ff85c0 100%) !important;
+}
+.canvas-node.video {
+  border-color: #ff85c0 !important;
+}
+
+.canvas-node.intent .node-header {
+  background: linear-gradient(135deg, #13c2c2 0%, #5cdbd3 100%) !important;
+}
+.canvas-node.intent {
+  border-color: #5cdbd3 !important;
+}
+
+.canvas-node.plan .node-header {
+  background: linear-gradient(135deg, #faad14 0%, #ffe58f 100%) !important;
+}
+.canvas-node.plan {
+  border-color: #faad14 !important;
+}
+
+.canvas-node.operation .node-header {
+  background: linear-gradient(135deg, #52c41a 0%, #95de64 100%) !important;
+}
+.canvas-node.operation {
+  border-color: #52c41a !important;
+}
+
+/* Custom premium toolbox buttons style */
+.canvas-toolbox {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 12px 36px rgba(31, 38, 135, 0.08);
+}
+
+.scene-toolbox-btn {
+  width: 100% !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(24, 144, 255, 0.15);
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.scene-toolbox-btn:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 0 6px 14px rgba(24, 144, 255, 0.25);
+  background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%) !important;
+  color: white !important;
+}
+
+.material-toolbox-btn {
+  width: 100% !important;
+  border-radius: 8px !important;
+  border: 1px solid #fa8c16 !important;
+  color: #fa8c16 !important;
+  background: transparent !important;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.material-toolbox-btn:hover {
+  background: rgba(250, 140, 22, 0.08) !important;
+  color: #d46b08 !important;
+  border-color: #d46b08 !important;
+  transform: translateY(-1.5px) scale(1.02);
+}
+
+.bgm-toolbox-btn {
+  width: 100% !important;
+  border-radius: 8px !important;
+  border: 1px solid #13c2c2 !important;
+  color: #13c2c2 !important;
+  background: transparent !important;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.bgm-toolbox-btn:hover {
+  background: rgba(19, 194, 194, 0.08) !important;
+  color: #08979c !important;
+  border-color: #08979c !important;
+  transform: translateY(-1.5px) scale(1.02);
+}
+
+.synthesis-toolbox-btn {
+  width: 100% !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, #eb2f96 0%, #ff85c0 100%) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 500;
+  box-shadow: 0 4px 10px rgba(235, 47, 150, 0.15);
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.synthesis-toolbox-btn:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  box-shadow: 0 6px 14px rgba(235, 47, 150, 0.25);
+  background: linear-gradient(135deg, #ff85c0 0%, #ffadd2 100%) !important;
+  color: white !important;
 }

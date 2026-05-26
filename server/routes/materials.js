@@ -1,6 +1,21 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
 const materialService = require('../services/materialService');
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads');
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // 获取全局素材库
 router.get('/library', (req, res) => {
@@ -28,6 +43,40 @@ router.get('/library', (req, res) => {
     res.status(500).json({
       success: false,
       error: '获取素材库失败: ' + error.message
+    });
+  }
+});
+
+router.post('/upload', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: '请上传文件'
+      });
+    }
+
+    const { type = 'video', projectId } = req.body;
+    const filePath = `/uploads/${req.file.filename}`;
+    
+    const material = materialService.addMaterial({
+      filename: req.file.originalname,
+      url: filePath,
+      type: type,
+      projectId: projectId,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    res.json({
+      success: true,
+      data: material
+    });
+  } catch (error) {
+    console.error('上传素材失败:', error);
+    res.status(500).json({
+      success: false,
+      error: '上传素材失败: ' + error.message
     });
   }
 });

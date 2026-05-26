@@ -1,5 +1,5 @@
 const BaseLLMProvider = require('./BaseLLMProvider');
-const { createOpenAI } = require('@ai-sdk/openai');
+const { z } = require('zod');
 
 class ArkLLMProvider extends BaseLLMProvider {
   constructor({ apiKey, llmEp, imageEp }) {
@@ -7,13 +7,6 @@ class ArkLLMProvider extends BaseLLMProvider {
     this.apiKey = apiKey;
     this.llmEp = llmEp;
     this.imageEp = imageEp;
-    
-    this.ark = createOpenAI({
-      name: 'volcengine',
-      baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
-      apiKey: this.apiKey,
-    });
-    this.model = this.ark.languageModel(this.llmEp);
   }
 
   async generateText({ system, prompt, temperature = 0.7, maxTokens = 2000 }) {
@@ -98,6 +91,10 @@ class ArkLLMProvider extends BaseLLMProvider {
       console.error('Ark LLM Provider generateImage 失败:', error);
       throw error;
     }
+  }
+
+  getModel() {
+    return this.model;
   }
 }
 

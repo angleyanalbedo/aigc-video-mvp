@@ -12,6 +12,10 @@ import WorkbenchPage from './pages/Workbench';
 import CopilotPage from './pages/Copilot';
 import Dashboard from './Dashboard';
 import StatusPage from './pages/Status';
+import SettingsPage from './pages/Settings';
+import VideoLibraryPage from './pages/VideoLibrary';
+import TemplateLibraryPage from './pages/TemplateLibrary';
+import OneClickPage from './pages/OneClick';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
@@ -42,6 +46,10 @@ function App() {
           <Route path="/observability" element={<DashboardWrapper><ObservabilityPage /></DashboardWrapper>} />
           <Route path="/compliance" element={<DashboardWrapper><CompliancePage /></DashboardWrapper>} />
           <Route path="/status" element={<DashboardWrapper><StatusPage /></DashboardWrapper>} />
+          <Route path="/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
+          <Route path="/video-library" element={<DashboardWrapper><VideoLibraryPage /></DashboardWrapper>} />
+          <Route path="/template-library" element={<DashboardWrapper><TemplateLibraryPage /></DashboardWrapper>} />
+          <Route path="/one-click" element={<DashboardWrapper><OneClickPage /></DashboardWrapper>} />
           <Route path="/dashboard" element={<Dashboard />} />
         </Routes>
       </Router>

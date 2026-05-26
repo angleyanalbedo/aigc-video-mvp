@@ -115,6 +115,12 @@ export const useWorkbench = () => {
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState('');
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
 
+  // 音频素材库相关状态（用于声音参考选择）
+  const [audioLibraryModalVisible, setAudioLibraryModalVisible] = useState(false);
+  const [audioLibraryMaterials, setAudioLibraryMaterials] = useState<any[]>([]);
+  const [isLoadingAudioLibrary, setIsLoadingAudioLibrary] = useState(false);
+  const [currentSceneForAudioSelect, setCurrentSceneForAudioSelect] = useState<number | null>(null);
+
   // Auto-save Status
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving'>('saved');
 
@@ -1235,6 +1241,14 @@ export const useWorkbench = () => {
     setLibrarySearchKeyword,
     isLoadingLibrary,
     setIsLoadingLibrary,
+    audioLibraryModalVisible,
+    setAudioLibraryModalVisible,
+    audioLibraryMaterials,
+    setAudioLibraryMaterials,
+    isLoadingAudioLibrary,
+    setIsLoadingAudioLibrary,
+    currentSceneForAudioSelect,
+    setCurrentSceneForAudioSelect,
     saveStatus,
     setSaveStatus,
     project,

@@ -11,10 +11,15 @@ const StatusPage: React.FC = () => {
   const checkServerStatus = async () => {
     setStatus('loading');
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${API_BASE}/api/health`, {
         method: 'GET',
-        signal: AbortSignal.timeout(5000)
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
