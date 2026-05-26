@@ -4,9 +4,23 @@ import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, S
 
 const { Option } = Select;
 
-const API_BASE = window.location.hostname.includes('trae.cn') 
-  ? 'http://localhost:3001' 
+const API_BASE = window.location.hostname.includes('trae.cn')
+  ? 'http://localhost:3001'
   : '';
+
+// 辅助函数：处理素材 URL，确保相对路径能正确解析
+const getMaterialUrl = (url: string): string => {
+  if (!url) return '';
+  // 如果已经是完整 URL，直接返回
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // 如果是相对路径，拼接 API_BASE
+  if (url.startsWith('/')) {
+    return `${API_BASE}${url}`;
+  }
+  return url;
+};
 
 interface Material {
   id: string;
@@ -253,11 +267,11 @@ const MaterialManagementPage = () => {
                   style={{ height: '100%', borderRadius: 12, overflow: 'hidden' }}
                   cover={
                     inferMediaType(item.filename, item.type).startsWith('image') ? (
-                      <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
+                      <img alt={item.filename} src={getMaterialUrl(item.url)} style={{ height: 160, objectFit: 'cover' }} />
                     ) : inferMediaType(item.filename, item.type).startsWith('video') ? (
                       <div style={{ height: 160, position: 'relative', overflow: 'hidden' }}>
                         <video
-                          src={item.url}
+                          src={getMaterialUrl(item.url)}
                           muted
                           loop
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -288,7 +302,7 @@ const MaterialManagementPage = () => {
                         </div>
                       </div>
                     ) : (
-                      <img alt={item.filename} src={item.url} style={{ height: 160, objectFit: 'cover' }} />
+                      <img alt={item.filename} src={getMaterialUrl(item.url)} style={{ height: 160, objectFit: 'cover' }} />
                     )
                   }
                   actions={[
@@ -358,13 +372,13 @@ const MaterialManagementPage = () => {
             }}>
               {inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('image') ? (
                 <img
-                  src={selectedMaterial.url}
+                  src={getMaterialUrl(selectedMaterial.url)}
                   alt={selectedMaterial.filename}
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
               ) : inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('video') ? (
                 <video
-                  src={selectedMaterial.url}
+                  src={getMaterialUrl(selectedMaterial.url)}
                   controls
                   autoPlay
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
@@ -373,7 +387,7 @@ const MaterialManagementPage = () => {
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   <SoundOutlined style={{ fontSize: 80, color: '#818cf8', marginBottom: 24 }} />
                   <audio
-                    src={selectedMaterial.url}
+                    src={getMaterialUrl(selectedMaterial.url)}
                     controls
                     autoPlay
                     style={{ width: '100%', maxWidth: 400 }}
@@ -381,7 +395,7 @@ const MaterialManagementPage = () => {
                 </div>
               ) : (
                 <img
-                  src={selectedMaterial.url}
+                  src={getMaterialUrl(selectedMaterial.url)}
                   alt={selectedMaterial.filename}
                   style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain' }}
                 />
