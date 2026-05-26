@@ -197,7 +197,7 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
 
   return (
     <div className="workbench">
-      <div className={`sidebar ${isProjectMode ? 'sidebar--dark' : ''}`}>
+      <div className="sidebar">
         <div className="sidebar__logo">
           <div className="sidebar__logo-icon"></div>
         </div>
@@ -241,18 +241,18 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
         </div>
       </div>
 
-      <div className={`main-content ${isProjectMode ? 'main-content--dark' : ''}`}>
-        <div style={{ 
-          position: 'fixed', 
-          top: 10, 
-          right: 10, 
+      <div className="main-content">
+        <div style={{
+          position: 'fixed',
+          top: 10,
+          right: 10,
           zIndex: 1000,
-          background: isProjectMode ? '#1e1e2f' : 'white',
-          color: isProjectMode ? '#fff' : '#000',
+          background: 'var(--card-bg)',
+          color: 'var(--text-primary)',
           padding: '4px 12px',
           borderRadius: '4px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          border: isProjectMode ? '1px solid #27272a' : 'none'
+          border: '1px solid var(--border-color)'
         }}>
           <ConnectionStatus />
         </div>

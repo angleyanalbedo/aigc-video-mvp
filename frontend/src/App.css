@@ -794,48 +794,4 @@ body {
   }
 }
 
-/* Premium Dark Sidebar for Immersive Project Workspace */
-.sidebar--dark {
-  background: #121214 !important;
-  border-right: 1px solid #1f1f23;
-  box-shadow: none !important;
-}
-
-.sidebar--dark .sidebar__logo-icon {
-  background: #ffffff !important;
-}
-
-.sidebar--dark .sidebar__item {
-  color: #a1a1aa !important;
-}
-
-.sidebar--dark .sidebar__item:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #ffffff !important;
-}
-
-.sidebar--dark .sidebar__item.active {
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4) !important;
-}
-
-/* Dynamic Dark Container for Project Workbench */
-.main-content--dark {
-  background: #09090b !important;
-  box-shadow: none !important;
-  --page-bg: #09090b;
-  --card-bg: #121214;
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --border-color: #1f1f23;
-  --hover-bg: rgba(255, 255, 255, 0.08);
-  --active-bg: #6366f1;
-  --input-bg: #1c1c1f;
-  --section-bg: #18181b;
-  --terminal-bg: #09090b;
-  --terminal-text: #f4f4f5;
-  --card-border: 1px solid #1f1f23;
-}
-
 

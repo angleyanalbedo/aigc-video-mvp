@@ -229,7 +229,7 @@ const WorkbenchPage: React.FC = () => {
                 clip: 'render'
               };
               const statusColor: Record<string, string> = {
-                pending: '#3f3f46',
+                pending: 'var(--text-secondary)',
                 running: '#6366f1',
                 completed: '#10b981',
                 failed: '#ef4444',
@@ -391,7 +391,7 @@ const WorkbenchPage: React.FC = () => {
                             background: 'rgba(0,0,0,0.6)',
                             padding: '2px 6px',
                             fontSize: 10,
-                            color: '#fff',
+                            color: 'var(--text-primary)',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
@@ -722,12 +722,12 @@ const WorkbenchPage: React.FC = () => {
         {isLoadingLibrary ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <LoadingOutlined style={{ fontSize: 40, color: '#818cf8' }} />
-            <p style={{ marginTop: 16, color: '#a1a1aa' }}>正在加载素材库...</p>
+            <p style={{ marginTop: 16, color: 'var(--text-secondary)' }}>正在加载素材库...</p>
           </div>
         ) : libraryMaterials.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <InboxOutlined style={{ fontSize: 60, color: '#3f3f46' }} />
-            <p style={{ marginTop: 16, color: '#a1a1aa' }}>
+            <InboxOutlined style={{ fontSize: 60, color: 'var(--text-secondary)' }} />
+            <p style={{ marginTop: 16, color: 'var(--text-secondary)' }}>
               {librarySearchKeyword ? '未找到匹配的素材' : '素材库为空，请先上传素材'}
             </p>
           </div>
@@ -750,7 +750,7 @@ const WorkbenchPage: React.FC = () => {
                         height: 120,
                         borderRadius: 8,
                         overflow: 'hidden',
-                        border: isSelected ? '3px solid #10b981' : '1px solid #27272a',
+                        border: isSelected ? '3px solid #10b981' : '1px solid var(--border-color)',
                         cursor: 'pointer',
                         position: 'relative',
                         transition: 'all 0.2s'
@@ -789,7 +789,7 @@ const WorkbenchPage: React.FC = () => {
                         background: 'rgba(0,0,0,0.6)',
                         padding: '4px 8px',
                         fontSize: 10,
-                        color: '#fff',
+                        color: 'var(--text-primary)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap'
@@ -813,9 +813,9 @@ const WorkbenchPage: React.FC = () => {
             {/* Left: Chat Copilot */}
             <Col span={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><AudioOutlined /> AI 创意导演 Copilot</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><AudioOutlined /> AI 创意导演 Copilot</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
                 bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '12px 16px' }}
               >
                 {/* Chat Message Lists */}
@@ -828,15 +828,15 @@ const WorkbenchPage: React.FC = () => {
                     }}>
                       <div style={{
                         maxWidth: '85%',
-                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#27272a',
-                        color: '#fff',
+                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'var(--hover-bg)',
+                        color: 'var(--text-primary)',
                         padding: '10px 14px',
                         borderRadius: msg.role === 'user' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                         lineHeight: 1.5,
                         fontSize: 13.5
                       }}>
-                        <Paragraph style={{ color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</Paragraph>
+                        <Paragraph style={{ color: 'var(--text-primary)', margin: 0, whiteSpace: 'pre-wrap' }}>{msg.content}</Paragraph>
                         <div style={{
                           fontSize: 10,
                           opacity: 0.6,
@@ -850,7 +850,7 @@ const WorkbenchPage: React.FC = () => {
                   ))}
                   {isChatting && (
                     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
-                      <div style={{ background: '#27272a', padding: '10px 14px', borderRadius: '12px 12px 12px 2px' }}>
+                      <div style={{ background: 'var(--hover-bg)', padding: '10px 14px', borderRadius: '12px 12px 12px 2px' }}>
                         <span style={{ color: '#818cf8' }}><LoadingOutlined /> AI 导演正在深入构思中...</span>
                       </div>
                     </div>
@@ -859,7 +859,7 @@ const WorkbenchPage: React.FC = () => {
                 </div>
 
                 {/* Input Controls */}
-                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #27272a', paddingTop: 12 }}>
+                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--border-color)', paddingTop: 12 }}>
                   <TextArea
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -871,7 +871,7 @@ const WorkbenchPage: React.FC = () => {
                     }}
                     placeholder="输入剧本创作想法...例如：'帮我制作一个破壁机的带货剧本，突出超静音特色'"
                     autoSize={{ minRows: 2, maxRows: 3 }}
-                    style={{ background: '#202023', border: '1px solid #2e2e33', color: '#fff', borderRadius: 8 }}
+                    style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 8 }}
                   />
                   <Button
                     type="primary"
@@ -887,24 +887,24 @@ const WorkbenchPage: React.FC = () => {
             {/* Right: Script Interactive Canvas */}
             <Col span={14} style={{ height: '100%' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><SaveOutlined /> 剧本画布预览</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><SaveOutlined /> 剧本画布预览</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%', overflowY: 'auto' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%', overflowY: 'auto' }}
               >
                 {script ? (
                   <div>
-                    <div style={{ background: '#202023', padding: 16, borderRadius: 8, marginBottom: 20 }}>
-                      <Title level={4} style={{ color: '#fff', margin: '0 0 8px 0' }}>📄 {script.title}</Title>
-                      <Paragraph style={{ color: '#a1a1aa', margin: 0, fontSize: 13 }}>
+                    <div style={{ background: 'var(--input-bg)', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                      <Title level={4} style={{ color: 'var(--text-primary)', margin: '0 0 8px 0' }}>📄 {script.title}</Title>
+                      <Paragraph style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 13 }}>
                         <strong>核心创意创意:</strong> {script.description}
                       </Paragraph>
                     </div>
 
-                    <Title level={5} style={{ color: '#fff', marginBottom: 12 }}>📝 分镜场景时间线</Title>
+                    <Title level={5} style={{ color: 'var(--text-primary)', marginBottom: 12 }}>📝 分镜场景时间线</Title>
                     {script.scenes?.map((scene: any, index: number) => (
                       <div key={index} style={{
                         display: 'flex',
-                        background: '#27272a',
+                        background: 'var(--hover-bg)',
                         borderRadius: 8,
                         padding: 16,
                         marginBottom: 12,
@@ -914,14 +914,14 @@ const WorkbenchPage: React.FC = () => {
                           <Tag color="geekblue" style={{ borderRadius: 4 }}>镜 {index + 1}</Tag>
                         </div>
                         <div style={{ flex: 1 }}>
-                          <Paragraph style={{ color: '#fff', fontSize: 13, margin: '0 0 4px 0' }}>{scene.description}</Paragraph>
+                          <Paragraph style={{ color: 'var(--text-primary)', fontSize: 13, margin: '0 0 4px 0' }}>{scene.description}</Paragraph>
                           <Text style={{ color: '#6366f1', fontSize: 11 }}>旁白: {scene.voiceover}</Text>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <Empty description={<span style={{ color: '#52525b' }}>暂无剧本，请先与 AI 导演沟通生成</span>} />
+                  <Empty description={<span style={{ color: 'var(--text-secondary)' }}>暂无剧本，请先与 AI 导演沟通生成</span>} />
                 )}
               </Card>
             </Col>
@@ -946,9 +946,9 @@ const WorkbenchPage: React.FC = () => {
               />
 
               <Card
-                title={<span style={{ color: '#fff' }}><AudioOutlined /> 分镜编辑 Co-pilot</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><AudioOutlined /> 分镜编辑 Co-pilot</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
                 bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 12 }}
               >
                 {/* Chat Message Lists for Storyboard */}
@@ -964,27 +964,27 @@ const WorkbenchPage: React.FC = () => {
                     }}>
                       <div style={{
                         maxWidth: '90%',
-                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : '#27272a',
-                        color: '#fff',
+                        background: msg.role === 'user' ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'var(--hover-bg)',
+                        color: 'var(--text-primary)',
                         padding: '6px 10px',
                         borderRadius: msg.role === 'user' ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
                         fontSize: 12,
                         lineHeight: 1.4
                       }}>
-                        <Paragraph style={{ color: '#fff', margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{msg.content}</Paragraph>
+                        <Paragraph style={{ color: 'var(--text-primary)', margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 }}>{msg.content}</Paragraph>
                       </div>
                     </div>
                   ))}
                   {isChatting && (
                     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 10 }}>
-                      <div style={{ background: '#27272a', padding: '6px 10px', borderRadius: '10px 10px 10px 2px', fontSize: 12 }}>
+                      <div style={{ background: 'var(--hover-bg)', padding: '6px 10px', borderRadius: '10px 10px 10px 2px', fontSize: 12 }}>
                         <span style={{ color: '#818cf8' }}><LoadingOutlined /> 导演正在修改分镜配置...</span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #27272a', paddingTop: 8, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid var(--border-color)', paddingTop: 8, flexShrink: 0 }}>
                   <TextArea
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
@@ -996,7 +996,7 @@ const WorkbenchPage: React.FC = () => {
                     }}
                     placeholder="输入修改指令..."
                     autoSize={{ minRows: 2, maxRows: 2 }}
-                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 12 }}
+                    style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: 12 }}
                   />
                   <Button
                     type="primary"
@@ -1014,12 +1014,12 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: '#fff' }}><VideoCameraOutlined /> 🎬 分镜视觉首帧编辑面板 (支持 AI 生图及手动上传图片)</span>
+                    <span style={{ color: 'var(--text-primary)' }}><VideoCameraOutlined /> 🎬 分镜视觉首帧编辑面板 (支持 AI 生图及手动上传图片)</span>
                     <Space size="middle">
                       {injectingMaterial && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12, color: '#818cf8' }}>点击分镜卡片注入参考图 →</span>
-                          <Button size="small" onClick={cancelInjectMode} style={{ background: '#27272a', border: 'none', color: '#a1a1aa' }}>取消</Button>
+                          <Button size="small" onClick={cancelInjectMode} style={{ background: 'var(--hover-bg)', border: 'none', color: 'var(--text-secondary)' }}>取消</Button>
                         </div>
                       )}
                       {/* Agent 批量操作 */}
@@ -1067,7 +1067,7 @@ const WorkbenchPage: React.FC = () => {
                         <Button
                           type="default"
                           icon={<ApiOutlined />}
-                          style={{ background: '#1890ff', border: 'none', color: '#fff', borderRadius: 6 }}
+                          style={{ background: '#1890ff', border: 'none', color: 'var(--text-primary)', borderRadius: 6 }}
                         >
                           Agent 工具箱
                         </Button>
@@ -1078,7 +1078,7 @@ const WorkbenchPage: React.FC = () => {
                         icon={<PictureOutlined />}
                         onClick={handleRenderAllImages}
                         disabled={!script || !script.scenes || script.scenes.length === 0}
-                        style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6 }}
+                        style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6 }}
                       >
                         一键生成所有图片
                       </Button>
@@ -1086,7 +1086,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                 }
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12 }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12 }}
               >
                 {script && script.scenes && script.scenes.length > 0 ? (
                   <Row gutter={[16, 16]}>
@@ -1100,8 +1100,8 @@ const WorkbenchPage: React.FC = () => {
                             }
                           }}
                           style={{
-                            background: '#18181c',
-                            border: injectingMaterial ? '2px dashed #6366f1' : '1px solid #27272a',
+                            background: 'var(--card-bg)',
+                            border: injectingMaterial ? '2px dashed #6366f1' : '1px solid var(--border-color)',
                             borderRadius: 8,
                             cursor: injectingMaterial ? 'pointer' : 'default',
                             transition: 'all 0.2s ease',
@@ -1111,7 +1111,7 @@ const WorkbenchPage: React.FC = () => {
                           title={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <Space>
-                                <span style={{ color: '#fff', fontWeight: 600 }}>分镜 {index + 1}</span>
+                                <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>分镜 {index + 1}</span>
                                 {!!scene.imageUrl ? (
                                   <Tag color="blue">首帧已就绪</Tag>
                                 ) : (
@@ -1224,8 +1224,8 @@ const WorkbenchPage: React.FC = () => {
                                 position: 'relative',
                                 width: '100%',
                                 height: 160,
-                                background: '#09090b',
-                                border: '1px dashed #27272a',
+                                background: 'var(--page-bg)',
+                                border: '1px dashed var(--border-color)',
                                 borderRadius: 6,
                                 display: 'flex',
                                 alignItems: 'center',
@@ -1278,7 +1278,7 @@ const WorkbenchPage: React.FC = () => {
                                     />
                                   </div>
                                 ) : (
-                                  <div style={{ textAlign: 'center', color: '#52525b', padding: 8 }}>
+                                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: 8 }}>
                                     <PictureOutlined style={{ fontSize: 24, marginBottom: 8 }} />
                                     <div style={{ fontSize: 10 }}>暂无首帧画面</div>
                                   </div>
@@ -1348,9 +1348,9 @@ const WorkbenchPage: React.FC = () => {
                                           }}
                                           style={{
                                             width: '100%',
-                                            background: '#27272a',
-                                            border: '1px solid #3f3f46',
-                                            color: '#fff',
+                                            background: 'var(--hover-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            color: 'var(--text-primary)',
                                             borderRadius: 4,
                                             fontSize: 12
                                           }}
@@ -1368,7 +1368,7 @@ const WorkbenchPage: React.FC = () => {
                                           e.stopPropagation();
                                           generateSingleSceneImage(index);
                                         }}
-                                        style={{ fontSize: 11, padding: 0, height: 'auto', color: '#a1a1aa' }}
+                                        style={{ fontSize: 11, padding: 0, height: 'auto', color: 'var(--text-secondary)' }}
                                       >
                                         🎨 重新生图
                                       </Button>
@@ -1418,7 +1418,7 @@ const WorkbenchPage: React.FC = () => {
 
                               {/* SLEEK TTS AUDIO PLAYBACK BAR */}
                               {scene.audioUrl && (
-                                <div style={{ marginTop: 8, padding: '4px 8px', background: '#202023', borderRadius: 4, border: '1px solid #2e2e33' }}>
+                                <div style={{ marginTop: 8, padding: '4px 8px', background: 'var(--input-bg)', borderRadius: 4, border: '1px solid var(--border-color)' }}>
                                   <div style={{ fontSize: 10, color: '#34d399', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
                                     <span>🎙️ 旁白配音就绪</span>
                                     {scene.ttsEstDuration && <span style={{ opacity: 0.6 }}>({scene.ttsEstDuration}s)</span>}
@@ -1437,7 +1437,7 @@ const WorkbenchPage: React.FC = () => {
                                     value={scene.description}
                                     onChange={(e) => updateSceneField(index, 'description', e.target.value)}
                                     rows={2}
-                                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 11.5 }}
+                                    style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: 11.5 }}
                                   />
                                 </div>
                                 <div>
@@ -1446,7 +1446,7 @@ const WorkbenchPage: React.FC = () => {
                                     value={scene.voiceover}
                                     onChange={(e) => updateSceneField(index, 'voiceover', e.target.value)}
                                     rows={1}
-                                    style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', fontSize: 11.5 }}
+                                    style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontSize: 11.5 }}
                                   />
                                 </div>
                                 
@@ -1461,7 +1461,7 @@ const WorkbenchPage: React.FC = () => {
                                   </Row>
                                   {scene.referenceAudioUrl ? (
                                     <div style={{
-                                      background: '#202023',
+                                      background: 'var(--input-bg)',
                                       borderRadius: 4,
                                       padding: 8,
                                       border: '1px solid #818cf8',
@@ -1548,7 +1548,7 @@ const WorkbenchPage: React.FC = () => {
                                       type="number"
                                       value={scene.duration}
                                       onChange={(e) => updateSceneField(index, 'duration', parseInt(e.target.value) || 3)}
-                                      style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', height: 26, fontSize: 11 }}
+                                      style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', height: 26, fontSize: 11 }}
                                     />
                                   </Col>
                                   <Col span={12}>
@@ -1565,15 +1565,15 @@ const WorkbenchPage: React.FC = () => {
                                     </Select>
                                   </Col>
                                 </Row>
-                                <Divider style={{ margin: '8px 0', borderColor: '#27272a' }} />
+                                <Divider style={{ margin: '8px 0', borderColor: 'var(--border-color)' }} />
                                 <Row gutter={8}>
                                   {/* 首帧 */}
                                   <Col span={12}>
                                     <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>首帧</Text>
                                     <div style={{
                                       height: 60,
-                                      background: '#09090b',
-                                      border: '1px dashed #27272a',
+                                      background: 'var(--page-bg)',
+                                      border: '1px dashed var(--border-color)',
                                       borderRadius: 4,
                                       display: 'flex',
                                       alignItems: 'center',
@@ -1609,7 +1609,7 @@ const WorkbenchPage: React.FC = () => {
                                           />
                                         </>
                                       ) : (
-                                        <span style={{ fontSize: 9, color: '#52525b' }}>点击上传</span>
+                                        <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>点击上传</span>
                                       )}
                                     </div>
                                   </Col>
@@ -1618,8 +1618,8 @@ const WorkbenchPage: React.FC = () => {
                                     <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>尾帧</Text>
                                     <div style={{
                                       height: 60,
-                                      background: '#09090b',
-                                      border: '1px dashed #27272a',
+                                      background: 'var(--page-bg)',
+                                      border: '1px dashed var(--border-color)',
                                       borderRadius: 4,
                                       display: 'flex',
                                       alignItems: 'center',
@@ -1655,7 +1655,7 @@ const WorkbenchPage: React.FC = () => {
                                           />
                                         </>
                                       ) : (
-                                        <span style={{ fontSize: 9, color: '#52525b' }}>点击上传</span>
+                                        <span style={{ fontSize: 9, color: 'var(--text-secondary)' }}>点击上传</span>
                                       )}
                                     </div>
                                   </Col>
@@ -1684,10 +1684,10 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: '#fff' }}><PlayCircleOutlined /> 🎬 分镜视频渲染仪表盘</span>
+                    <span style={{ color: 'var(--text-primary)' }}><PlayCircleOutlined /> 🎬 分镜视频渲染仪表盘</span>
                     <Space size="large">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: '#a1a1aa' }}>同时生成并同步旁白配音:</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>同时生成并同步旁白配音:</span>
                         <Switch
                           checked={settings.enableTTS}
                           onChange={(val) => updateSettings({ ...settings, enableTTS: val })}
@@ -1825,7 +1825,7 @@ const WorkbenchPage: React.FC = () => {
                               message.error('❌ 获取任务状态失败: ' + err.message);
                             });
                         }}
-                        style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 38 }}
+                        style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6, height: 38 }}
                       >
                         📋 查看任务列表
                       </Button>
@@ -1833,7 +1833,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                 }
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12 }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12 }}
               >
                 {script && script.scenes && script.scenes.length > 0 ? (
                   <Row gutter={[16, 16]}>
@@ -1841,14 +1841,14 @@ const WorkbenchPage: React.FC = () => {
                       <Col span={8} key={index}>
                         <Card
                           style={{
-                            background: '#202023',
-                            border: '1px solid #2e2e33',
+                            background: 'var(--input-bg)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: 8
                           }}
                           bodyStyle={{ padding: 12 }}
                           title={
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>分镜 {index + 1} ({scene.duration}秒)</span>
+                              <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13 }}>分镜 {index + 1} ({scene.duration}秒)</span>
                               <Space>
                                 {scene.videoUrl ? (
                                   <Tag color="success">视频就绪</Tag>
@@ -1954,13 +1954,13 @@ const WorkbenchPage: React.FC = () => {
                             position: 'relative',
                             width: '100%',
                             height: 180,
-                            background: '#09090b',
+                            background: 'var(--page-bg)',
                             borderRadius: 6,
                             overflow: 'hidden',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            border: '1px solid #27272a',
+                            border: '1px solid var(--border-color)',
                             marginBottom: 12
                           }}>
                             {scene.videoUrl ? (
@@ -1968,7 +1968,7 @@ const WorkbenchPage: React.FC = () => {
                             ) : (scene.rendering || scene.status === 'generating') ? (
                               <div style={{ textAlign: 'center', padding: 8 }}>
                                 <LoadingOutlined style={{ fontSize: 32, color: '#10b981', marginBottom: 12 }} />
-                                <div style={{ fontSize: 12, color: '#a1a1aa' }}>后台渲染中 ({scene.progress || 10}%)</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>后台渲染中 ({scene.progress || 10}%)</div>
                               </div>
                             ) : scene.imageUrl ? (
                               <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -1981,13 +1981,13 @@ const WorkbenchPage: React.FC = () => {
                                   justifyContent: 'center',
                                   background: 'rgba(0,0,0,0.4)'
                                 }}>
-                                  <span style={{ color: '#fff', fontSize: 11, background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 4 }}>
+                                  <span style={{ color: 'var(--text-primary)', fontSize: 11, background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: 4 }}>
                                     首帧就绪，待生成视频
                                   </span>
                                 </div>
                               </div>
                             ) : (
-                              <div style={{ textAlign: 'center', color: '#52525b' }}>
+                              <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 <PictureOutlined style={{ fontSize: 32, marginBottom: 8 }} />
                                 <div style={{ fontSize: 11 }}>请先在分镜编辑中准备首帧</div>
                               </div>
@@ -1995,12 +1995,12 @@ const WorkbenchPage: React.FC = () => {
                           </div>
 
                           {/* Scene Script Reference Details */}
-                          <div style={{ background: '#18181b', padding: 8, borderRadius: 6, marginBottom: 8 }}>
-                            <div style={{ fontSize: 10, color: '#a1a1aa', marginBottom: 2 }}>分镜视觉 Prompt:</div>
-                            <div style={{ fontSize: 11, color: '#e4e4e7', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, height: 30, marginBottom: 6 }}>
+                          <div style={{ background: 'var(--card-bg)', padding: 8, borderRadius: 6, marginBottom: 8 }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 2 }}>分镜视觉 Prompt:</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4, height: 30, marginBottom: 6 }}>
                               {scene.description}
                             </div>
-                            <div style={{ fontSize: 10, color: '#a1a1aa', marginBottom: 2 }}>旁白台词:</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 2 }}>旁白台词:</div>
                             <div style={{ fontSize: 11, color: '#818cf8', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
                               {scene.voiceover || '无'}
                             </div>
@@ -2008,7 +2008,7 @@ const WorkbenchPage: React.FC = () => {
 
                           {/* Narration Player Wave */}
                           {scene.audioUrl && (
-                            <div style={{ padding: '6px 10px', background: '#18181b', borderRadius: 6, border: '1px solid #2e2e33', marginBottom: 10 }}>
+                            <div style={{ padding: '6px 10px', background: 'var(--card-bg)', borderRadius: 6, border: '1px solid var(--border-color)', marginBottom: 10 }}>
                               <div style={{ fontSize: 10, color: '#34d399', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <span>🎙️ 旁白配音预听</span>
                                 {scene.ttsEstDuration && <span style={{ opacity: 0.6 }}>({scene.ttsEstDuration}s)</span>}
@@ -2085,7 +2085,7 @@ const WorkbenchPage: React.FC = () => {
                                         ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'
                                         : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
                                     border: 'none',
-                                    color: '#fff',
+                                    color: 'var(--text-primary)',
                                     borderRadius: 6,
                                     height: 36,
                                     fontSize: 13
@@ -2138,13 +2138,13 @@ const WorkbenchPage: React.FC = () => {
             {/* Left: Global Audio Settings & Agent Panel */}
             <Col span={8} style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
               <Card
-                title={<span style={{ color: '#fff' }}><CustomerServiceOutlined /> 全局音频设置</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><CustomerServiceOutlined /> 全局音频设置</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12 }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12 }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>1. 发音人选择</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>1. 发音人选择</Text></div>
                     <Select
                       value={settings.voice}
                       onChange={(val) => updateSettings({ ...settings, voice: val })}
@@ -2158,11 +2158,11 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                   
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>2. 配音语速</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>2. 配音语速</Text></div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ color: '#a1a1aa', fontSize: 12 }}>慢速</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>慢速</span>
                       <span style={{ color: '#818cf8', fontWeight: 600 }}>{settings.speed}x</span>
-                      <span style={{ color: '#a1a1aa', fontSize: 12 }}>快速</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>快速</span>
                     </div>
                     <Slider
                       min={0.5}
@@ -2174,7 +2174,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                   
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>3. 背景音乐选择</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>3. 背景音乐选择</Text></div>
                     <Select
                       value={settings.bgm}
                       onChange={(val) => updateSettings({ ...settings, bgm: val })}
@@ -2189,8 +2189,8 @@ const WorkbenchPage: React.FC = () => {
                   
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text strong style={{ color: '#fff' }}>4. 背景音乐音量</Text>
-                      <Text style={{ color: '#a1a1aa' }}>{settings.volume}%</Text>
+                      <Text strong style={{ color: 'var(--text-primary)' }}>4. 背景音乐音量</Text>
+                      <Text style={{ color: 'var(--text-secondary)' }}>{settings.volume}%</Text>
                     </div>
                     <Slider
                       min={0}
@@ -2202,7 +2202,7 @@ const WorkbenchPage: React.FC = () => {
                   
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <Text strong style={{ color: '#fff' }}>5. 启用 AI 配音</Text>
+                      <Text strong style={{ color: 'var(--text-primary)' }}>5. 启用 AI 配音</Text>
                       <Switch checked={settings.enableTTS} onChange={(val) => updateSettings({ ...settings, enableTTS: val })} />
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>
@@ -2213,9 +2213,9 @@ const WorkbenchPage: React.FC = () => {
               </Card>
               
               <Card
-                title={<span style={{ color: '#fff' }}><ApiOutlined /> 音频 AI 助手</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><ApiOutlined /> 音频 AI 助手</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, flex: 1, display: 'flex', flexDirection: 'column' }}
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Text type="secondary" style={{ fontSize: 12 }}>
@@ -2256,7 +2256,7 @@ const WorkbenchPage: React.FC = () => {
                     ⏱️ 智能调整文案长度以匹配画面时长
                   </Button>
                   
-                  <Divider style={{ margin: '8px 0', borderColor: '#27272a' }} />
+                  <Divider style={{ margin: '8px 0', borderColor: 'var(--border-color)' }} />
                   
                   <Text type="secondary" style={{ fontSize: 11 }}>
                     🔧 快速操作
@@ -2306,7 +2306,7 @@ const WorkbenchPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#fff' }}><AudioOutlined /> 分镜配音轨道编辑器</span>
+                    <span style={{ color: 'var(--text-primary)' }}><AudioOutlined /> 分镜配音轨道编辑器</span>
                     <Space>
                       <Button
                         type="primary"
@@ -2327,7 +2327,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                 }
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%' }}
               >
                 {script?.scenes?.length > 0 ? (
                   <Space direction="vertical" style={{ width: '100%' }} size="middle">
@@ -2336,8 +2336,8 @@ const WorkbenchPage: React.FC = () => {
                         key={index}
                         size="small"
                         style={{
-                          background: '#202023',
-                          border: scene.audioUrl ? '1px solid #10b981' : '1px solid #27272a',
+                          background: 'var(--input-bg)',
+                          border: scene.audioUrl ? '1px solid #10b981' : '1px solid var(--border-color)',
                           borderRadius: 8
                         }}
                       >
@@ -2364,9 +2364,9 @@ const WorkbenchPage: React.FC = () => {
                                 placeholder="输入该分镜的旁白配音文案..."
                                 rows={3}
                                 style={{ 
-                                  background: '#09090b', 
-                                  color: '#fff', 
-                                  border: '1px solid #27272a',
+                                  background: 'var(--page-bg)', 
+                                  color: 'var(--text-primary)', 
+                                  border: '1px solid var(--border-color)',
                                   fontSize: 12
                                 }}
                               />
@@ -2392,7 +2392,7 @@ const WorkbenchPage: React.FC = () => {
                     </Text>
                     {scene.referenceAudioUrl ? (
                       <div style={{
-                        background: '#202023',
+                        background: 'var(--input-bg)',
                         borderRadius: 4,
                         padding: 6,
                         border: '1px solid #818cf8',
@@ -2543,7 +2543,7 @@ const WorkbenchPage: React.FC = () => {
                                 </Button>
                               )}
                               
-                              <Divider style={{ margin: '4px 0', borderColor: '#27272a' }} />
+                              <Divider style={{ margin: '4px 0', borderColor: 'var(--border-color)' }} />
                               
                               <Button
                                 type="default"
@@ -2587,13 +2587,13 @@ const WorkbenchPage: React.FC = () => {
             {/* Left: Resolution, Ratio, transition configs & AI Clip Agent planner */}
             <Col span={10} style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%', overflowY: 'auto', paddingRight: 4 }}>
               <Card
-                title={<span style={{ color: '#fff' }}><RocketOutlined /> 视频最终渲染编译设置</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><RocketOutlined /> 视频最终渲染编译设置</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, flexShrink: 0 }}
               >
                 <Space direction="vertical" size="large" style={{ width: '100%' }}>
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>1. 分辨率选择 (Resolution)</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>1. 分辨率选择 (Resolution)</Text></div>
                     <Select
                       value={settings.resolution}
                       onChange={(val) => updateSettings({ ...settings, resolution: val })}
@@ -2606,7 +2606,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>2. 画面幅面比 (Aspect Ratio)</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>2. 画面幅面比 (Aspect Ratio)</Text></div>
                     <Select
                       value={settings.ratio}
                       onChange={(val) => updateSettings({ ...settings, ratio: val })}
@@ -2619,7 +2619,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>3. 分镜转场效果 (Transitions)</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>3. 分镜转场效果 (Transitions)</Text></div>
                     <Select
                       value={settings.transition}
                       onChange={(val) => updateSettings({ ...settings, transition: val })}
@@ -2632,7 +2632,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>4. 配音发音人角色 (Speaker Role)</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>4. 配音发音人角色 (Speaker Role)</Text></div>
                     <Select
                       value={settings.voice}
                       onChange={(val) => updateSettings({ ...settings, voice: val })}
@@ -2646,7 +2646,7 @@ const WorkbenchPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>5. 带货背景音乐 (BGM Soundtrack)</Text></div>
+                    <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>5. 带货背景音乐 (BGM Soundtrack)</Text></div>
                     <Select
                       value={settings.bgm}
                       onChange={(val) => updateSettings({ ...settings, bgm: val })}
@@ -2661,8 +2661,8 @@ const WorkbenchPage: React.FC = () => {
 
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <Text strong style={{ color: '#fff' }}>6. 背景音乐音量混音比例</Text>
-                      <Text style={{ color: '#a1a1aa' }}>{settings.volume}%</Text>
+                      <Text strong style={{ color: 'var(--text-primary)' }}>6. 背景音乐音量混音比例</Text>
+                      <Text style={{ color: 'var(--text-secondary)' }}>{settings.volume}%</Text>
                     </div>
                     <Slider
                       min={0}
@@ -2674,7 +2674,7 @@ const WorkbenchPage: React.FC = () => {
 
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <Text strong style={{ color: '#fff' }}>7. 启用 AI 旁白配音</Text>
+                      <Text strong style={{ color: 'var(--text-primary)' }}>7. 启用 AI 旁白配音</Text>
                       <Switch checked={settings.enableTTS} onChange={(val) => updateSettings({ ...settings, enableTTS: val })} />
                     </div>
                     <Text type="secondary" style={{ fontSize: 11 }}>
@@ -2682,7 +2682,7 @@ const WorkbenchPage: React.FC = () => {
                     </Text>
                   </div>
 
-                  <Divider style={{ margin: '12px 0', borderTopColor: '#27272a' }} />
+                  <Divider style={{ margin: '12px 0', borderTopColor: 'var(--border-color)' }} />
 
                   <Button
                     type="primary"
@@ -2709,14 +2709,14 @@ const WorkbenchPage: React.FC = () => {
 
               {/* AI Video Editor Agent (ClipAgent) */}
               <Card
-                title={<span style={{ color: '#fff' }}><ScissorOutlined /> AI 剪辑师 Copilot</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><ScissorOutlined /> AI 剪辑师 Copilot</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, flexShrink: 0 }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, flexShrink: 0 }}
                 bodyStyle={{ padding: 16 }}
               >
                 {!clipPlan ? (
                   <div style={{ textAlign: 'center', padding: '12px 0' }}>
-                    <Paragraph style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 16 }}>
+                    <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
                       AI 剪辑师可以智能分析分镜剧本节奏，编排最佳转场，并精确配平旁白配音与背景乐（BGM）比例！
                     </Paragraph>
                     <Button
@@ -2731,12 +2731,12 @@ const WorkbenchPage: React.FC = () => {
                   </div>
                 ) : (
                   <div>
-                    <div style={{ background: '#202023', padding: 12, borderRadius: 8, marginBottom: 12, borderLeft: '4px solid #6366f1' }}>
-                      <div style={{ fontWeight: 600, color: '#fff', fontSize: 13.5, marginBottom: 4 }}>🎉 智能剪辑编排方案已应用：</div>
+                    <div style={{ background: 'var(--input-bg)', padding: 12, borderRadius: 8, marginBottom: 12, borderLeft: '4px solid #6366f1' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 13.5, marginBottom: 4 }}>🎉 智能剪辑编排方案已应用：</div>
                       <div style={{ color: '#34d399', fontSize: 12, marginBottom: 4 }}>
                         🎵 推荐背景乐: <strong>{clipPlan.audio?.bgm || '欢快乐活'}</strong> | 音量: <strong>{Math.round((clipPlan.audio?.volume || 0.2) * 100)}%</strong>
                       </div>
-                      <div style={{ color: '#a1a1aa', fontSize: 11.5 }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 11.5 }}>
                         AI 建议: 配音音量设为 80% (当前为 {settings.volume}%)，与 BGM 保持完美听觉平衡，防止背景音嘈杂。
                       </div>
                     </div>
@@ -2770,15 +2770,15 @@ const WorkbenchPage: React.FC = () => {
             {/* Right: Render Monitoring Dashboard & final persistent video player */}
             <Col span={14} style={{ height: '100%' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><VideoCameraOutlined /> 渲染终端 & 最终预览大盘</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><VideoCameraOutlined /> 渲染终端 & 最终预览大盘</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%', overflowY: 'auto' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%', overflowY: 'auto' }}
               >
                 {/* When rendering is active */}
                 {isRenderingAll && (
-                  <div style={{ background: '#202023', padding: 24, borderRadius: 8, textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ background: 'var(--input-bg)', padding: 24, borderRadius: 8, textAlign: 'center', marginBottom: 20 }}>
                     <Progress type="circle" percent={renderProgress} strokeColor={{ '0%': '#10b981', '100%': '#6366f1' }} width={120} />
-                    <div style={{ marginTop: 20, fontWeight: 500, color: '#fff' }}>{renderStatus}</div>
+                    <div style={{ marginTop: 20, fontWeight: 500, color: 'var(--text-primary)' }}>{renderStatus}</div>
                     <Text type="secondary" style={{ fontSize: 12, marginTop: 8, display: 'block' }}>
                       后台 FFmpeg 与大声轨合成器正在飞速运作，请稍候片刻...
                     </Text>
@@ -2788,9 +2788,9 @@ const WorkbenchPage: React.FC = () => {
                 {/* Final Rendered Video Player */}
                 {finalVideoUrl ? (
                   <div>
-                    <div style={{ background: '#202023', padding: 12, borderRadius: 8, marginBottom: 16, borderLeft: '4px solid #10b981' }}>
+                    <div style={{ background: 'var(--input-bg)', padding: 12, borderRadius: 8, marginBottom: 16, borderLeft: '4px solid #10b981' }}>
                       <span style={{ color: '#10b981', fontWeight: 600 }}>🎉 合成完毕：</span>
-                      <Text style={{ color: '#a1a1aa', fontSize: 13 }}>最终高精度带货视频已妥善渲染在本地临时存储。</Text>
+                      <Text style={{ color: 'var(--text-secondary)', fontSize: 13 }}>最终高精度带货视频已妥善渲染在本地临时存储。</Text>
                     </div>
 
                     <div style={{
@@ -2798,7 +2798,7 @@ const WorkbenchPage: React.FC = () => {
                       background: '#000',
                       borderRadius: 8,
                       overflow: 'hidden',
-                      border: '1px solid #27272a',
+                      border: '1px solid var(--border-color)',
                       boxShadow: '0 12px 24px -8px rgba(0,0,0,0.5)',
                       display: 'flex',
                       alignItems: 'center',
@@ -2823,7 +2823,7 @@ const WorkbenchPage: React.FC = () => {
                         <Button
                           block
                           onClick={handlePublishVideo}
-                          style={{ height: 40, borderRadius: 6, background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                          style={{ height: 40, borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                         >
                           🚀 一键分发至社交媒体
                         </Button>
@@ -2847,7 +2847,7 @@ const WorkbenchPage: React.FC = () => {
       {/* 分镜编辑模态框 */}
       <Modal
         title={
-          <div style={{ color: '#fff', fontSize: 16, fontWeight: 600 }}>
+          <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 600 }}>
             编辑分镜 {currentEditSceneIndex !== null ? currentEditSceneIndex + 1 : ''}
           </div>
         }
@@ -2858,9 +2858,9 @@ const WorkbenchPage: React.FC = () => {
         cancelText="取消"
         maskClosable={false}
         styles={{
-          content: { background: '#18181b', border: '1px solid #27272a' },
-          header: { borderBottom: '1px solid #27272a', background: '#18181b' },
-          footer: { borderTop: '1px solid #27272a', background: '#18181b' }
+          content: { background: 'var(--card-bg)', border: '1px solid var(--border-color)' },
+          header: { borderBottom: '1px solid var(--border-color)', background: 'var(--card-bg)' },
+          footer: { borderTop: '1px solid var(--border-color)', background: 'var(--card-bg)' }
         }}
         width={700}
       >
@@ -2879,11 +2879,11 @@ const WorkbenchPage: React.FC = () => {
             <Col span={24}>
               <Form.Item
                 name="description"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>分镜视觉提示词</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>分镜视觉提示词</span>}
               >
                 <TextArea
                   rows={3}
-                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                  style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                 />
               </Form.Item>
             </Col>
@@ -2893,11 +2893,11 @@ const WorkbenchPage: React.FC = () => {
             <Col span={24}>
               <Form.Item
                 name="voiceover"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>旁白配音</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>旁白配音</span>}
               >
                 <TextArea
                   rows={2}
-                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                  style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                 />
               </Form.Item>
             </Col>
@@ -2907,20 +2907,20 @@ const WorkbenchPage: React.FC = () => {
             <Col span={8}>
               <Form.Item
                 name="duration"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>时长（秒）</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>时长（秒）</span>}
               >
                 <Input
                   type="number"
-                  style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33' }}
+                  style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                 />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
                 name="shot_type"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>镜头类型</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>镜头类型</span>}
               >
-                <Select style={{ background: '#202023', color: '#fff' }}>
+                <Select style={{ background: 'var(--input-bg)', color: 'var(--text-primary)' }}>
                   <Option value="特写">特写</Option>
                   <Option value="中景">中景</Option>
                   <Option value="全景">全景</Option>
@@ -2932,9 +2932,9 @@ const WorkbenchPage: React.FC = () => {
             <Col span={8}>
               <Form.Item
                 name="transition"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>转场</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>转场</span>}
               >
-                <Select style={{ background: '#202023', color: '#fff' }}>
+                <Select style={{ background: 'var(--input-bg)', color: 'var(--text-primary)' }}>
                   <Option value="fade">渐入渐出</Option>
                   <Option value="cut">硬切</Option>
                   <Option value="flash">闪白</Option>
@@ -2943,15 +2943,15 @@ const WorkbenchPage: React.FC = () => {
             </Col>
           </Row>
 
-          <Divider style={{ borderColor: '#27272a', margin: '16px 0' }} />
+          <Divider style={{ borderColor: 'var(--border-color)', margin: '16px 0' }} />
 
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item
                 name="cameraAngle"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>拍摄角度</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>拍摄角度</span>}
               >
-                <Select placeholder="选择角度" style={{ background: '#202023', color: '#fff' }}>
+                <Select placeholder="选择角度" style={{ background: 'var(--input-bg)', color: 'var(--text-primary)' }}>
                   <Option value="平视">平视</Option>
                   <Option value="俯视">俯视</Option>
                   <Option value="仰视">仰视</Option>
@@ -2963,9 +2963,9 @@ const WorkbenchPage: React.FC = () => {
             <Col span={8}>
               <Form.Item
                 name="lighting"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>光线类型</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>光线类型</span>}
               >
-                <Select placeholder="选择光线" style={{ background: '#202023', color: '#fff' }}>
+                <Select placeholder="选择光线" style={{ background: 'var(--input-bg)', color: 'var(--text-primary)' }}>
                   <Option value="自然光">自然光</Option>
                   <Option value="暖光">暖光</Option>
                   <Option value="冷光">冷光</Option>
@@ -2977,9 +2977,9 @@ const WorkbenchPage: React.FC = () => {
             <Col span={8}>
               <Form.Item
                 name="colorTone"
-                label={<span style={{ color: '#a1a1aa', fontSize: 12 }}>色调</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>色调</span>}
               >
-                <Select placeholder="选择色调" style={{ background: '#202023', color: '#fff' }}>
+                <Select placeholder="选择色调" style={{ background: 'var(--input-bg)', color: 'var(--text-primary)' }}>
                   <Option value="冷色调">冷色调</Option>
                   <Option value="暖色调">暖色调</Option>
                   <Option value="黑白">黑白</Option>
@@ -2992,16 +2992,16 @@ const WorkbenchPage: React.FC = () => {
 
           {currentEditSceneIndex !== null && script && script.scenes[currentEditSceneIndex] && (
             <>
-              <Divider style={{ borderColor: '#27272a', margin: '16px 0' }} />
-              <Text style={{ color: '#a1a1aa', fontSize: 12, display: 'block', marginBottom: 12 }}>
+              <Divider style={{ borderColor: 'var(--border-color)', margin: '16px 0' }} />
+              <Text style={{ color: 'var(--text-secondary)', fontSize: 12, display: 'block', marginBottom: 12 }}>
                 首尾帧预览（点击图片可重新上传）
               </Text>
               <Row gutter={16}>
                 <Col span={12}>
                   <div style={{
                     height: 100,
-                    background: '#09090b',
-                    border: '1px dashed #27272a',
+                    background: 'var(--page-bg)',
+                    border: '1px dashed var(--border-color)',
                     borderRadius: 6,
                     display: 'flex',
                     alignItems: 'center',
@@ -3034,15 +3034,15 @@ const WorkbenchPage: React.FC = () => {
                         />
                       </>
                     ) : (
-                      <span style={{ fontSize: 11, color: '#52525b' }}>点击上传首帧</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>点击上传首帧</span>
                     )}
                   </div>
                 </Col>
                 <Col span={12}>
                   <div style={{
                     height: 100,
-                    background: '#09090b',
-                    border: '1px dashed #27272a',
+                    background: 'var(--page-bg)',
+                    border: '1px dashed var(--border-color)',
                     borderRadius: 6,
                     display: 'flex',
                     alignItems: 'center',
@@ -3075,7 +3075,7 @@ const WorkbenchPage: React.FC = () => {
                         />
                       </>
                     ) : (
-                      <span style={{ fontSize: 11, color: '#52525b' }}>点击上传尾帧</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>点击上传尾帧</span>
                     )}
                   </div>
                 </Col>
@@ -3110,12 +3110,12 @@ const WorkbenchPage: React.FC = () => {
         {isLoadingAudioLibrary ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <LoadingOutlined style={{ fontSize: 40, color: '#818cf8' }} />
-            <p style={{ marginTop: 16, color: '#a1a1aa' }}>正在加载素材库...</p>
+            <p style={{ marginTop: 16, color: 'var(--text-secondary)' }}>正在加载素材库...</p>
           </div>
         ) : audioLibraryMaterials.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40 }}>
-            <SoundOutlined style={{ fontSize: 60, color: '#3f3f46' }} />
-            <p style={{ marginTop: 16, color: '#a1a1aa' }}>
+            <SoundOutlined style={{ fontSize: 60, color: 'var(--text-secondary)' }} />
+            <p style={{ marginTop: 16, color: 'var(--text-secondary)' }}>
               素材库中暂无音频素材，请先在素材管理页面上传音频。
             </p>
           </div>
@@ -3140,7 +3140,7 @@ const WorkbenchPage: React.FC = () => {
                   >
                     <div style={{
                       height: 120,
-                      background: '#202023',
+                      background: 'var(--input-bg)',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -3158,7 +3158,7 @@ const WorkbenchPage: React.FC = () => {
                       <div style={{
                         marginTop: 8,
                         fontSize: 12,
-                        color: '#a1a1aa',
+                        color: 'var(--text-secondary)',
                         textAlign: 'center',
                         wordBreak: 'break-word',
                         overflow: 'hidden',
