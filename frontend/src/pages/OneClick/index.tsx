@@ -445,6 +445,10 @@ const OneClickPage: React.FC = () => {
                       <Option value={4}>4 个分镜 (约16秒)</Option>
                       <Option value={5}>5 个分镜 (约20秒)</Option>
                       <Option value={6}>6 个分镜 (约24秒)</Option>
+                      <Option value={7}>7 个分镜 (约28秒)</Option>
+                      <Option value={8}>8 个分镜 (约32秒)</Option>
+                      <Option value={9}>9 个分镜 (约36秒)</Option>
+                      <Option value={10}>10 个分镜 (约40秒)</Option>
                     </Select>
                   </Form.Item>
                 </Col>
