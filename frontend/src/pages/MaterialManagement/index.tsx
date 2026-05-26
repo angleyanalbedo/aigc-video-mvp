@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
 import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, SoundOutlined } from '@ant-design/icons';
 
@@ -8,13 +8,23 @@ const API_BASE = window.location.hostname.includes('trae.cn')
   ? 'http://localhost:3001' 
   : '';
 
+interface Material {
+  id: string;
+  filename: string;
+  url: string;
+  type: string;
+  tags?: string[];
+  content?: string;
+  createdAt?: string;
+}
+
 const MaterialManagementPage = () => {
-  const [materials, setMaterials] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchTags, setSearchTags] = useState<string[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
-  const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
+  const [selectedMaterial, setSelectedMaterial] = useState<Material | null>(null);
   const [editingTags, setEditingTags] = useState<string[]>([]);
 
   useEffect(() => {
@@ -29,10 +39,10 @@ const MaterialManagementPage = () => {
       if (data.success && data.data) {
         setMaterials(data.data);
         // 收集所有标签
-        const tags = new Set();
-        data.data.forEach(m => {
+        const tags = new Set<string>();
+        data.data.forEach((m: Material) => {
           if (m.tags && Array.isArray(m.tags)) {
-            m.tags.forEach(t => tags.add(t));
+            m.tags.forEach((t: string) => tags.add(t));
           }
         });
         setAllTags([...tags]);
@@ -70,7 +80,7 @@ const MaterialManagementPage = () => {
     }
   };
 
-  const handleUpload = async (file) => {
+  const handleUpload = async (file: any) => {
     try {
       // 1. 先使用 FormData 将真实文件上传到服务器 /api/upload
       const formData = new FormData();
@@ -118,7 +128,7 @@ const MaterialManagementPage = () => {
     return false;
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     try {
       const response = await fetch(`${API_BASE}/api/materials/${id}`, { method: 'DELETE' });
       const data = await response.json();
@@ -144,7 +154,7 @@ const MaterialManagementPage = () => {
         message.success('标签更新成功');
         // 更新本地状态中的素材列表和当前选中素材
         setMaterials(prev => prev.map(m => m.id === id ? { ...m, tags: updatedTags } : m));
-        setSelectedMaterial(prev => prev && prev.id === id ? { ...prev, tags: updatedTags } : prev);
+        setSelectedMaterial((prev: Material | null) => prev && prev.id === id ? { ...prev, tags: updatedTags } : prev);
         // 动态更新可选的全量标签列表
         const newAllTags = new Set(allTags);
         updatedTags.forEach(t => newAllTags.add(t));
@@ -158,7 +168,7 @@ const MaterialManagementPage = () => {
     }
   };
 
-  const getIcon = (type) => {
+  const getIcon = (type: string | null | undefined) => {
     if (type && type.startsWith('image')) return <PictureOutlined />;
     if (type && type.startsWith('video')) return <VideoCameraOutlined />;
     if (type && type.startsWith('audio')) return <SoundOutlined />;
@@ -168,7 +178,7 @@ const MaterialManagementPage = () => {
   };
 
   // 根据文件名推断 MIME 类型
-  const inferMediaType = (filename, type) => {
+  const inferMediaType = (filename: string, type: string | null | undefined) => {
     if (type && (type.startsWith('image') || type.startsWith('video') || type.startsWith('audio'))) {
       return type;
     }
@@ -267,13 +277,13 @@ const MaterialManagementPage = () => {
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}>
-                          <VideoCameraOutlined style={{ fontSize: 24, color: '#fff' }} />
+                          <VideoCameraOutlined style={{ fontSize: 24, color: 'var(--text-primary)' }} />
                         </div>
                       </div>
                     ) : inferMediaType(item.filename, item.type).startsWith('audio') ? (
-                      <div style={{ height: 160, backgroundColor: '#121214', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ height: 160, backgroundColor: 'var(--section-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                         <SoundOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 8 }} />
-                        <div style={{ fontSize: 12, color: '#a1a1aa', textAlign: 'center', wordBreak: 'break-word', padding: '0 16px' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', wordBreak: 'break-word', padding: '0 16px' }}>
                           {item.filename}
                         </div>
                       </div>
@@ -295,11 +305,11 @@ const MaterialManagementPage = () => {
                     description={
                       <Space direction="vertical" size="small">
                         <Space wrap>
-                          {item.tags && item.tags.map(tag => (
+                          {item.tags && item.tags.map((tag: string) => (
                             <Tag key={tag} color="blue">{tag}</Tag>
                           ))}
                         </Space>
-                        <div style={{ fontSize: 12, color: '#999' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
                         </div>
                       </Space>
@@ -315,7 +325,7 @@ const MaterialManagementPage = () => {
       {selectedMaterial && (
         <Modal
           title={
-            <div style={{ fontSize: 18, color: '#e4e4e7', fontWeight: 600 }}>
+            <div style={{ fontSize: 18, color: 'var(--text-primary)', fontWeight: 600 }}>
               {getIcon(selectedMaterial.type)} 素材预览与编辑
             </div>
           }
@@ -328,14 +338,14 @@ const MaterialManagementPage = () => {
           ]}
           width={800}
           styles={{
-            body: { background: '#121214', color: '#e4e4e7', padding: '24px 12px 12px 12px' }
+            body: { background: 'var(--card-bg)', color: 'var(--text-primary)', padding: '24px 12px 12px 12px' }
           }}
           style={{ top: 40 }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* Media Preview Window */}
             <div style={{
-              background: '#09090b',
+              background: 'var(--page-bg)',
               borderRadius: 12,
               overflow: 'hidden',
               display: 'flex',
@@ -343,8 +353,8 @@ const MaterialManagementPage = () => {
               justifyContent: 'center',
               minHeight: 320,
               maxHeight: 480,
-              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8)',
-              border: '1px solid #1f1f23'
+              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.05)',
+              border: '1px solid var(--border-color)'
             }}>
               {inferMediaType(selectedMaterial.filename, selectedMaterial.type).startsWith('image') ? (
                 <img
@@ -379,8 +389,8 @@ const MaterialManagementPage = () => {
             </div>
 
             {/* Metadata and Edit Tags Panel */}
-            <Card style={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8 }}>
-              <Descriptions column={2} labelStyle={{ color: '#a1a1aa' }} contentStyle={{ color: '#f4f4f5' }}>
+            <Card style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
+              <Descriptions column={2} labelStyle={{ color: 'var(--text-secondary)' }} contentStyle={{ color: 'var(--text-primary)' }}>
                 <Descriptions.Item label="文件名" span={2}>
                   <div style={{ wordBreak: 'break-all', fontWeight: 500 }}>{selectedMaterial.filename}</div>
                 </Descriptions.Item>
@@ -393,8 +403,8 @@ const MaterialManagementPage = () => {
               </Descriptions>
 
               {/* Tag Editing Section */}
-              <div style={{ marginTop: 20, borderTop: '1px solid #27272a', paddingTop: 16 }}>
-                <div style={{ color: '#e4e4e7', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
+              <div style={{ marginTop: 20, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 500, marginBottom: 8 }}>
                   🏷️ 标签管理（输入新标签后按回车键即可创建）
                 </div>
                 <Select
@@ -407,7 +417,7 @@ const MaterialManagementPage = () => {
                     handleSaveTags(selectedMaterial.id, newTags);
                   }}
                   tokenSeparators={[',', ' ']}
-                  dropdownStyle={{ background: '#1f1f23', border: '1px solid #27272a' }}
+                  dropdownStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
                 >
                   {allTags.map(tag => (
                     <Option key={tag} value={tag}>{tag}</Option>

@@ -91,9 +91,9 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           width: 40,
-          background: '#18181b',
+          background: 'var(--card-bg)',
           borderRadius: 12,
-          border: '1px solid #27272a',
+          border: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -115,7 +115,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                 height: 28,
                 borderRadius: 6,
                 overflow: 'hidden',
-                border: '1px solid #27272a',
+                border: '1px solid var(--border-color)',
                 flexShrink: 0,
               }}
             >
@@ -124,7 +124,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
           </Tooltip>
         ))}
         {materials.length > 4 && (
-          <div style={{ fontSize: 9, color: '#52525b' }}>+{materials.length - 4}</div>
+          <div style={{ fontSize: 9, color: 'var(--text-secondary)' }}>+{materials.length - 4}</div>
         )}
       </div>
     );
@@ -135,9 +135,9 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       style={{
         width: 192,
         flexShrink: 0,
-        background: '#18181b',
+        background: 'var(--card-bg)',
         borderRadius: 12,
-        border: '1px solid #27272a',
+        border: '1px solid var(--border-color)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -151,14 +151,14 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           padding: '10px 12px',
-          borderBottom: '1px solid #27272a',
+          borderBottom: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#a1a1aa' }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
           <PictureOutlined style={{ marginRight: 6, color: '#6366f1' }} />
           商品素材
         </span>
@@ -168,7 +168,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            color: '#52525b',
+            color: 'var(--text-secondary)',
             padding: 0,
             display: 'flex',
             alignItems: 'center',
@@ -184,7 +184,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
         <div
           style={{
             background: 'rgba(99, 102, 241, 0.15)',
-            border: '1px solid #6366f1',
+            border: '1px solid var(--active-bg)',
             borderRadius: 8,
             margin: '8px 8px 0',
             padding: '6px 12px',
@@ -201,14 +201,14 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       {/* 搜索框 */}
       <div style={{ padding: '8px', flexShrink: 0 }}>
         <Input
-          prefix={<SearchOutlined style={{ color: '#52525b', fontSize: 12 }} />}
+          prefix={<SearchOutlined style={{ color: 'var(--text-secondary)', fontSize: 12 }} />}
           placeholder="搜索素材..."
           value={searchKeyword}
           onChange={(e) => setSearchKeyword(e.target.value)}
           style={{
-            background: '#202023',
-            border: '1px solid #2e2e33',
-            color: '#fff',
+            background: 'var(--input-bg)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
             fontSize: 11,
             height: 28,
           }}
@@ -222,7 +222,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
           <div
             style={{
               textAlign: 'center',
-              color: '#3f3f46',
+              color: 'var(--text-secondary)',
               fontSize: 11,
               padding: '20px 8px',
             }}
@@ -251,8 +251,8 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                     borderRadius: 8,
                     overflow: 'hidden',
                     border: isInjecting
-                      ? '2px solid #6366f1'
-                      : '1px solid #27272a',
+                      ? '2px solid var(--active-bg)'
+                      : '1px solid var(--border-color)',
                     cursor: 'pointer',
                     height: 72,
                     transition: 'border-color 0.15s',
@@ -285,7 +285,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                         <span
                           style={{
                             fontSize: 10,
-                            color: '#fff',
+                            color: 'var(--text-primary)',
                             background: '#6366f1',
                             padding: '3px 8px',
                             borderRadius: 6,
@@ -308,7 +308,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
       <div
         style={{
           padding: '8px 10px',
-          borderTop: '1px solid #27272a',
+          borderTop: '1px solid var(--border-color)',
           flexShrink: 0,
         }}
       >
@@ -329,10 +329,10 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
           style={{
             width: '100%',
             height: 36,
-            background: uploading ? '#18181b' : 'rgba(99,102,241,0.12)',
-            border: '1px dashed #4f46e5',
+            background: uploading ? 'var(--card-bg)' : 'rgba(99,102,241,0.12)',
+            border: '1px dashed var(--active-bg)',
             borderRadius: 8,
-            color: uploading ? '#52525b' : '#818cf8',
+            color: uploading ? 'var(--text-secondary)' : '#818cf8',
             cursor: uploading ? 'not-allowed' : 'pointer',
             fontSize: 12,
             display: 'flex',
@@ -354,7 +354,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
             </>
           )}
         </button>
-        <div style={{ fontSize: 9, color: '#3f3f46', textAlign: 'center', marginTop: 4 }}>
+        <div style={{ fontSize: 9, color: 'var(--text-secondary)', textAlign: 'center', marginTop: 4 }}>
           支持 jpg/png/webp，最大 20MB
         </div>
       </div>
