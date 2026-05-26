@@ -155,11 +155,11 @@ const WorkbenchPage: React.FC = () => {
 
 
   return (
-    <Layout style={{ height: '100%', minHeight: '100%', background: '#09090b', color: '#e4e4e7' }}>
-      {/* Premium Dark Navigation Header */}
+    <Layout style={{ height: '100%', minHeight: '100%', background: 'var(--page-bg)', color: 'var(--text-primary)' }}>
+      {/* Premium Navigation Header */}
       <div style={{
-        background: '#121214',
-        borderBottom: '1px solid #1f1f23',
+        background: 'var(--card-bg)',
+        borderBottom: '1px solid var(--border-color)',
         flexShrink: 0,
       }}>
         {/* Row 1: Project title + save controls */}
@@ -172,10 +172,10 @@ const WorkbenchPage: React.FC = () => {
           <Space size="large">
             <Button
               type="text"
-              icon={<ArrowLeftOutlined style={{ color: '#a1a1aa', fontSize: '20px' }} />}
+              icon={<ArrowLeftOutlined style={{ color: 'var(--text-secondary)', fontSize: '20px' }} />}
               onClick={() => navigate('/projects')}
-              style={{ 
-                color: '#a1a1aa', 
+              style={{
+                color: 'var(--text-secondary)',
                 fontSize: '14px',
                 padding: '8px 16px',
                 height: 'auto',
@@ -187,7 +187,7 @@ const WorkbenchPage: React.FC = () => {
               返回项目列表
             </Button>
             <div>
-              <Title level={4} style={{ margin: 0, color: '#fff' }}>🎬 {project?.name || '创意工作台'}</Title>
+              <Title level={4} style={{ margin: 0, color: 'var(--text-primary)' }}>🎬 {project?.name || '创意工作台'}</Title>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {project?.description ? `绑定素材: ${projectMaterials.length} 个 | ${project.description.slice(0, 40)}` : '创意无限，全 AI 驱动视频生成器'}
               </Text>
@@ -261,7 +261,7 @@ const WorkbenchPage: React.FC = () => {
                       <span style={{ color: statusColor[node.status] }}>
                         {statusIcon[node.status]}
                       </span>
-                      <span style={{ fontSize: 11, color: node.status === 'pending' ? '#52525b' : '#e4e4e7', fontWeight: node.status !== 'pending' ? 600 : 400 }}>
+                      <span style={{ fontSize: 11, color: node.status === 'pending' ? 'var(--text-secondary)' : 'var(--text-primary)', fontWeight: node.status !== 'pending' ? 600 : 400 }}>
                         {node.name}
                       </span>
                       {node.status === 'completed' && node.output?.score !== undefined && (
@@ -273,7 +273,7 @@ const WorkbenchPage: React.FC = () => {
                     </div>
                   </Tooltip>
                   {idx < workflowNodes.length - 1 && (
-                    <div style={{ width: 20, height: 1, background: '#27272a', flexShrink: 0 }} />
+                    <div style={{ width: 20, height: 1, background: 'var(--border-color)', flexShrink: 0 }} />
                   )}
                 </React.Fragment>
               );
@@ -294,13 +294,13 @@ const WorkbenchPage: React.FC = () => {
             {/* Left: Materials List & Upload */}
             <Col span={10} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><PictureOutlined /> 商品参考素材库</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><PictureOutlined /> 商品参考素材库</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
                 bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 20 }}
               >
                 <div style={{ flexShrink: 0, marginBottom: 16 }}>
-                  <Paragraph style={{ color: '#a1a1aa', fontSize: 13, margin: 0 }}>
+                  <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 13, margin: 0 }}>
                     请在此处上传该商品的图片素材（如：商品图、使用场景图、卖点说明图）。这些素材将作为大模型自动生成分镜、参考图的底蕴基础。
                   </Paragraph>
                 </div>
@@ -341,7 +341,7 @@ const WorkbenchPage: React.FC = () => {
                         };
                         input.click();
                       }}
-                      style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 36 }}
+                      style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6, height: 36 }}
                     >
                       📤 上传新素材
                     </Button>
@@ -367,7 +367,7 @@ const WorkbenchPage: React.FC = () => {
                             setIsLoadingLibrary(false);
                           });
                       }}
-                      style={{ background: '#27272a', border: '1px solid #3f3f46', color: '#fff', borderRadius: 6, height: 36 }}
+                      style={{ background: 'var(--hover-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 6, height: 36 }}
                     >
                       📚 从素材库选择
                     </Button>
@@ -379,7 +379,7 @@ const WorkbenchPage: React.FC = () => {
                           height: 100,
                           borderRadius: 8,
                           overflow: 'hidden',
-                          border: '1px solid #27272a',
+                          border: '1px solid var(--border-color)',
                           position: 'relative'
                         }}>
                           <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -391,7 +391,7 @@ const WorkbenchPage: React.FC = () => {
                             background: 'rgba(0,0,0,0.6)',
                             padding: '2px 6px',
                             fontSize: 10,
-                            color: '#a1a1aa',
+                            color: '#fff',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
@@ -403,7 +403,7 @@ const WorkbenchPage: React.FC = () => {
                     ))}
                   </Row>
                   {projectMaterials.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#52525b', padding: '60px 0' }}>
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '60px 0' }}>
                       <PictureOutlined style={{ fontSize: 36, display: 'block', margin: '0 auto 12px' }} />
                       暂无关联素材，您可以点击上方按钮开始上传商品图
                     </div>
@@ -415,9 +415,9 @@ const WorkbenchPage: React.FC = () => {
             {/* Right: AI Asset Analysis Panel */}
             <Col span={14} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Card
-                title={<span style={{ color: '#fff' }}><RocketOutlined /> AI 核心卖点提炼与分析</span>}
+                title={<span style={{ color: 'var(--text-primary)' }}><RocketOutlined /> AI 核心卖点提炼与分析</span>}
                 bordered={false}
-                style={{ background: '#18181b', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
+                style={{ background: 'var(--card-bg)', borderRadius: 12, height: '100%', display: 'flex', flexDirection: 'column' }}
                 bodyStyle={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 20 }}
               >
                 {!productInfo && !isAnalyzing ? (
@@ -435,8 +435,8 @@ const WorkbenchPage: React.FC = () => {
                     }}>
                       <RocketOutlined style={{ fontSize: 36, color: '#818cf8' }} />
                     </div>
-                    <Title level={4} style={{ color: '#fff', marginBottom: 12 }}>唤醒 AI 导演深度提炼商品核心数据</Title>
-                    <Paragraph style={{ color: '#a1a1aa', fontSize: 13.5, lineHeight: 1.6, marginBottom: 24 }}>
+                    <Title level={4} style={{ color: 'var(--text-primary)', marginBottom: 12 }}>唤醒 AI 导演深度提炼商品核心数据</Title>
+                    <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 13.5, lineHeight: 1.6, marginBottom: 24 }}>
                       您上传的产品素材是大模型策划脑暴的燃料。通过 AI 素材提取 Agent，系统将智能解析产品特点、自动提炼 3 个绝对吸睛的带货痛点，并锁受众群体与视频主调。
                     </Paragraph>
                     <Space size="middle">
@@ -496,7 +496,7 @@ const WorkbenchPage: React.FC = () => {
                           setWorkflowNodes(prev => prev.map(n => n.id === 'materials' ? { ...n, status: 'completed' } : n));
                           message.info('已跳过素材提取，已生成默认产品策划模版。');
                         }}
-                        style={{ height: 48, borderRadius: 8, background: '#27272a', color: '#fff', border: '1px solid #3f3f46' }}
+                        style={{ height: 48, borderRadius: 8, background: 'var(--hover-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                       >
                         直接配置剧本 ➔
                       </Button>
@@ -505,7 +505,7 @@ const WorkbenchPage: React.FC = () => {
                 ) : isAnalyzing ? (
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <LoadingOutlined style={{ fontSize: 40, color: '#818cf8', marginBottom: 20 }} />
-                    <Title level={5} style={{ color: '#fff', marginBottom: 8 }}>AI 素材特征提取 Agent 正在读取解析中...</Title>
+                    <Title level={5} style={{ color: 'var(--text-primary)', marginBottom: 8 }}>AI 素材特征提取 Agent 正在读取解析中...</Title>
                     <Text type="secondary" style={{ fontSize: 12 }}>FFmpeg 与 Vision LLM 正在提取图片卖点、分析流行痛点，请稍候片刻...</Text>
                   </div>
                 ) : (
@@ -513,58 +513,58 @@ const WorkbenchPage: React.FC = () => {
                     <div style={{ flex: 1, overflowY: 'auto', marginBottom: 16, paddingRight: 4 }}>
                       <Space direction="vertical" size="large" style={{ width: '100%' }}>
                         <div>
-                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🛒 商品带货名称 / 策划标题</Text></div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>🛒 商品带货名称 / 策划标题</Text></div>
                           <Input
                             value={productInfo.title}
                             onChange={(e) => setProductInfo({ ...productInfo, title: e.target.value })}
-                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                            style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 6, height: 38 }}
                           />
                         </div>
                         <div>
-                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>💎 商品核心卖点与亮点摘要 (80字内)</Text></div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>💎 商品核心卖点与亮点摘要 (80字内)</Text></div>
                           <TextArea
                             value={productInfo.sellingPoints}
                             onChange={(e) => setProductInfo({ ...productInfo, sellingPoints: e.target.value })}
                             rows={3}
-                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6 }}
+                            style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 6 }}
                           />
                         </div>
                         <Row gutter={16}>
                           <Col span={12}>
-                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>👥 精准目标受众群体</Text></div>
+                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>👥 精准目标受众群体</Text></div>
                             <Input
                               value={productInfo.targetAudience}
                               onChange={(e) => setProductInfo({ ...productInfo, targetAudience: e.target.value })}
-                              style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                              style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 6, height: 38 }}
                             />
                           </Col>
                           <Col span={12}>
-                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🏷️ 售价参考区间</Text></div>
+                            <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>🏷️ 售价参考区间</Text></div>
                             <Input
                               value={productInfo.price}
                               onChange={(e) => setProductInfo({ ...productInfo, price: e.target.value })}
-                              style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                              style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 6, height: 38 }}
                             />
                           </Col>
                         </Row>
                         <div>
-                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: '#fff' }}>🎨 建议短视频整体创意调性</Text></div>
+                          <div style={{ marginBottom: 6 }}><Text strong style={{ color: 'var(--text-primary)' }}>🎨 建议短视频整体创意调性</Text></div>
                           <Input
                             value={productInfo.style}
                             onChange={(e) => setProductInfo({ ...productInfo, style: e.target.value })}
-                            style={{ background: '#202023', color: '#fff', border: '1px solid #2e2e33', borderRadius: 6, height: 38 }}
+                            style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 6, height: 38 }}
                           />
                         </div>
                       </Space>
                     </div>
 
-                    <div style={{ flexShrink: 0, borderTop: '1px solid #27272a', paddingTop: 16, display: 'flex', justifyContent: 'space-between' }}>
+                    <div style={{ flexShrink: 0, borderTop: '1px solid var(--border-color)', paddingTop: 16, display: 'flex', justifyContent: 'space-between' }}>
                       <Button
                         type="dashed"
                         onClick={() => {
                           setProductInfo(null);
                         }}
-                        style={{ background: 'transparent', color: '#a1a1aa', border: '1px dashed #3f3f46' }}
+                        style={{ background: 'transparent', color: 'var(--text-secondary)', border: '1px dashed var(--border-color)' }}
                       >
                         重新分析素材
                       </Button>

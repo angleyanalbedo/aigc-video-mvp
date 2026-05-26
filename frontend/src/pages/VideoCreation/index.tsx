@@ -564,17 +564,17 @@ const VideoCreationPage: React.FC = () => {
     <div style={{ display: 'flex', gap: 20, height: '100%' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{
-          background: '#121214', borderRadius: 12, padding: 20,
-          border: '1px solid #1f1f23', boxShadow: '0 4px 150px rgba(0,0,0,0.2)'
+          background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+          border: '1px solid var(--border-color)', boxShadow: '0 4px 150px rgba(0,0,0,0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <UploadOutlined style={{ color: '#6366f1', fontSize: 16 }} />
-            <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>上传素材</span>
+            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>上传素材</span>
           </div>
           <div style={{
-            border: '1px dashed #3f3f46',
+            border: '1px dashed var(--border-color)',
             borderRadius: 8,
-            background: '#18181b',
+            background: 'var(--section-bg)',
             overflow: 'hidden'
           }}>
             <Upload.Dragger
@@ -586,8 +586,8 @@ const VideoCreationPage: React.FC = () => {
             >
               <div style={{ padding: '20px 0' }}>
                 <UploadOutlined style={{ fontSize: 32, color: '#6366f1', marginBottom: 8 }} />
-                <div style={{ color: '#e4e4e7', fontSize: 14 }}>点击或拖拽上传素材</div>
-                <div style={{ color: '#71717a', fontSize: 12, marginTop: 4 }}>支持图片和视频格式</div>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14 }}>点击或拖拽上传素材</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginTop: 4 }}>支持图片和视频格式</div>
               </div>
             </Upload.Dragger>
           </div>
@@ -595,7 +595,7 @@ const VideoCreationPage: React.FC = () => {
             block
             icon={<AppstoreOutlined />}
             onClick={openLibrary}
-            style={{ marginTop: 12, height: 40, borderRadius: 8, background: '#18181b', color: '#6366f1', border: '1px solid #3f3f46' }}
+            style={{ marginTop: 12, height: 40, borderRadius: 8, background: 'var(--section-bg)', color: '#6366f1', border: '1px solid var(--border-color)' }}
           >
             从素材库选择
           </Button>
@@ -603,14 +603,14 @@ const VideoCreationPage: React.FC = () => {
 
         {materials.length > 0 && (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 20,
-            border: '1px solid #1f1f23', flex: 1, overflow: 'auto',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+            border: '1px solid var(--border-color)', flex: 1, overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <PictureOutlined style={{ color: '#6366f1', fontSize: 16 }} />
-                <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>已选素材</span>
+                <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>已选素材</span>
                 <Tag color="blue" style={{ marginLeft: 4, background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#818cf8' }}>{materials.length}</Tag>
               </div>
               <Button
@@ -625,13 +625,16 @@ const VideoCreationPage: React.FC = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
               {materials.map((m, i) => (
-                <div key={i} style={{
-                  position: 'relative', borderRadius: 8, overflow: 'hidden',
-                  border: '1px solid #27272a', background: '#18181b'
-                }}>
+                <div
+                  key={i}
+                  style={{
+                    position: 'relative', borderRadius: 8, overflow: 'hidden',
+                    border: '1px solid var(--border-color)', background: 'var(--section-bg)'
+                  }}
+                >
                   {m.type?.startsWith('video') ? (
                     <div style={{
-                      height: 100, background: '#09090b', display: 'flex',
+                      height: 100, background: 'var(--input-bg)', display: 'flex',
                       alignItems: 'center', justifyContent: 'center'
                     }}>
                       <VideoCameraOutlined style={{ fontSize: 24, color: '#818cf8' }} />
@@ -639,7 +642,7 @@ const VideoCreationPage: React.FC = () => {
                   ) : (
                     <img src={m.url} alt="" style={{ width: '100%', height: 100, objectFit: 'cover' }} />
                   )}
-                  <div style={{ padding: '6px 8px', fontSize: 11, color: '#a1a1aa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ padding: '6px 8px', fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {m.filename || `素材${i + 1}`}
                   </div>
                   <Tooltip title="AI分析">
@@ -665,16 +668,16 @@ const VideoCreationPage: React.FC = () => {
 
       <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
         <div style={{
-          background: '#121214', borderRadius: 12, padding: 20,
-          border: '1px solid #1f1f23', flex: 1, overflow: 'auto',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+          background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+          border: '1px solid var(--border-color)', flex: 1, overflow: 'auto',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <BulbOutlined style={{ color: '#fbbf24', fontSize: 16 }} />
-            <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>素材分析结果</span>
+            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>素材分析结果</span>
           </div>
           {analysisResult ? (
-            <div style={{ fontSize: 13, lineHeight: 1.8, color: '#e4e4e7' }}>
+            <div style={{ fontSize: 13, lineHeight: 1.8, color: 'var(--text-primary)' }}>
               {(() => {
                 const info = analysisResult.data || analysisResult;
                 const title = info.category ? `${info.category}精选单品` : '智能带货单品';
@@ -685,26 +688,26 @@ const VideoCreationPage: React.FC = () => {
                 return (
                   <>
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fbbf24' }} />
                         智能提取商品信息
                       </div>
-                      <div style={{ color: '#a1a1aa', padding: 12, background: '#18181b', borderRadius: 8, border: '1px solid #27272a' }}>
-                        <div><span style={{ color: '#71717a' }}>建议标题:</span> <strong style={{ color: '#f4f4f5' }}>{title}</strong></div>
-                        <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: '#71717a' }}>核心摘要:</span> <span style={{ color: '#e4e4e7' }}>{info.summary || '-'}</span></div>
-                        {info.category && <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: '#71717a' }}>推荐品类:</span> <Tag color="blue" style={{ borderRadius: 4, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', margin: '0 0 0 6px' }}>{info.category}</Tag></div>}
+                      <div style={{ color: 'var(--text-secondary)', padding: 12, background: 'var(--section-bg)', borderRadius: 8, border: '1px solid var(--border-color)' }}>
+                        <div><span style={{ color: 'var(--text-secondary)' }}>建议标题:</span> <strong style={{ color: 'var(--text-primary)' }}>{title}</strong></div>
+                        <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: 'var(--text-secondary)' }}>核心摘要:</span> <span style={{ color: 'var(--text-primary)' }}>{info.summary || '-'}</span></div>
+                        {info.category && <div style={{ marginTop: 6, fontSize: 12 }}><span style={{ color: 'var(--text-secondary)' }}>推荐品类:</span> <Tag color="blue" style={{ borderRadius: 4, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#1890ff', margin: '0 0 0 6px' }}>{info.category}</Tag></div>}
                       </div>
                     </div>
 
                     {tags.length > 0 && (
                       <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa' }} />
                           三层标签画像
                         </div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           {tags.slice(0, 8).map((t: string, i: number) => (
-                            <Tag key={i} color="purple" style={{ borderRadius: 4, margin: 0, background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#c084fc' }}>{t}</Tag>
+                            <Tag key={i} color="purple" style={{ borderRadius: 4, margin: 0, background: 'rgba(139, 92, 246, 0.15)', border: '1px solid rgba(139, 92, 246, 0.3)', color: '#8b5cf6' }}>{t}</Tag>
                           ))}
                         </div>
                       </div>
@@ -712,11 +715,11 @@ const VideoCreationPage: React.FC = () => {
 
                     {info.suitable_scenes && info.suitable_scenes.length > 0 && (
                       <div style={{ marginBottom: 14 }}>
-                        <div style={{ fontWeight: 600, color: '#f4f4f5', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8' }} />
                           拟真消费场景
                         </div>
-                        <div style={{ color: '#e4e4e7', fontSize: 12, padding: '8px 12px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 8 }}>
+                        <div style={{ color: 'var(--text-primary)', fontSize: 12, padding: '8px 12px', background: 'rgba(56,189,248,0.1)', border: '1px solid rgba(56,189,248,0.15)', borderRadius: 8 }}>
                           {info.suitable_scenes.join(' ｜ ')}
                         </div>
                       </div>
@@ -743,8 +746,8 @@ const VideoCreationPage: React.FC = () => {
               })()}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: '#71717a' }}>
-              <BulbOutlined style={{ fontSize: 36, marginBottom: 12, color: '#3f3f46' }} />
+            <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+              <BulbOutlined style={{ fontSize: 36, marginBottom: 12, color: 'var(--border-color)' }} />
               <div style={{ fontSize: 13 }}>点击素材上的灯泡图标<br />进行AI分析</div>
             </div>
           )}
@@ -757,41 +760,41 @@ const VideoCreationPage: React.FC = () => {
     <div style={{ display: 'flex', gap: 20, height: '100%' }}>
       <div style={{ width: 340, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
         <div style={{
-          background: '#121214', borderRadius: 12, padding: 20,
-          border: '1px solid #1f1f23', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+          background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+          border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <EditOutlined style={{ color: '#8b5cf6', fontSize: 16 }} />
-            <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>商品信息</span>
+            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>商品信息</span>
           </div>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>
               商品标题 <span style={{ color: '#f43f5e' }}>*</span>
             </label>
             <Input
               placeholder="例如：2024新款轻薄羽绒服"
               value={productInfo.title}
               onChange={e => setProductInfo({ ...productInfo, title: e.target.value })}
-              style={{ borderRadius: 8, background: '#18181b', color: '#f4f4f5', border: '1px solid #27272a' }}
+              style={{ borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
             />
           </div>
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>卖点描述</label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>卖点描述</label>
             <TextArea
               rows={3}
               placeholder="每行一个卖点"
               value={productInfo.sellingPoints}
               onChange={e => setProductInfo({ ...productInfo, sellingPoints: e.target.value })}
-              style={{ borderRadius: 8, background: '#18181b', color: '#f4f4f5', border: '1px solid #27272a' }}
+              style={{ borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
             />
           </div>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>目标人群</label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>目标人群</label>
             <Input
               placeholder="例如：18-35岁都市女性"
               value={productInfo.targetAudience}
               onChange={e => setProductInfo({ ...productInfo, targetAudience: e.target.value })}
-              style={{ borderRadius: 8, background: '#18181b', color: '#f4f4f5', border: '1px solid #27272a' }}
+              style={{ borderRadius: 8, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
             />
           </div>
 
@@ -814,19 +817,19 @@ const VideoCreationPage: React.FC = () => {
 
         {script && (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 20,
-            border: '1px solid #1f1f23', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+            border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <SwapOutlined style={{ color: '#8b5cf6', fontSize: 16 }} />
-              <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>剧本干预</span>
+              <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>剧本干预</span>
             </div>
             <TextArea
               rows={3}
               placeholder="输入修改指令，如：让旁白更活泼、增加一个产品特写分镜..."
               value={refinePrompt}
               onChange={e => setRefinePrompt(e.target.value)}
-              style={{ borderRadius: 8, marginBottom: 10, background: '#18181b', color: '#f4f4f5', border: '1px solid #27272a' }}
+              style={{ borderRadius: 8, marginBottom: 10, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
             />
             <Button
               block size="small"
@@ -844,19 +847,19 @@ const VideoCreationPage: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
         {script ? (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 20,
-            border: '1px solid #1f1f23', flex: 1, overflow: 'auto',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column'
+            background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+            border: '1px solid var(--border-color)', flex: 1, overflow: 'auto',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileTextOutlined style={{ color: '#8b5cf6', fontSize: 16 }} />
-                <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>《{script.title}》</span>
-                <Tag color="purple" style={{ borderRadius: 4, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#c084fc' }}>{script.scenes.length} 分镜</Tag>
-                <Tag color="blue" style={{ borderRadius: 4, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)', color: '#38bdf8' }}>{script.totalDuration}s</Tag>
+                <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>《{script.title}》</span>
+                <Tag color="purple" style={{ borderRadius: 4, background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6' }}>{script.scenes.length} 分镜</Tag>
+                <Tag color="blue" style={{ borderRadius: 4, background: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)', color: '#1890ff' }}>{script.totalDuration}s</Tag>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <Button size="small" icon={<PlusOutlined />} onClick={addScene} style={{ borderRadius: 6, background: '#18181b', color: '#c084fc', border: '1px solid #3f3f46' }}>
+                <Button size="small" icon={<PlusOutlined />} onClick={addScene} style={{ borderRadius: 6, background: 'var(--section-bg)', color: '#8b5cf6', border: '1px solid var(--border-color)' }}>
                   添加分镜
                 </Button>
                 <Button
@@ -878,8 +881,8 @@ const VideoCreationPage: React.FC = () => {
 
                 return (
                   <div key={scene.id} style={{
-                    background: '#18181b',
-                    border: isRendering ? '1px solid #ec4899' : '1px solid #27272a',
+                    background: 'var(--section-bg)',
+                    border: isRendering ? '1px solid #ec4899' : '1px solid var(--border-color)',
                     borderRadius: 10, padding: 14,
                     transition: 'all 0.25s ease',
                     boxShadow: isRendering ? '0 0 15px rgba(236,72,153,0.15)' : 'none',
@@ -890,7 +893,7 @@ const VideoCreationPage: React.FC = () => {
                       height: 6,
                       borderRadius: '3px 3px 0 0',
                       marginBottom: 10,
-                      background: 'repeating-linear-gradient(90deg, #27272a, #27272a 12px, transparent 12px, transparent 20px)'
+                      background: 'repeating-linear-gradient(90deg, var(--border-color), var(--border-color) 12px, transparent 12px, transparent 20px)'
                     }} />
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -902,7 +905,7 @@ const VideoCreationPage: React.FC = () => {
                           color: '#fff', fontSize: 12, fontWeight: 700,
                           boxShadow: '0 2px 6px rgba(139,92,246,0.3)'
                         }}>{index + 1}</span>
-                        <Tag style={{ borderRadius: 4, margin: 0, background: '#27272a', border: '1px solid #3f3f46', color: '#e4e4e7' }}>{scene.shot}</Tag>
+                        <Tag style={{ borderRadius: 4, margin: 0, background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}>{scene.shot}</Tag>
                         {scene.emotion && <Tag color="volcano" style={{ borderRadius: 4, margin: 0, background: 'rgba(244,63,94,0.15)', border: '1px solid rgba(244,63,94,0.3)', color: '#fb7185' }}>{scene.emotion}</Tag>}
                       </div>
 
@@ -911,7 +914,7 @@ const VideoCreationPage: React.FC = () => {
                         <Tooltip title="上移分镜">
                           <Button
                             type="text" size="small"
-                            icon={<ArrowUpOutlined style={{ color: '#a1a1aa' }} />}
+                            icon={<ArrowUpOutlined style={{ color: 'var(--text-secondary)' }} />}
                             onClick={() => swapScenes(index, index - 1)}
                             disabled={index === 0}
                             style={{ minWidth: 24, width: 24, height: 24, padding: 0 }}
@@ -920,22 +923,22 @@ const VideoCreationPage: React.FC = () => {
                         <Tooltip title="下移分镜">
                           <Button
                             type="text" size="small"
-                            icon={<ArrowDownOutlined style={{ color: '#a1a1aa' }} />}
+                            icon={<ArrowDownOutlined style={{ color: 'var(--text-secondary)' }} />}
                             onClick={() => swapScenes(index, index + 1)}
                             disabled={index === script.scenes.length - 1}
                             style={{ minWidth: 24, width: 24, height: 24, padding: 0 }}
                           />
                         </Tooltip>
 
-                        <Divider type="vertical" style={{ borderColor: '#3f3f46', margin: '0 4px' }} />
+                        <Divider type="vertical" style={{ borderColor: 'var(--border-color)', margin: '0 4px' }} />
 
                         {/* Duration Input */}
                         <Input
                           type="number" value={scene.duration}
                           onChange={e => updateScene(index, 'duration', parseInt(e.target.value) || 3)}
-                          style={{ width: 44, height: 24, fontSize: 12, borderRadius: 4, textAlign: 'center', background: '#09090b', color: '#f4f4f5', border: '1px solid #3f3f46', padding: '0 4px' }}
+                          style={{ width: 44, height: 24, fontSize: 12, borderRadius: 4, textAlign: 'center', background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', padding: '0 4px' }}
                         />
-                        <span style={{ fontSize: 11, color: '#71717a' }}>秒</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>秒</span>
 
                         <Divider type="vertical" style={{ borderColor: '#3f3f46', margin: '0 4px' }} />
 
@@ -954,19 +957,19 @@ const VideoCreationPage: React.FC = () => {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {/* Visual Description */}
                         <div>
-                          <div style={{ fontSize: 11, color: '#71717a', marginBottom: 4 }}>画面描述</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>画面描述</div>
                           <TextArea
                             value={scene.description}
                             rows={2}
                             onChange={e => updateScene(index, 'description', e.target.value)}
-                            style={{ fontSize: 12, borderRadius: 6, background: '#09090b', color: '#e4e4e7', border: '1px solid #27272a' }}
+                            style={{ fontSize: 12, borderRadius: 6, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
                           />
                         </div>
 
                         {/* Voiceover & Audition */}
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <span style={{ fontSize: 11, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 11, color: '#8b5cf6', display: 'flex', alignItems: 'center', gap: 4 }}>
                               <SoundOutlined /> 旁白配音
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -976,7 +979,7 @@ const VideoCreationPage: React.FC = () => {
                                 placeholder="选择配音主播"
                                 value={scene.voice || 'zh-CN-XiaoxiaoNeural'}
                                 onChange={val => updateScene(index, 'voice', val)}
-                                dropdownStyle={{ background: '#121214', border: '1px solid #27272a' }}
+                                dropdownStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
                                 style={{ width: 120, fontSize: 11 }}
                                 options={VOICE_OPTIONS}
                               />
@@ -1003,14 +1006,14 @@ const VideoCreationPage: React.FC = () => {
                           <Input
                             value={scene.voiceover}
                             onChange={e => updateScene(index, 'voiceover', e.target.value)}
-                            style={{ fontSize: 12, borderRadius: 6, background: '#09090b', color: '#a78bfa', border: '1px solid #27272a' }}
+                            style={{ fontSize: 12, borderRadius: 6, background: 'var(--input-bg)', color: '#8b5cf6', border: '1px solid var(--border-color)' }}
                           />
                         </div>
                       </div>
 
                       {/* Right column: Single scene local render and micro preview */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'flex-start' }}>
-                        <div style={{ fontSize: 11, color: '#71717a', textAlign: 'center' }}>单镜局部渲染</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', textAlign: 'center' }}>单镜局部渲染</div>
 
                         {scene.videoUrl ? (
                           <div style={{ position: 'relative', width: '100%', height: 100, borderRadius: 6, overflow: 'hidden', border: '2px solid #10b981', boxShadow: '0 0 8px rgba(16,185,129,0.3)' }}>
@@ -1039,9 +1042,9 @@ const VideoCreationPage: React.FC = () => {
                             style={{
                               height: 100,
                               borderRadius: 6,
-                              background: isRendering ? '#121214' : '#09090b',
-                              border: isRendering ? '1px solid #ec4899' : '1px dashed #3f3f46',
-                              color: isRendering ? '#ec4899' : '#71717a',
+                              background: isRendering ? 'var(--card-bg)' : 'var(--input-bg)',
+                              border: isRendering ? '1px solid #ec4899' : '1px dashed var(--border-color)',
+                              color: isRendering ? '#ec4899' : 'var(--text-secondary)',
                               display: 'flex',
                               flexDirection: 'column',
                               alignItems: 'center',
@@ -1072,13 +1075,13 @@ const VideoCreationPage: React.FC = () => {
           </div>
         ) : (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 40,
-            border: '1px solid #1f1f23', flex: 1,
+            background: 'var(--card-bg)', borderRadius: 12, padding: 40,
+            border: '1px solid var(--border-color)', flex: 1,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            color: '#71717a', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            color: 'var(--text-secondary)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
           }}>
-            <FileTextOutlined style={{ fontSize: 48, marginBottom: 12, color: '#3f3f46' }} />
-            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4, color: '#a1a1aa' }}>暂无剧本</div>
+            <FileTextOutlined style={{ fontSize: 48, marginBottom: 12, color: 'var(--border-color)' }} />
+            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4, color: 'var(--text-secondary)' }}>暂无剧本</div>
             <div style={{ fontSize: 13 }}>填写商品信息后点击「AI 生成剧本」</div>
           </div>
         )}
@@ -1094,56 +1097,56 @@ const VideoCreationPage: React.FC = () => {
     <div style={{ display: 'flex', gap: 20, height: '100%' }}>
       <div style={{ width: 320, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
         <div style={{
-          background: '#121214', borderRadius: 12, padding: 20,
-          border: '1px solid #1f1f23', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+          background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+          border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
             <VideoCameraOutlined style={{ color: '#ec4899', fontSize: 16 }} />
-            <span style={{ fontWeight: 600, fontSize: 15, color: '#f4f4f5' }}>生成设置</span>
+            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)' }}>生成设置</span>
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>生成模式</label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>生成模式</label>
             <Radio.Group value={generationMode} onChange={e => setGenerationMode(e.target.value)} style={{ width: '100%' }}>
-              <Radio.Button value="batch" style={{ width: '50%', textAlign: 'center', background: generationMode === 'batch' ? 'linear-gradient(135deg, #ec4899, #f472b6)' : '#18181b', color: '#fff', border: '1px solid #3f3f46', borderRadius: '8px 0 0 8px' }}>
+              <Radio.Button value="batch" style={{ width: '50%', textAlign: 'center', background: generationMode === 'batch' ? 'linear-gradient(135deg, #ec4899, #f472b6)' : 'var(--input-bg)', color: generationMode === 'batch' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '8px 0 0 8px' }}>
                 <ThunderboltOutlined /> 批量合成
               </Radio.Button>
-              <Radio.Button value="single" style={{ width: '50%', textAlign: 'center', background: generationMode === 'single' ? 'linear-gradient(135deg, #ec4899, #f472b6)' : '#18181b', color: '#fff', border: '1px solid #3f3f46', borderRadius: '0 8px 8px 0' }}>
+              <Radio.Button value="single" style={{ width: '50%', textAlign: 'center', background: generationMode === 'single' ? 'linear-gradient(135deg, #ec4899, #f472b6)' : 'var(--input-bg)', color: generationMode === 'single' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '0 8px 8px 0' }}>
                 <PlayCircleOutlined /> 首帧预览
               </Radio.Button>
             </Radio.Group>
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>分辨率</label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>分辨率</label>
             <Radio.Group value={resolution} onChange={e => setResolution(e.target.value)} size="small">
-              <Radio.Button value="480p" style={{ background: resolution === '480p' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>480p</Radio.Button>
-              <Radio.Button value="720p" style={{ background: resolution === '720p' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>720p</Radio.Button>
+              <Radio.Button value="480p" style={{ background: resolution === '480p' ? '#ec4899' : 'var(--input-bg)', color: resolution === '480p' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>480p</Radio.Button>
+              <Radio.Button value="720p" style={{ background: resolution === '720p' ? '#ec4899' : 'var(--input-bg)', color: resolution === '720p' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>720p</Radio.Button>
             </Radio.Group>
           </div>
 
           <div style={{ marginBottom: 12 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>画幅比例</label>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>画幅比例</label>
             <Radio.Group value={ratio} onChange={e => setRatio(e.target.value)} size="small">
-              <Radio.Button value="9:16" style={{ background: ratio === '9:16' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>9:16</Radio.Button>
-              <Radio.Button value="16:9" style={{ background: ratio === '16:9' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>16:9</Radio.Button>
-              <Radio.Button value="1:1" style={{ background: ratio === '1:1' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>1:1</Radio.Button>
+              <Radio.Button value="9:16" style={{ background: ratio === '9:16' ? '#ec4899' : 'var(--input-bg)', color: ratio === '9:16' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>9:16</Radio.Button>
+              <Radio.Button value="16:9" style={{ background: ratio === '16:9' ? '#ec4899' : 'var(--input-bg)', color: ratio === '16:9' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>16:9</Radio.Button>
+              <Radio.Button value="1:1" style={{ background: ratio === '1:1' ? '#ec4899' : 'var(--input-bg)', color: ratio === '1:1' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>1:1</Radio.Button>
             </Radio.Group>
           </div>
 
           {generationMode === 'batch' && (
             <>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 13, fontWeight: 500, color: '#a1a1aa', marginBottom: 6, display: 'block' }}>转场效果</label>
+                <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6, display: 'block' }}>转场效果</label>
                 <Radio.Group value={transition} onChange={e => setTransition(e.target.value)} size="small">
-                  <Radio.Button value="cut" style={{ background: transition === 'cut' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>切换</Radio.Button>
-                  <Radio.Button value="fade" style={{ background: transition === 'fade' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>淡入</Radio.Button>
-                  <Radio.Button value="dissolve" style={{ background: transition === 'dissolve' ? '#ec4899' : '#18181b', color: '#fff', border: '1px solid #3f3f46' }}>溶解</Radio.Button>
+                  <Radio.Button value="cut" style={{ background: transition === 'cut' ? '#ec4899' : 'var(--input-bg)', color: transition === 'cut' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>切换</Radio.Button>
+                  <Radio.Button value="fade" style={{ background: transition === 'fade' ? '#ec4899' : 'var(--input-bg)', color: transition === 'fade' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>淡入</Radio.Button>
+                  <Radio.Button value="dissolve" style={{ background: transition === 'dissolve' ? '#ec4899' : 'var(--input-bg)', color: transition === 'dissolve' ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border-color)' }}>溶解</Radio.Button>
                 </Radio.Group>
               </div>
               <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Switch checked={enableTTS} onChange={setEnableTTS} style={{ background: enableTTS ? '#ec4899' : '#3f3f46' }} />
-                <span style={{ fontSize: 13, color: '#e4e4e7' }}>启用 TTS 旁白合成配音</span>
+                <Switch checked={enableTTS} onChange={setEnableTTS} style={{ background: enableTTS ? '#ec4899' : 'var(--border-color)' }} />
+                <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>启用 TTS 旁白合成配音</span>
               </div>
             </>
           )}
@@ -1173,11 +1176,11 @@ const VideoCreationPage: React.FC = () => {
 
         {videoStatus === 'generating' && (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 20,
-            border: '1px solid #1f1f23', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+            background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+            border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <span style={{ fontWeight: 600, fontSize: 14, color: '#e4e4e7' }}>{statusText || '生成中...'}</span>
+              <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{statusText || '生成中...'}</span>
               <span style={{ fontWeight: 700, fontSize: 18, color: '#ec4899' }}>{videoProgress}%</span>
             </div>
             <Progress
@@ -1202,7 +1205,7 @@ const VideoCreationPage: React.FC = () => {
             message="生成失败"
             description={errorMsg}
             type="error" showIcon
-            action={<Button size="small" onClick={generateVideo} style={{ background: '#18181b', color: '#fff', border: '1px solid #3f3f46' }}><ReloadOutlined /> 重试</Button>}
+            action={<Button size="small" onClick={generateVideo} style={{ background: 'var(--section-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}><ReloadOutlined /> 重试</Button>}
             style={{ borderRadius: 8, background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)', color: '#fb7185' }}
           />
         )}
@@ -1211,13 +1214,13 @@ const VideoCreationPage: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
         {script && (
           <div style={{
-            background: '#121214', borderRadius: 12, padding: 16,
-            border: '1px solid #1f1f23', boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            background: 'var(--card-bg)', borderRadius: 12, padding: 16,
+            border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
             flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <ScissorOutlined style={{ color: '#ec4899', fontSize: 14 }} />
-              <span style={{ fontWeight: 600, fontSize: 14, color: '#f4f4f5' }}>分镜预览胶片轨道</span>
+              <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>分镜预览胶片轨道</span>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {script.scenes.map((scene, i) => (
@@ -1243,10 +1246,10 @@ const VideoCreationPage: React.FC = () => {
         )}
 
         <div style={{
-          background: '#121214', borderRadius: 12, padding: 20,
-          border: '1px solid #1f1f23', flex: 1,
+          background: 'var(--card-bg)', borderRadius: 12, padding: 20,
+          border: '1px solid var(--border-color)', flex: 1,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
           minHeight: 380
         }}>
           {videoUrl ? (
@@ -1358,16 +1361,16 @@ const VideoCreationPage: React.FC = () => {
                     下载完整视频
                   </Button>
                 </a>
-                <Button onClick={resetAll} style={{ borderRadius: 8, background: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46', height: 38 }}>
+                <Button onClick={resetAll} style={{ borderRadius: 8, background: 'var(--section-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', height: 38 }}>
                   重新创建
                 </Button>
               </div>
             </div>
           ) : videoStatus !== 'generating' ? (
-            <div style={{ color: '#71717a', textAlign: 'center' }}>
-              <VideoCameraOutlined style={{ fontSize: 54, marginBottom: 16, color: '#3f3f46' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: '#a1a1aa' }}>等待成片合成</div>
-              <div style={{ fontSize: 13, color: '#52525b' }}>
+            <div style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>
+              <VideoCameraOutlined style={{ fontSize: 54, marginBottom: 16, color: 'var(--border-color)' }} />
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6, color: 'var(--text-secondary)' }}>等待成片合成</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 {script ? '调整上述画幅比例后点击生成按钮' : '请先在剧本模块中AI生成剧本'}
               </div>
             </div>
@@ -1384,21 +1387,21 @@ const VideoCreationPage: React.FC = () => {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#09090b', color: '#f4f4f5', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--page-bg)', color: 'var(--text-primary)', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div style={{
         padding: '16px 24px 0',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f4f4f5' }}>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>
               视频创作工作台
             </h2>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
               素材分析 → 剧本创作 → 视频生成，三控制舱智能协同
             </p>
           </div>
-          <Button size="small" onClick={resetAll} style={{ borderRadius: 6, background: '#18181b', color: '#a1a1aa', border: '1px solid #3f3f46' }}>
+          <Button size="small" onClick={resetAll} style={{ borderRadius: 6, background: 'var(--section-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
             重置工作台
           </Button>
         </div>
@@ -1414,8 +1417,8 @@ const VideoCreationPage: React.FC = () => {
                 onClick={() => setActiveModule(key)}
                 style={{
                   flex: 1, cursor: 'pointer',
-                  background: isActive ? cfg.gradient : '#121214',
-                  border: isActive ? 'none' : '1px solid #1f1f23',
+                  background: isActive ? cfg.gradient : 'var(--card-bg)',
+                  border: isActive ? 'none' : '1px solid var(--border-color)',
                   borderRadius: 12, padding: '14px 18px',
                   display: 'flex', alignItems: 'center', gap: 12,
                   transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
@@ -1435,7 +1438,7 @@ const VideoCreationPage: React.FC = () => {
                 <div style={{
                   width: 40, height: 40, borderRadius: 10,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: isActive ? 'rgba(255,255,255,0.25)' : '#18181b',
+                  background: isActive ? 'rgba(255,255,255,0.25)' : 'var(--section-bg)',
                   color: isActive ? '#fff' : cfg.color,
                   fontSize: 18, flexShrink: 0,
                   transition: 'all 0.25s'
@@ -1445,7 +1448,7 @@ const VideoCreationPage: React.FC = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontWeight: 600, fontSize: 15,
-                    color: isActive ? '#fff' : '#e4e4e7',
+                    color: isActive ? '#fff' : 'var(--text-primary)',
                     display: 'flex', alignItems: 'center', gap: 6
                   }}>
                     {cfg.label}
@@ -1455,7 +1458,7 @@ const VideoCreationPage: React.FC = () => {
                   </div>
                   <div style={{
                     fontSize: 12,
-                    color: isActive ? 'rgba(255,255,255,0.8)' : '#71717a',
+                    color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)',
                     marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
                   }}>
                     {cfg.description}
@@ -1482,17 +1485,17 @@ const VideoCreationPage: React.FC = () => {
             <RobotOutlined style={{ color: '#a78bfa', fontSize: 18 }} />
             <div style={{ flex: 1 }}>
               {incomingTemplate && (
-                <div style={{ fontSize: 13, color: '#e4e4e7' }}>
-                  <span style={{ color: '#a78bfa', fontWeight: 600 }}>灵感模板</span>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
+                  <span style={{ color: '#8b5cf6', fontWeight: 600 }}>灵感模板</span>
                   {' '}「{incomingTemplate.name}」- 策略：{incomingTemplate.strategy?.slice(0, 60)}...
                 </div>
               )}
               {incomingReferenceVideo && (
-                <div style={{ fontSize: 13, color: '#e4e4e7', marginTop: incomingTemplate ? 4 : 0 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-primary)', marginTop: incomingTemplate ? 4 : 0 }}>
                   <span style={{ color: '#f97316', fontWeight: 600 }}>参考视频</span>
                   {' '}「{incomingReferenceVideo.title}」
                   {incomingReferenceVideo.hookTechnique && (
-                    <span style={{ color: '#71717a', marginLeft: 8 }}>Hook: {incomingReferenceVideo.hookTechnique?.slice(0, 40)}...</span>
+                    <span style={{ color: 'var(--text-secondary)', marginLeft: 8 }}>Hook: {incomingReferenceVideo.hookTechnique?.slice(0, 40)}...</span>
                   )}
                 </div>
               )}
@@ -1538,7 +1541,7 @@ const VideoCreationPage: React.FC = () => {
         minHeight: 0, display: 'flex', flexDirection: 'column'
       }}>
         <div style={{
-          background: '#09090b', borderRadius: 16, padding: 0,
+          background: 'var(--page-bg)', borderRadius: 16, padding: 0,
           height: '100%', border: 'none', display: 'flex', flexDirection: 'column'
         }}>
           {moduleRenderers[activeModule]()}
@@ -1555,16 +1558,16 @@ const VideoCreationPage: React.FC = () => {
         cancelText="取消"
         className="dark-modal"
         styles={{
-          body: { background: '#121214', color: '#f4f4f5' },
-          header: { background: '#121214', borderBottom: '1px solid #1f1f23' },
-          content: { background: '#121214', border: '1px solid #1f1f23', padding: 24 }
+          body: { background: 'var(--card-bg)', color: 'var(--text-primary)' },
+          header: { background: 'var(--card-bg)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-primary)' },
+          content: { background: 'var(--card-bg)', border: '1px solid var(--border-color)', padding: 24 }
         }}
       >
         <Input.Search
           placeholder="搜索素材"
           value={librarySearch}
           onChange={e => setLibrarySearch(e.target.value)}
-          style={{ marginBottom: 16, background: '#18181b', color: '#fff', border: '1px solid #27272a' }}
+          style={{ marginBottom: 16, background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border-color)' }}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, maxHeight: 400, overflow: 'auto' }}>
           {libraryItems
@@ -1577,8 +1580,8 @@ const VideoCreationPage: React.FC = () => {
                   onClick={() => selectFromLibrary(item)}
                   style={{
                     borderRadius: 8, overflow: 'hidden', cursor: 'pointer',
-                    border: selected ? '2px solid #6366f1' : '1px solid #27272a',
-                    background: selected ? 'rgba(99, 102, 241, 0.1)' : '#18181b',
+                    border: selected ? '2px solid #6366f1' : '1px solid var(--border-color)',
+                    background: selected ? 'rgba(99, 102, 241, 0.1)' : 'var(--section-bg)',
                     transition: 'all 0.2s'
                   }}
                 >

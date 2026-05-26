@@ -13,6 +13,12 @@
   --gradient-success: linear-gradient(135deg, #52c41a 0%, #237804 100%);
   --gradient-warning: linear-gradient(135deg, #faad14 0%, #d48806 100%);
   --gradient-info: linear-gradient(135deg, #1890ff 0%, #0050b3 100%);
+  /* New input and section helper variables for theme support */
+  --input-bg: #ffffff;
+  --section-bg: #fafafa;
+  --terminal-bg: #000000;
+  --terminal-text: #ffffff;
+  --card-border: 1px solid #e8e8e8;
 }
 
 * {
@@ -818,6 +824,18 @@ body {
 .main-content--dark {
   background: #09090b !important;
   box-shadow: none !important;
+  --page-bg: #09090b;
+  --card-bg: #121214;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --border-color: #1f1f23;
+  --hover-bg: rgba(255, 255, 255, 0.08);
+  --active-bg: #6366f1;
+  --input-bg: #1c1c1f;
+  --section-bg: #18181b;
+  --terminal-bg: #09090b;
+  --terminal-text: #f4f4f5;
+  --card-border: 1px solid #1f1f23;
 }
 
 

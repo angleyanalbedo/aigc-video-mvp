@@ -301,14 +301,16 @@ const OneClickPage: React.FC = () => {
 
   return (
     <div style={{ 
-      background: '#09090b', 
+      background: 'var(--page-bg)', 
       minHeight: 'calc(100vh - 64px)', 
-      color: '#e4e4e7',
+      color: 'var(--text-primary)',
       padding: '40px 24px',
-      fontFamily: 'Outfit, Inter, system-ui, -apple-system, sans-serif'
+      fontFamily: 'Outfit, Inter, system-ui, -apple-system, sans-serif',
+      overflowY: 'auto',
+      maxHeight: 'calc(100vh - 64px)'
     }}>
       
-      {/* Premium Dark Navigation Title Block */}
+      {/* Premium Navigation Title Block */}
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div style={{ 
           display: 'inline-flex', 
@@ -323,10 +325,10 @@ const OneClickPage: React.FC = () => {
         }}>
           <ThunderboltOutlined style={{ color: '#fff', fontSize: 28 }} />
         </div>
-        <Title level={2} style={{ color: '#fff', margin: 0, fontWeight: 700, letterSpacing: '-0.5px' }}>
+        <Title level={2} style={{ color: 'var(--text-primary)', margin: 0, fontWeight: 700, letterSpacing: '-0.5px' }}>
           一键成片控制台
         </Title>
-        <Text style={{ color: '#71717a', fontSize: 13, marginTop: 6, display: 'block' }}>
+        <Text style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 6, display: 'block' }}>
           零门槛端到端自动构建 · AI 导演自动起底卖点 · 多分镜并行极速渲染
         </Text>
       </div>
@@ -340,10 +342,10 @@ const OneClickPage: React.FC = () => {
           <Card 
             bordered={false}
             style={{ 
-              background: '#121214', 
-              border: '1px solid #1f1f23', 
+              background: 'var(--card-bg)', 
+              border: '1px solid var(--border-color)', 
               borderRadius: 16,
-              boxShadow: '0 4px 30px rgba(0,0,0,0.4)',
+              boxShadow: '0 4px 30px rgba(0,0,0,0.08)',
               padding: '12px 12px'
             }}
           >
@@ -356,24 +358,24 @@ const OneClickPage: React.FC = () => {
                 <Col span={12}>
                   <Form.Item
                     name="productLink"
-                    label={<span style={{ color: '#a1a1aa', fontWeight: 600 }}>🔗 商品链接</span>}
+                    label={<span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>🔗 商品链接</span>}
                   >
                     <Input 
-                      prefix={<LinkOutlined style={{ color: '#6b7280' }} />} 
+                      prefix={<LinkOutlined style={{ color: 'var(--text-secondary)' }} />} 
                       placeholder="粘贴 TikTok Shop 或公开电商商品链接" 
-                      style={{ background: '#1c1c1f', border: '1px solid #2e2e33', color: '#fff', borderRadius: 8, height: 42 }}
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 8, height: 42 }}
                     />
                   </Form.Item>
                 </Col>
                 <Col span={12}>
                   <Form.Item
                     name="productImage"
-                    label={<span style={{ color: '#a1a1aa', fontWeight: 600 }}>🖼️ 上传主图以做 Image-to-Video 渲染</span>}
+                    label={<span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>🖼️ 上传主图以做 Image-to-Video 渲染</span>}
                   >
                     <Upload maxCount={1} listType="picture" beforeUpload={() => false}>
                       <Button 
                         icon={<UploadOutlined />}
-                        style={{ background: '#1c1c1f', border: '1px dashed #3f3f46', color: '#e4e4e7', borderRadius: 8, height: 42, width: '100%' }}
+                        style={{ background: 'var(--input-bg)', border: '1px dashed var(--border-color)', color: 'var(--text-primary)', borderRadius: 8, height: 42, width: '100%' }}
                       >
                         上传商品高清图 (自动作为首帧注入)
                       </Button>
@@ -384,14 +386,14 @@ const OneClickPage: React.FC = () => {
 
               <Form.Item
                 name="productInfo"
-                label={<span style={{ color: '#a1a1aa', fontWeight: 600 }}>📝 商品属性策划 (必填)</span>}
+                label={<span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>📝 商品属性策划 (必填)</span>}
                 rules={[{ required: true, message: '请填写商品信息以方便 AI 生成剧本' }]}
-                extra={<span style={{ fontSize: 11, color: '#52525b', marginTop: 4, display: 'block' }}>{productInfoHelp}</span>}
+                extra={<span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, display: 'block' }}>{productInfoHelp}</span>}
               >
                 <TextArea
                   rows={4}
                   placeholder='例如：{"title": "真无线降噪耳机", "sellingPoints": "主动降噪、HiFi音质、40小时长续航", "targetAudience": "年轻通勤族"}'
-                  style={{ background: '#1c1c1f', border: '1px solid #2e2e33', color: '#fff', borderRadius: 8 }}
+                  style={{ background: 'var(--input-bg)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', borderRadius: 8 }}
                 />
               </Form.Item>
 
@@ -399,12 +401,12 @@ const OneClickPage: React.FC = () => {
                 <Col span={12}>
                   <Form.Item
                     name="templateId"
-                    label={<span style={{ color: '#a1a1aa', fontWeight: 600 }}>⚡ 绑定灵感模板 (方法论因子组合)</span>}
+                    label={<span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>⚡ 绑定灵感模板 (方法论因子组合)</span>}
                   >
                     <Select 
                       placeholder="选择要匹配的创作策略，留空则由 AI 自动聚类匹配"
                       style={{ width: '100%' }}
-                      dropdownStyle={{ background: '#18181b', border: '1px solid #2e2e33' }}
+                      dropdownStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
                       allowClear
                     >
                       {templates.map((t) => (
@@ -416,12 +418,12 @@ const OneClickPage: React.FC = () => {
                 <Col span={12}>
                   <Form.Item
                     name="referenceVideoId"
-                    label={<span style={{ color: '#a1a1aa', fontWeight: 600 }}>🔥 绑定爆款参考视频 (仿写模式)</span>}
+                    label={<span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>🔥 绑定爆款参考视频 (仿写模式)</span>}
                   >
                     <Select 
                       placeholder="挑选要模仿结构风格的爆款视频"
                       style={{ width: '100%' }}
-                      dropdownStyle={{ background: '#18181b', border: '1px solid #2e2e33' }}
+                      dropdownStyle={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
                       allowClear
                     >
                       {videos.map((v) => (
@@ -432,12 +434,12 @@ const OneClickPage: React.FC = () => {
                 </Col>
               </Row>
 
-              <Divider style={{ borderColor: '#1f1f23', margin: '20px 0' }} />
+              <Divider style={{ borderColor: 'var(--border-color)', margin: '20px 0' }} />
 
               <Row gutter={16} style={{ marginBottom: 20 }}>
                 <Col span={6}>
-                  <Form.Item name={['options', 'sceneCount']} label={<span style={{ color: '#71717a', fontSize: 12 }}>分镜数量</span>} initialValue={0}>
-                    <Select dropdownStyle={{ background: '#18181b' }}>
+                  <Form.Item name={['options', 'sceneCount']} label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>分镜数量</span>} initialValue={0}>
+                    <Select dropdownStyle={{ background: 'var(--card-bg)' }}>
                       <Option value={0}>🤖 AI 智能决定</Option>
                       <Option value={3}>3 个分镜 (约12秒)</Option>
                       <Option value={4}>4 个分镜 (约16秒)</Option>
@@ -447,8 +449,8 @@ const OneClickPage: React.FC = () => {
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item name={['options', 'resolution']} label={<span style={{ color: '#71717a', fontSize: 12 }}>清晰度</span>} initialValue="720p">
-                    <Select dropdownStyle={{ background: '#18181b' }}>
+                  <Form.Item name={['options', 'resolution']} label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>清晰度</span>} initialValue="720p">
+                    <Select dropdownStyle={{ background: 'var(--card-bg)' }}>
                       <Option value="480p">480p 流畅</Option>
                       <Option value="720p">720p 高清</Option>
                       <Option value="1080p">1080p 超清</Option>
@@ -456,8 +458,8 @@ const OneClickPage: React.FC = () => {
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item name={['options', 'ratio']} label={<span style={{ color: '#71717a', fontSize: 12 }}>画幅</span>} initialValue="9:16">
-                    <Select dropdownStyle={{ background: '#18181b' }}>
+                  <Form.Item name={['options', 'ratio']} label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>画幅</span>} initialValue="9:16">
+                    <Select dropdownStyle={{ background: 'var(--card-bg)' }}>
                       <Option value="9:16">🎬 9:16 抖音竖屏</Option>
                       <Option value="16:9">💻 16:9 横画幅</Option>
                       <Option value="1:1">📱 1:1 极简方屏</Option>
@@ -465,8 +467,8 @@ const OneClickPage: React.FC = () => {
                   </Form.Item>
                 </Col>
                 <Col span={6}>
-                  <Form.Item name={['options', 'transition']} label={<span style={{ color: '#71717a', fontSize: 12 }}>拼接转场</span>} initialValue="fade">
-                    <Select dropdownStyle={{ background: '#18181b' }}>
+                  <Form.Item name={['options', 'transition']} label={<span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>拼接转场</span>} initialValue="fade">
+                    <Select dropdownStyle={{ background: 'var(--card-bg)' }}>
                       <Option value="fade">🎨 优雅淡入淡出</Option>
                       <Option value="dissolve">✨ 像素化溶解</Option>
                       <Option value="cut">⚡ 动感硬切</Option>
@@ -511,8 +513,8 @@ const OneClickPage: React.FC = () => {
               <Card
                 bordered={false}
                 style={{ 
-                  background: '#121214', 
-                  border: '1px solid #1f1f23', 
+                  background: 'var(--card-bg)', 
+                  border: '1px solid var(--border-color)', 
                   borderRadius: 16,
                   textAlign: 'center',
                   flex: 1,
@@ -539,10 +541,10 @@ const OneClickPage: React.FC = () => {
 
                   {/* SVG circular loading circle */}
                   <svg width="220" height="220" viewBox="0 0 220 220" style={{ transform: 'rotate(-90deg)', transition: 'all 0.5s' }}>
-                    <circle 
-                      cx="110" cy="110" r="92" 
-                      stroke="#1c1c1f" strokeWidth="6" 
-                      fill="transparent" 
+                    <circle
+                      cx="110" cy="110" r="92"
+                      stroke="var(--border-color)" strokeWidth="6"
+                      fill="transparent"
                     />
                     <circle 
                       cx="110" cy="110" r="92" 
@@ -569,16 +571,16 @@ const OneClickPage: React.FC = () => {
                       <WarningOutlined style={{ fontSize: 44, color: '#f43f5e', marginBottom: 4 }} />
                     ) : (
                       <>
-                        <span style={{ 
-                          fontSize: 48, 
-                          fontWeight: 800, 
-                          color: '#fff', 
+                        <span style={{
+                          fontSize: 48,
+                          fontWeight: 800,
+                          color: 'var(--text-primary)',
                           lineHeight: '1',
                           textShadow: `0 0 10px ${getOrbitalColor()}22`
                         }}>
                           {status?.progress || 0}%
                         </span>
-                        <span style={{ fontSize: 11, color: '#71717a', marginTop: 4, letterSpacing: '0.5px' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 4, letterSpacing: '0.5px' }}>
                           PIPE COMPILE
                         </span>
                       </>
@@ -586,20 +588,20 @@ const OneClickPage: React.FC = () => {
                   </div>
                 </div>
 
-                <Title level={4} style={{ color: '#fff', margin: '0 0 8px 0', fontWeight: 600 }}>
+                <Title level={4} style={{ color: 'var(--text-primary)', margin: '0 0 8px 0', fontWeight: 600 }}>
                   {getPhaseLabel()}
                 </Title>
-                <Paragraph style={{ color: '#a1a1aa', fontSize: 13, minHeight: 40, padding: '0 16px', margin: 0 }}>
+                <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 13, minHeight: 40, padding: '0 16px', margin: 0 }}>
                   {status?.message || '等待管道触发分配...'}
                 </Paragraph>
 
                 {/* Micro step tracker pins */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'center', 
-                  gap: 8, 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: 8,
                   marginTop: 24,
-                  borderTop: '1px solid #1f1f23',
+                  borderTop: '1px solid var(--border-color)',
                   paddingTop: 20
                 }}>
                   {[
@@ -619,7 +621,7 @@ const OneClickPage: React.FC = () => {
                           width: 10,
                           height: 10,
                           borderRadius: '50%',
-                          background: isDone ? '#10b981' : isActive ? getOrbitalColor() : '#27272a',
+                          background: isDone ? '#10b981' : isActive ? getOrbitalColor() : 'var(--border-color)',
                           boxShadow: isActive ? `0 0 8px ${getOrbitalColor()}` : 'none',
                           transition: 'all 0.3s'
                         }} />
@@ -636,8 +638,8 @@ const OneClickPage: React.FC = () => {
                 <Card
                   bordered={false}
                   style={{
-                    background: '#1c1917',
-                    border: '1px solid #78716c33',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: 16,
                     marginTop: 16,
                     padding: '8px 8px'
@@ -646,30 +648,30 @@ const OneClickPage: React.FC = () => {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                     <WarningOutlined style={{ color: '#f43f5e', fontSize: 20, marginTop: 2 }} />
                     <div style={{ flex: 1 }}>
-                      <span style={{ color: '#fca5a5', fontWeight: 600, fontSize: 13.5, display: 'block', marginBottom: 4 }}>
+                      <span style={{ color: '#f43f5e', fontWeight: 600, fontSize: 13.5, display: 'block', marginBottom: 4 }}>
                         智能自愈诊断引擎已唤醒
                       </span>
-                      <Paragraph style={{ color: '#d6d3d1', fontSize: 12, lineHeight: '1.6', margin: '0 0 12px 0' }}>
+                      <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '1.6', margin: '0 0 12px 0' }}>
                         错误排查：{errorState || '无法建立与火山API的握手'}<br />
-                        <span style={{ color: '#a8a29e' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
                           诊断建议：系统检测到网络握手异常，可能因火山端并发受限所致。为防止您的生成进度丢失，引擎即将发起原参一键重试。
                         </span>
                       </Paragraph>
                       
                       {retryCountdown !== null ? (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 12, color: '#fca5a5' }}>
+                          <span style={{ fontSize: 12, color: '#f43f5e' }}>
                             🔄 正在自愈... 将在 <strong style={{ fontSize: 14 }}>{retryCountdown}</strong> 秒内强制重试
                           </span>
-                          <Button size="small" type="text" onClick={cancelRetry} style={{ color: '#a8a29e', fontSize: 11, padding: '0 8px' }}>
+                          <Button size="small" type="text" onClick={cancelRetry} style={{ color: 'var(--text-secondary)', fontSize: 11, padding: '0 8px' }}>
                             取消
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          type="primary" 
-                          size="small" 
-                          icon={<ReloadOutlined />} 
+                        <Button
+                          type="primary"
+                          size="small"
+                          icon={<ReloadOutlined />}
                           onClick={handleRetry}
                           style={{ background: '#f43f5e', border: 'none', borderRadius: 6, fontSize: 12 }}
                         >
@@ -687,26 +689,26 @@ const OneClickPage: React.FC = () => {
               <Card
                 title={
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>
-                      <CodeOutlined style={{ color: getOrbitalColor(), marginRight: 8, transition: 'color 0.5s' }} /> 
+                    <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>
+                      <CodeOutlined style={{ color: getOrbitalColor(), marginRight: 8, transition: 'color 0.5s' }} />
                       一键成片生产流监控终端 (LIVE STREAM TERMINAL)
                     </span>
                   </div>
                 }
                 bordered={false}
-                style={{ 
-                  background: '#121214', 
-                  border: '1px solid #1f1f23', 
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: 16,
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
-                  boxShadow: '0 4px 30px rgba(0,0,0,0.4)'
+                  boxShadow: '0 4px 30px rgba(0,0,0,0.08)'
                 }}
-                bodyStyle={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
+                bodyStyle={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
                   overflow: 'hidden',
                   padding: 0
                 }}
@@ -714,7 +716,7 @@ const OneClickPage: React.FC = () => {
                 {/* Console text window */}
                 <div style={{
                   flex: 1,
-                  background: '#09090b',
+                  background: 'var(--section-bg)',
                   borderRadius: '0 0 12px 12px',
                   padding: '16px 20px',
                   fontFamily: 'Consolas, Monaco, "Courier New", monospace',
@@ -723,7 +725,7 @@ const OneClickPage: React.FC = () => {
                   lineHeight: '1.7',
                   minHeight: 380,
                   maxHeight: 520,
-                  boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.8)'
+                  boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.05)'
                 }}>
                   {consoleLogs.map((log) => {
                     const isError = log.sender === 'ERROR';
@@ -736,12 +738,12 @@ const OneClickPage: React.FC = () => {
 
                     return (
                       <div key={log.id} style={{ marginBottom: 6, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <span style={{ color: '#52525b', flexShrink: 0 }}>[{log.timestamp}]</span>
+                        <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>[{log.timestamp}]</span>
                         <span style={{ color: senderColor, fontWeight: 700, flexShrink: 0 }}>
                           [{log.sender}]
                         </span>
-                        <span style={{ 
-                          color: isError ? '#fca5a5' : '#f4f4f5', 
+                        <span style={{
+                          color: isError ? '#f43f5e' : 'var(--text-primary)',
                           wordBreak: 'break-all',
                           whiteSpace: 'pre-wrap'
                         }}>
@@ -773,9 +775,9 @@ const OneClickPage: React.FC = () => {
             <Col span={10}>
               <Card
                 bordered={false}
-                style={{ 
-                  background: '#121214', 
-                  border: '1px solid #1f1f23', 
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: 16,
                   height: '100%',
                   display: 'flex',
@@ -783,7 +785,7 @@ const OneClickPage: React.FC = () => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   padding: '24px 10px',
-                  boxShadow: '0 4px 30px rgba(0,0,0,0.4)',
+                  boxShadow: '0 4px 30px rgba(0,0,0,0.08)',
                   position: 'relative'
                 }}
               >
@@ -792,11 +794,11 @@ const OneClickPage: React.FC = () => {
                   position: 'relative',
                   width: 250,
                   height: 480,
-                  background: '#09090b',
+                  background: 'var(--section-bg)',
                   borderRadius: 36,
                   padding: 8,
-                  border: '4px solid #3f3f46',
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.6), inset 0 0 10px rgba(255,255,255,0.1)',
+                  border: '4px solid var(--border-color)',
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.15), inset 0 0 10px rgba(0,0,0,0.05)',
                   overflow: 'hidden'
                 }}>
                   {/* Camera notch / dynamic island */}
@@ -807,7 +809,7 @@ const OneClickPage: React.FC = () => {
                     transform: 'translateX(-50%)',
                     width: 70,
                     height: 18,
-                    background: '#000',
+                    background: 'var(--text-primary)',
                     borderRadius: 12,
                     zIndex: 100
                   }} />
@@ -819,7 +821,7 @@ const OneClickPage: React.FC = () => {
                     borderRadius: 28,
                     overflow: 'hidden',
                     position: 'relative',
-                    background: '#000'
+                    background: 'var(--page-bg)'
                   }}>
                     {status.videoUrl ? (
                       <video
@@ -835,7 +837,7 @@ const OneClickPage: React.FC = () => {
                         }}
                       />
                     ) : (
-                      <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: '#52525b' }}>
+                      <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
                         无视频流
                       </div>
                     )}
@@ -900,51 +902,51 @@ const OneClickPage: React.FC = () => {
             <Col span={14}>
               <Card
                 bordered={false}
-                style={{ 
-                  background: '#121214', 
-                  border: '1px solid #1f1f23', 
+                style={{
+                  background: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
                   borderRadius: 16,
                   height: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
                   padding: '24px 16px',
-                  boxShadow: '0 4px 30px rgba(0,0,0,0.4)'
+                  boxShadow: '0 4px 30px rgba(0,0,0,0.08)'
                 }}
               >
                 <div style={{ padding: '0 12px' }}>
-                  
+
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                     <CheckCircleFilled style={{ color: '#10b981', fontSize: 24 }} />
-                    <Title level={3} style={{ color: '#fff', margin: 0, fontWeight: 700 }}>一键生产圆满结束！</Title>
+                    <Title level={3} style={{ color: 'var(--text-primary)', margin: 0, fontWeight: 700 }}>一键生产圆满结束！</Title>
                   </div>
-                  
-                  <Paragraph style={{ color: '#a1a1aa', fontSize: 14, lineHeight: '1.7', marginBottom: 24 }}>
+
+                  <Paragraph style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: '1.7', marginBottom: 24 }}>
                     AI 导演与剪辑师已协同运作完毕。脚本、多语种 TTS 声道以及火山 Seedance 图像到视频的拼接转场已全自动缝合完毕。<br />
                     成品短视频完全符合 15s 以内站外短平快传播逻辑。
                   </Paragraph>
 
                   {/* Summary of what changed */}
-                  <div style={{ 
-                    background: '#1c1c1f', 
-                    borderRadius: 10, 
-                    border: '1px solid #27272a',
-                    padding: '16px 20px', 
-                    marginBottom: 28 
+                  <div style={{
+                    background: 'var(--section-bg)',
+                    borderRadius: 10,
+                    border: '1px solid var(--border-color)',
+                    padding: '16px 20px',
+                    marginBottom: 28
                   }}>
                     <Row gutter={16}>
-                      <Col span={12} style={{ borderRight: '1px solid #27272a' }}>
-                        <span style={{ fontSize: 11, color: '#71717a', display: 'block', marginBottom: 4 }}>商品推广策划</span>
-                        <span style={{ fontSize: 13.5, color: '#fff', fontWeight: 600 }}>{status.productInfo?.title}</span>
+                      <Col span={12} style={{ borderRight: '1px solid var(--border-color)' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>商品推广策划</span>
+                        <span style={{ fontSize: 13.5, color: 'var(--text-primary)', fontWeight: 600 }}>{status.productInfo?.title}</span>
                       </Col>
                       <Col span={12} style={{ paddingLeft: 20 }}>
-                        <span style={{ fontSize: 11, color: '#71717a', display: 'block', marginBottom: 4 }}>最终成片长度</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>最终成片长度</span>
                         <span style={{ fontSize: 13.5, color: '#10b981', fontWeight: 600 }}>{status.duration || 12} 秒</span>
                       </Col>
                     </Row>
-                    <Divider style={{ borderColor: '#27272a', margin: '12px 0' }} />
+                    <Divider style={{ borderColor: 'var(--border-color)', margin: '12px 0' }} />
                     <div>
-                      <span style={{ fontSize: 11, color: '#71717a', display: 'block', marginBottom: 6 }}>AI 智能多维度剧本设计</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>AI 智能多维度剧本设计</span>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         <Tag color="purple" style={{ borderRadius: 4 }}>{status.script?.scenes?.length || 4} 个核心分镜</Tag>
                         <Tag color="cyan" style={{ borderRadius: 4 }}>智能 cross-fade 转场</Tag>
@@ -984,9 +986,9 @@ const OneClickPage: React.FC = () => {
                           flex: 1,
                           height: 46,
                           borderRadius: 8,
-                          background: '#27272a',
-                          border: '1px solid #3f3f46',
-                          color: '#fff',
+                          background: 'var(--hover-bg)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-primary)',
                           fontWeight: 600,
                           fontSize: 13.5
                         }}
@@ -1005,8 +1007,8 @@ const OneClickPage: React.FC = () => {
                           height: 46,
                           borderRadius: 8,
                           background: 'transparent',
-                          border: '1px solid #27272a',
-                          color: '#a1a1aa',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)',
                           fontSize: 13.5
                         }}
                       >
