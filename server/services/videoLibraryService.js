@@ -10,6 +10,24 @@ function parseJSON(value) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
+function snakeToCamel(str) {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+function convertKeysToCamel(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(convertKeysToCamel);
+  if (typeof obj !== 'object') return obj;
+  
+  const result = {};
+  for (const key in obj) {
+    const camelKey = snakeToCamel(key);
+    const value = obj[key];
+    result[camelKey] = (key === 'tags' || key === 'fullAnalysis') ? parseJSON(value) : value;
+  }
+  return result;
+}
+
 class VideoLibraryService {
   getAll({ category, keyword, platform, limit = 50, offset = 0 } = {}) {
     let query = 'SELECT * FROM video_library WHERE 1=1';
@@ -32,12 +50,12 @@ class VideoLibraryService {
     params.push(limit, offset);
 
     const rows = db.prepare(query).all(...params);
-    return rows.map(r => this._formatRow(r));
+    return rows.map(r => convertKeysToCamel(r));
   }
 
   getById(id) {
     const row = db.prepare('SELECT * FROM video_library WHERE id = ?').get(id);
-    return row ? this._formatRow(row) : null;
+    return row ? convertKeysToCamel(row) : null;
   }
 
   create(data) {
@@ -169,14 +187,6 @@ ${video.sourceDeclaration ? `来源声明：${video.sourceDeclaration}` : ''}
     const byPlatform = db.prepare('SELECT platform, COUNT(*) as count FROM video_library GROUP BY platform').all();
     const analyzed = db.prepare("SELECT COUNT(*) as count FROM video_library WHERE status = 'analyzed'").get().count;
     return { total, byCategory, byPlatform, analyzed };
-  }
-
-  _formatRow(row) {
-    return {
-      ...row,
-      tags: parseJSON(row.tags),
-      fullAnalysis: parseJSON(row.full_analysis)
-    };
   }
 }
 
