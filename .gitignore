@@ -43,7 +43,7 @@ coverage/
 *.mov
 *.avi
 *.srt
-
+*.mp3
 # 浏览器截图
 /data/tool/browser_snapshots/
 server/data/
