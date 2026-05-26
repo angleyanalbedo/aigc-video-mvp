@@ -274,7 +274,40 @@ class OneClickService {
       : '';
 
     const options = input.options || {};
-    const sceneCount = options.sceneCount ? parseInt(options.sceneCount, 10) : 0;
+    let sceneCount = options.sceneCount ? parseInt(options.sceneCount, 10) : 0;
+    
+    // 智能参数覆盖与提取逻辑：如果下拉框是 AI 智能决定 (0)，我们尝试从商品属性/描述 (productInfo) 中提取自定义的分镜数
+    if (sceneCount === 0 && input.productInfo) {
+      let parsedInfo = {};
+      if (typeof input.productInfo === 'string') {
+        try { 
+          parsedInfo = JSON.parse(input.productInfo); 
+        } catch (e) {
+          // 文本提取模式：从通俗描述文本中通过正则捕获数字，例如 "生成5个分镜"
+          const textMatch = input.productInfo.match(/(?:生成|需要|分镜数|镜头数|要|个|做)\s*(\d+)\s*(?:个分镜|分镜|个镜头|镜头|个)/);
+          if (textMatch) {
+            const parsedRegex = parseInt(textMatch[1], 10);
+            if (!isNaN(parsedRegex) && parsedRegex > 0) {
+              sceneCount = parsedRegex;
+              console.log(`🎯 [智能参数解析] 从商品描述纯文本中正则提取出分镜数: ${sceneCount}`);
+            }
+          }
+        }
+      } else {
+        parsedInfo = input.productInfo;
+      }
+      
+      const customCount = parsedInfo.sceneCount || parsedInfo.scene_count || parsedInfo.scenes || parsedInfo.sceneNum;
+      if (customCount) {
+        const parsedCustom = parseInt(customCount, 10);
+        if (!isNaN(parsedCustom) && parsedCustom > 0) {
+          sceneCount = parsedCustom;
+          console.log(`🎯 [智能参数解析] 从商品属性 JSON 对象中提取并覆盖分镜数: ${sceneCount}`);
+        }
+      }
+    }
+
+    console.log('🔮 [后端剧本生成] 收到分镜数参数 (sceneCount):', sceneCount, 'options:', JSON.stringify(options));
     
     let durationRequirement = "总时长控制在15秒以内（3-5个分镜）";
     let targetSceneCountPrompt = "";
@@ -340,7 +373,23 @@ ${materialContext}${templateContext}${referenceContext}
 
       // Filter and limit or warn if LLM didn't return exact number, but prompt should force it.
       // In case LLM generated too many or too few scenes, we map them carefully.
-      const finalScenes = script.scenes || [];
+      let finalScenes = script.scenes || [];
+
+      // 强防御逻辑：如果用户指定了分镜数量，且大模型没有精确遵循，我们在后端进行裁剪或填充校准
+      if (sceneCount > 0 && finalScenes.length !== sceneCount) {
+        console.log(`⚠️ [大模型生成校准] 期望分镜数: ${sceneCount}, 大模型实际生成数: ${finalScenes.length}。启动动态校准逻辑...`);
+        if (finalScenes.length > sceneCount) {
+          // 裁剪多余分镜
+          finalScenes = finalScenes.slice(0, sceneCount);
+        } else {
+          // 数量不足，使用兜底分镜填充
+          const fallbackObj = this._getFallbackScript(productInfo, sceneCount);
+          const deficit = sceneCount - finalScenes.length;
+          const paddingScenes = fallbackObj.scenes.slice(finalScenes.length, sceneCount);
+          finalScenes = [...finalScenes, ...paddingScenes];
+        }
+      }
+
       const totalDuration = finalScenes.reduce((sum, s) => sum + (s.duration || 3), 0);
       return {
         title: script.title || `${productInfo.title} - 带货视频`,

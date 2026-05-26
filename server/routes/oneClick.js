@@ -3,9 +3,22 @@ const router = express.Router();
 const oneClickService = require('../services/oneClickService');
 
 router.post('/generate', async (req, res) => {
-  const { productLink, productImage, productInfo, templateId, referenceVideoId, options } = req.body;
+  let { productLink, productImage, productInfo, templateId, referenceVideoId, options } = req.body;
+  console.log('📥 [一键成片 API] 收到请求, options:', JSON.stringify(options));
 
-  if (!productLink && !productImage && (!productInfo || !productInfo.title)) {
+  // 智能解析：如果商品属性策划传入的是 JSON 字符串，尝试解析为对象以支持高级校验与提取
+  if (typeof productInfo === 'string' && productInfo.trim().startsWith('{')) {
+    try {
+      productInfo = JSON.parse(productInfo);
+    } catch (e) {
+      console.warn('⚠️ [一键成片 API] 解析商品属性 JSON 失败，将作为纯文本传递');
+    }
+  }
+
+  const hasTitle = (typeof productInfo === 'object' && productInfo !== null && productInfo.title);
+  const isPlainString = (typeof productInfo === 'string' && productInfo.trim().length > 0);
+
+  if (!productLink && !productImage && !hasTitle && !isPlainString) {
     return res.status(400).json({
       success: false,
       error: '请提供商品链接(productLink)、商品图片(productImage)或商品信息(productInfo)'
