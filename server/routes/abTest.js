@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const abTestService = require('../services/abTestService');
+const oneClickService = require('../services/oneClickService');
+const videoFactorService = require('../services/videoFactorService');
 const projectModel = require('../models/project');
 
 router.get('/dimensions', (req, res) => {
@@ -15,7 +17,7 @@ router.get('/dimensions', (req, res) => {
 router.get('/projects', (req, res) => {
   try {
     const result = projectModel.getAll({ pageSize: 100 });
-    const projects = (result.projects || []).map(p => ({
+    const projects = (result.list || []).map(p => ({
       id: p.id,
       name: p.name,
       status: p.status,
@@ -139,13 +141,6 @@ router.post('/experiments/:experimentId/variants/:variantId/generate', async (re
       return res.status(400).json({ success: false, error: '该变体正在生成中' });
     }
 
-    const script = abTestService.getVariantScriptWithStyle(experimentId, variantId);
-    const settings = abTestService.getVariantSettings(experimentId, variantId);
-
-    if (!script || !script.scenes || script.scenes.length === 0) {
-      return res.status(400).json({ success: false, error: '项目没有分镜数据，请先在工作台生成分镜' });
-    }
-
     abTestService.updateVariantData(experimentId, variantId, {
       status: 'generating',
       videoUrl: null,
@@ -154,14 +149,102 @@ router.post('/experiments/:experimentId/variants/:variantId/generate', async (re
     res.json({
       success: true,
       message: `${variant.name} 视频生成已启动`,
-      script,
-      settings,
       variantId,
     });
 
     console.log(`🎬 [ABTest] 开始生成变体视频: ${experimentId}/${variantId} (${variant.name})`);
     console.log(`   维度: ${experiment.testDimension} = ${variant.settings?.[experiment.testDimension] || '默认'}`);
-    console.log(`   分镜数: ${script.scenes.length}, 设置:`, JSON.stringify(settings));
+
+    (async () => {
+      try {
+        let projectId = experiment.projectId;
+        let productInfo = null;
+
+        if (projectId) {
+          try {
+            const project = projectModel.get(projectId);
+            if (project?.product_info) {
+              productInfo = JSON.parse(project.product_info);
+            }
+          } catch (e) {
+            console.warn('获取项目信息失败:', e.message);
+          }
+        }
+
+        if (!productInfo) {
+          productInfo = {
+            title: 'A/B 测试商品',
+            sellingPoints: '优质商品，值得购买',
+            targetAudience: '普通消费者',
+            category: '综合',
+          };
+        }
+
+        const options = abTestService.getVariantSettings(experimentId, variantId);
+
+        const taskId = await oneClickService.startGeneration(
+          { productInfo, options },
+          null
+        );
+
+        console.log(`⏳ [ABTest] 一键生成任务已启动: ${taskId}, 等待完成...`);
+
+        let videoResult = null;
+        let attempts = 0;
+        const maxAttempts = 360;
+
+        while (attempts < maxAttempts) {
+          const status = oneClickService.getStatus(taskId);
+          if (!status) {
+            throw new Error('任务不存在');
+          }
+          if (status.status === 'completed') {
+            videoResult = status;
+            break;
+          }
+          if (status.status === 'failed') {
+            throw new Error(status.error || '视频生成失败');
+          }
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          attempts++;
+        }
+
+        if (!videoResult) {
+          throw new Error('视频生成超时');
+        }
+
+        console.log(`✅ [ABTest] 变体视频生成完成: ${experimentId}/${variantId}`);
+
+        abTestService.updateVariantData(experimentId, variantId, {
+          status: 'generated',
+          videoUrl: videoResult.videoUrl,
+        });
+
+        if (videoResult.script) {
+          const duration = (videoResult.script.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
+          const factorData = {
+            openingStyle: '痛点提问',
+            bgmStyle: '节奏感强',
+            voiceoverStyle: '活泼热情',
+            colorTone: '暖色调',
+            aspectRatio: options.ratio || '9:16',
+            duration,
+            sceneCount: videoResult.script.scenes?.length || 3,
+            productName: productInfo?.title,
+            productCategory: productInfo?.category,
+          };
+          videoFactorService.recordFactors(projectId || 'abtest_' + experimentId, factorData);
+        }
+
+      } catch (error) {
+        console.error(`❌ [ABTest] 变体视频生成失败: ${experimentId}/${variantId}`, error);
+        abTestService.updateVariantData(experimentId, variantId, {
+          status: 'failed',
+          error: error.message,
+        });
+      }
+    })();
+
   } catch (error) {
     console.error('❌ 生成变体视频失败:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -193,7 +276,25 @@ router.post('/experiments/:experimentId/variants/:variantId/generate-complete', 
 router.post('/experiments/:experimentId/variants/:variantId/publish', (req, res) => {
   try {
     const { experimentId, variantId } = req.params;
-    const metrics = abTestService.publishVariant(experimentId, variantId);
+    const variantData = abTestService.getVariantData(experimentId, variantId);
+    const experiment = abTestService.getExperiment(experimentId);
+    
+    if (!variantData?.videoUrl) {
+      return res.status(400).json({ success: false, error: '请先生成视频' });
+    }
+
+    const metrics = videoFactorService.publishVideo(
+      experiment?.projectId || `abtest_${experimentId}`,
+      { experimentId, variantId }
+    );
+
+    abTestService.updateVariantData(experimentId, variantId, {
+      status: 'published',
+      publishedAt: Date.now(),
+      metrics,
+    });
+
+    console.log(`🚀 [ABTest] 变体发布完成: ${experimentId}/${variantId}`, metrics);
     res.json({ success: true, metrics, message: '变体已发布，数据已收集' });
   } catch (error) {
     console.error('❌ 发布变体失败:', error);

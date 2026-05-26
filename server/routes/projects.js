@@ -6,6 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const projectModel = require('../models/project');
 const attributionService = require('../services/attributionService');
+const { ComplianceService } = require('../services/complianceService');
 
 
 // 上传目录配置（与主 index.js 保持一致）
@@ -246,7 +247,7 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
  * POST /api/projects/:id/publish
  * 一键发布/分发带货视频，生成随机mock数据并注册到多因子归因
  */
-router.post('/:id/publish', (req, res) => {
+router.post('/:id/publish', async (req, res) => {
   try {
     const { id } = req.params;
     const project = projectModel.getById(id);
@@ -254,11 +255,45 @@ router.post('/:id/publish', (req, res) => {
       return res.status(404).json({ success: false, error: '项目不存在' });
     }
 
+    // 0. 先执行合规审查
+    let complianceReview = null;
+    try {
+      const complianceService = new ComplianceService();
+      const review = complianceService.createReview({
+        title: project.name || '工作台发布视频',
+        description: `项目: ${project.name || '未命名'}, 分镜数: ${project.script?.scenes?.length || 0}`,
+        type: 'video',
+        creator: 'system',
+      });
+      
+      const reviewResult = await complianceService.executeFullReview(review.id);
+      console.log(`✅ [合规审查] 工作台发布视频审查完成: ${review.id}, 状态: ${reviewResult.status}`);
+      
+      complianceReview = {
+        reviewId: review.id,
+        status: reviewResult.status,
+        checkResults: reviewResult.checkResults
+      };
+      
+      // 如果合规审查失败，阻止发布（可选：可以改为警告模式）
+      if (reviewResult.status === 'rejected') {
+        return res.status(400).json({
+          success: false,
+          error: '合规审查未通过，请检查内容后重试',
+          complianceReview
+        });
+      }
+    } catch (complianceErr) {
+      console.warn('合规审查失败:', complianceErr.message);
+      // 可选：即使合规审查失败也允许发布，但记录警告
+    }
+
     // 1. 更新项目状态为已完成/已发布，并保存模拟的视频 URL
     const mockVideoUrl = `https://example.com/videos/${id}.mp4`;
     projectModel.update(id, { 
       status: 'completed', 
-      videoUrl: mockVideoUrl 
+      videoUrl: mockVideoUrl,
+      complianceReview
     });
 
     // 2. 提取生成因子 (Factors)

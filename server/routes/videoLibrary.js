@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const videoLibraryService = require('../services/videoLibraryService');
+const { ComplianceService } = require('../services/complianceService');
 
 router.get('/', (req, res) => {
   const { category, keyword, platform, limit, offset } = req.query;
@@ -28,10 +29,43 @@ router.get('/:id', (req, res) => {
   res.json({ success: true, data: video });
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
+    // 1. 先执行合规审查
+    let complianceReview = null;
+    try {
+      const complianceService = new ComplianceService();
+      const review = complianceService.createReview({
+        title: req.body.title || '视频库添加视频',
+        description: `来源: ${req.body.sourceUrl || req.body.platform || '未知'}, 类目: ${req.body.category || '未分类'}`,
+        type: 'video',
+        creator: 'system',
+      });
+      
+      const reviewResult = await complianceService.executeFullReview(review.id);
+      console.log(`✅ [合规审查] 视频库添加视频审查完成: ${review.id}, 状态: ${reviewResult.status}`);
+      
+      complianceReview = {
+        reviewId: review.id,
+        status: reviewResult.status,
+        checkResults: reviewResult.checkResults
+      };
+      
+      // 如果合规审查失败，拒绝入库
+      if (reviewResult.status === 'rejected') {
+        return res.status(400).json({
+          success: false,
+          error: '合规审查未通过，该视频无法入库',
+          complianceReview
+        });
+      }
+    } catch (complianceErr) {
+      console.warn('合规审查失败:', complianceErr.message);
+    }
+
+    // 2. 再创建视频记录
     const video = videoLibraryService.create(req.body);
-    res.json({ success: true, data: video });
+    res.json({ success: true, data: { video, complianceReview } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

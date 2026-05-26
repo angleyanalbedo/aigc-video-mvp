@@ -4,6 +4,8 @@ const { withRetry, sleep, videoRetryOptions, ttsRetryOptions } = require('../uti
 const db = require('../db');
 const path = require('path');
 const fs = require('fs');
+const videoFactorService = require('./videoFactorService');
+const { ComplianceService } = require('./complianceService');
 
 const OUTPUT_DIR = path.join(__dirname, '..', 'outputs');
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
@@ -85,6 +87,9 @@ class OneClickService {
 
       this._cleanup(generatedScenes, audioPath);
 
+      const duration = (script.scenes || []).reduce((sum, s) => sum + (s.duration || 3), 0);
+      const options = input.options || {};
+
       const finalResult = {
         status: 'completed',
         progress: 100,
@@ -99,6 +104,49 @@ class OneClickService {
 
       this.tasks.set(taskId, finalResult);
       if (onProgress) onProgress({ taskId, progress: 100, phase: 'completed', message: '一键成片完成！' });
+
+      try {
+        const factorData = {
+          openingStyle: '痛点提问',
+          bgmStyle: '节奏感强',
+          voiceoverStyle: '活泼热情',
+          colorTone: '暖色调',
+          aspectRatio: options.ratio || '9:16',
+          duration,
+          sceneCount: script.scenes?.length || 3,
+          productName: productInfo?.title,
+          productCategory: productInfo?.category,
+        };
+        const recordId = videoFactorService.recordFactors(input.projectId || 'oneclick_' + taskId, factorData);
+        console.log(`✅ [因子记录] 已记录创作因子: ${recordId}`);
+      } catch (factorErr) {
+        console.warn('记录创作因子失败:', factorErr.message);
+      }
+
+      try {
+        const complianceService = new ComplianceService();
+        const review = complianceService.createReview({
+          title: script.title || productInfo.title || '一键生成视频',
+          description: `商品: ${productInfo?.title || '未命名'}, 分镜数: ${script.scenes?.length || 0}`,
+          type: 'video',
+          creator: 'system',
+        });
+        
+        const reviewResult = await complianceService.executeFullReview(review.id);
+        console.log(`✅ [合规审查] 一键生成视频审查完成: ${review.id}, 状态: ${reviewResult.status}`);
+        
+        finalResult.complianceReview = {
+          reviewId: review.id,
+          status: reviewResult.status,
+          checkResults: reviewResult.checkResults
+        };
+      } catch (complianceErr) {
+        console.warn('合规审查失败:', complianceErr.message);
+        finalResult.complianceReview = {
+          status: 'error',
+          message: complianceErr.message
+        };
+      }
 
       console.log(`✅ 一键成片完成: ${taskId}`);
       return finalResult;
