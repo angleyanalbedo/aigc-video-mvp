@@ -38,6 +38,8 @@ if not exist "server\.env" (
 if not exist "server\node_modules\" (
     echo 📦 未检测到后端依赖，正在为您安装，请稍候（这可能需要几分钟）...
     cd server
+    set npm_config_registry=https://registry.npmmirror.com
+    set NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node/
     call npm install
     cd ..
     echo ✅ 后端依赖安装完成!
@@ -51,12 +53,14 @@ echo 🔍 正在检查前端环境...
 if not exist "frontend\node_modules\" (
     echo 📦 未检测到前端依赖，正在为您安装，请稍候（这可能需要几分钟）...
     cd frontend
+    set npm_config_registry=https://registry.npmmirror.com
     call npm install
     cd ..
     echo ✅ 前端依赖安装完成!
 ) else (
     echo ✅ 前端环境就绪.
 )
+
 
 :: 4. 启动服务
 echo.
