@@ -83,21 +83,21 @@ class ImageAgent {
       console.log(`🔗 ImageAgent: 已挂载商品参考图: ${referenceImageUrl}`);
     }
 
-    const { llmProvider } = require('../services/providers');
+    const { imageProvider } = require('../services/providers');
     let resultUrl = null;
 
     const actualSceneIndex = sceneId ? sceneId - 1 : (sceneIndex !== null ? sceneIndex : null);
 
-    // 1. 尝试调用 llmProvider.generateImage 抽象接口进行真实生图
+    // 1. 尝试调用 imageProvider.generateImage 抽象接口进行真实生图
     try {
-      console.log(`📡 ImageAgent: 正在调用 llmProvider.generateImage 抽象接口...`);
+      console.log(`📡 ImageAgent: 正在调用 imageProvider.generateImage 抽象接口...`);
       
       // 智能拼接融合电商产品 Prompts
       const enhancedPrompt = referenceImageUrl
         ? `High-end commercial product photography, extremely detailed, reference style: ${referenceImageUrl}, scene context: ${prompt}`
         : `High-end commercial product rendering, photorealistic, premium e-commerce style, scene context: ${prompt}`;
 
-      const url = await llmProvider.generateImage({
+      const url = await imageProvider.generateImage({
         prompt: enhancedPrompt,
         width: 1024,
         height: 1024
