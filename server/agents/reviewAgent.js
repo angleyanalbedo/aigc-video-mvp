@@ -6,7 +6,6 @@
  * 仅当评分 < 60 时，才由 Orchestrator 触发 ScriptAgent.refine() 进行 LLM 修复。
  */
 
-const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
 const FALLBACK_PROMPT = `你是带货视频剧本质量审核专家，负责对生成的剧本进行规则校验。
@@ -50,7 +49,6 @@ class ReviewAgent {
     this.agentName = 'ReviewAgent';
     this.layer = '监督层';
     this.skillId = 'ReviewAgent_check';
-    this.tools = getToolsForAgent('ReviewAgent');
   }
 
   getSystemPrompt() {

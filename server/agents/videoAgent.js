@@ -1,6 +1,5 @@
 const { createVideoTask, getVideoStatus, waitForVideo } = require('./tools/videoAPI');
 const skillLoader = require('./skills/skillLoader');
-const { getToolsForAgent } = require('./tools/agentTools');
 
 const FALLBACK_PROMPT = `你是电商视频分镜渲染专家，负责将剧本分镜转化为视频片段。
 
@@ -32,7 +31,6 @@ class VideoAgent {
     this.agentName = 'VideoAgent';
     this.skillId = 'VideoAgent_generation';
     this.maxRetries = 2;
-    this.tools = getToolsForAgent('VideoAgent');
   }
 
   getSystemPrompt() {

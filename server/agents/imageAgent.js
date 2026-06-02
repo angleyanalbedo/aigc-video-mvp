@@ -5,7 +5,6 @@
  * 调用文生图/图生图大模型，为每个分镜生成高清、一致的关键帧视觉效果图。
  */
 
-const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
 const FALLBACK_PROMPT = `你是电商视频关键帧视觉生成专家，负责为每个分镜生成高质量的关键帧图片。
@@ -38,7 +37,6 @@ class ImageAgent {
     this.agentName = 'ImageAgent';
     this.layer = '执行层';
     this.skillId = 'ImageAgent_generation';
-    this.tools = getToolsForAgent('ImageAgent');
   }
 
   getSystemPrompt() {

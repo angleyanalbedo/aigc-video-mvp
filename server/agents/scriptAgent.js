@@ -1,7 +1,6 @@
 const { generateStructuredText } = require('./tools/llm');
 const { memoryManager } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
-const { getToolsForAgent } = require('./tools/agentTools');
 
 const FALLBACK_PROMPT = `你是电商带货视频剧本生成专家。
 
@@ -32,7 +31,6 @@ class ScriptAgent {
     this.agentName = 'ScriptAgent';
     this.skillId = 'ScriptAgent_generation';
     this.maxScenes = 5;
-    this.tools = getToolsForAgent('ScriptAgent');
   }
 
   getSystemPrompt() {
