@@ -66,7 +66,7 @@ const MaterialsTab: React.FC<WorkbenchProps> = (workbench) => {
                   onClick={() => {
                     const input = document.createElement('input');
                     input.type = 'file';
-                    input.accept = 'image/*';
+                    input.accept = 'image/*,video/*';
                     input.onchange = async (e: any) => {
                       const file = e.target.files?.[0];
                       if (file) {
@@ -126,34 +126,41 @@ const MaterialsTab: React.FC<WorkbenchProps> = (workbench) => {
                 </Button>
               </div>
               <Row gutter={[12, 12]}>
-                {projectMaterials.map((m: any) => (
-                  <Col span={8} key={m.id}>
-                    <div style={{
-                      height: 100,
-                      borderRadius: 8,
-                      overflow: 'hidden',
-                      border: '1px solid var(--border-color)',
-                      position: 'relative'
-                    }}>
-                      <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                {projectMaterials.map((m: any) => {
+                  const isVideo = m.type?.startsWith('video') || /\.(mp4|mov|avi|webm)$/i.test(m.filename || m.url || '');
+                  return (
+                    <Col span={8} key={m.id}>
                       <div style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        padding: '2px 6px',
-                        fontSize: 10,
-                        color: 'var(--text-primary)',
+                        height: 100,
+                        borderRadius: 8,
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }} title={m.filename}>
-                        {m.filename}
+                        border: '1px solid var(--border-color)',
+                        position: 'relative'
+                      }}>
+                        {isVideo ? (
+                          <video src={m.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} muted />
+                        ) : (
+                          <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          background: 'rgba(0,0,0,0.6)',
+                          padding: '2px 6px',
+                          fontSize: 10,
+                          color: 'var(--text-primary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }} title={m.filename}>
+                          {isVideo ? '🎬 ' : ''}{m.filename}
+                        </div>
                       </div>
-                    </div>
-                  </Col>
-                ))}
+                    </Col>
+                  );
+                })}
               </Row>
               {projectMaterials.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '60px 0' }}>
@@ -486,6 +493,7 @@ const MaterialsTab: React.FC<WorkbenchProps> = (workbench) => {
             <Row gutter={[12, 12]}>
               {libraryMaterials.map((material: any) => {
                 const isSelected = selectedLibraryMaterials.includes(material.url);
+                const isVideo = material.type?.startsWith('video') || /\.(mp4|mov|avi|webm)$/i.test(material.filename || material.name || material.url || '');
                 return (
                   <Col span={8} key={material.id}>
                     <div
@@ -506,16 +514,29 @@ const MaterialsTab: React.FC<WorkbenchProps> = (workbench) => {
                         transition: 'all 0.2s'
                       }}
                     >
-                      <img
-                        src={material.url}
-                        alt={material.filename || material.name}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          filter: isSelected ? 'brightness(0.7)' : 'brightness(1)'
-                        }}
-                      />
+                      {isVideo ? (
+                        <video
+                          src={material.url}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            filter: isSelected ? 'brightness(0.7)' : 'brightness(1)'
+                          }}
+                          muted
+                        />
+                      ) : (
+                        <img
+                          src={material.url}
+                          alt={material.filename || material.name}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            filter: isSelected ? 'brightness(0.7)' : 'brightness(1)'
+                          }}
+                        />
+                      )}
                       {isSelected && (
                         <div style={{
                           position: 'absolute',
