@@ -13,7 +13,9 @@ import {
   PlayCircleOutlined,
   CloseOutlined,
   DownloadOutlined,
-  RightOutlined
+  RightOutlined,
+  HistoryOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import { Button, Input, Spin, List, Card, Tag, Typography, Upload, message, Timeline, Image } from 'antd';
 import {
@@ -21,6 +23,7 @@ import {
   executePlan,
   cancelPlan,
   getChatHistory,
+  getChatSessions,
   createChatSession,
   connectWebSocket,
   type Message,
@@ -160,6 +163,73 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
     type: 'image' | 'video' | 'file';
   } | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // History panel state
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<Array<{
+    id: string;
+    title: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const result = await getChatSessions(projectId);
+      if (result.success) {
+        setSessions(result.sessions);
+      }
+    } catch (err) {
+      console.error('Failed to load sessions:', err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const handleSwitchSession = async (newSessionId: string) => {
+    if (newSessionId === sessionId) {
+      setShowHistory(false);
+      return;
+    }
+    setSessionId(newSessionId);
+    setMessages([]);
+    setIsLoading(false);
+    setPendingPlan(null);
+    setShowHistory(false);
+
+    const history = await getChatHistory(newSessionId);
+    if (history.success) {
+      const normalizedHistory = history.messages.map((m: any) => ({
+        id: m.id,
+        role: m.role,
+        type: m.type || m.messageType || 'text',
+        content: m.content,
+        timestamp: m.timestamp || m.createdAt || Date.now(),
+        metadata: m.metadata
+      }));
+      setMessages(normalizedHistory);
+    }
+
+    if (onSessionCreated) {
+      onSessionCreated(newSessionId);
+    }
+  };
+
+  const handleNewSession = async () => {
+    const session = await createChatSession(projectId, '新对话');
+    if (session.success) {
+      setSessionId(session.sessionId);
+      setMessages([]);
+      setPendingPlan(null);
+      setShowHistory(false);
+      if (onSessionCreated) {
+        onSessionCreated(session.sessionId);
+      }
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -432,7 +502,96 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
           <Text strong>Copilot Agent</Text>
           <Text type="secondary">智能创作助手</Text>
         </div>
+        <Button
+          type="text"
+          size="small"
+          icon={<HistoryOutlined />}
+          onClick={() => {
+            if (!showHistory) loadSessions();
+            setShowHistory(!showHistory);
+          }}
+          style={{ marginLeft: 'auto', color: showHistory ? '#6366f1' : 'var(--text-secondary)' }}
+          title="历史对话"
+        />
       </div>
+
+      {/* History Panel */}
+      {showHistory && (
+        <div className="history-panel" style={{
+          background: 'var(--card-bg)',
+          borderBottom: '1px solid var(--border-color)',
+          maxHeight: 280,
+          overflowY: 'auto',
+          padding: '8px 12px',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <Text strong style={{ fontSize: 12, color: 'var(--text-secondary)' }}>历史对话</Text>
+            <Button
+              type="primary"
+              size="small"
+              icon={<PlusOutlined />}
+              onClick={handleNewSession}
+              style={{ fontSize: 11, height: 24, background: '#6366f1', border: 'none' }}
+            >
+              新对话
+            </Button>
+          </div>
+          {loadingSessions ? (
+            <div style={{ textAlign: 'center', padding: 16 }}>
+              <Spin size="small" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-secondary)', fontSize: 12 }}>
+              暂无历史对话
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {sessions.map(s => (
+                <div
+                  key={s.id}
+                  onClick={() => handleSwitchSession(s.id)}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    background: s.id === sessionId ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    border: s.id === sessionId ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                    transition: 'all 0.15s',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (s.id !== sessionId) e.currentTarget.style.background = 'var(--hover-bg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (s.id !== sessionId) e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <div style={{ overflow: 'hidden', flex: 1 }}>
+                    <div style={{
+                      fontSize: 12,
+                      color: 'var(--text-primary)',
+                      fontWeight: s.id === sessionId ? 600 : 400,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {s.title || '未命名对话'}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2 }}>
+                      {new Date(s.updatedAt).toLocaleDateString()} {new Date(s.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  {s.id === sessionId && (
+                    <CheckCircleOutlined style={{ fontSize: 12, color: '#6366f1', flexShrink: 0, marginLeft: 8 }} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="messages-container">
         {messages.length === 0 && (
