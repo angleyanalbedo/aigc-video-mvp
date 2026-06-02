@@ -42,7 +42,7 @@ if (IMAGE_PROVIDER === 'ali' || IMAGE_PROVIDER === 'alibaba') {
   if (!DASHSCOPE_API_KEY) {
     throw new Error('❌ [CRITICAL] 生产环境配置了阿里 Image，但缺失环境变量：DASHSCOPE_API_KEY。请检查您的 .env 配置文件！');
   }
-  const ALI_IMAGE_MODEL = process.env.ALI_IMAGE_MODEL || 'wanx-v1';
+  const ALI_IMAGE_MODEL = process.env.ALI_IMAGE_MODEL || 'qwen-image-2.0-pro';
   console.log(`🚀 [PROVIDER] 正在配置真实阿里灵积 Image 服务 (${ALI_IMAGE_MODEL})...`);
   imageProvider = new AliLLMProvider({ apiKey: DASHSCOPE_API_KEY, imageModel: ALI_IMAGE_MODEL });
   console.log('✅ [PROVIDER] 使用真实阿里灵积 Image 服务就绪');
@@ -63,8 +63,8 @@ if (VIDEO_PROVIDER === 'ali' || VIDEO_PROVIDER === 'alibaba') {
   if (!DASHSCOPE_API_KEY) {
     throw new Error('❌ [CRITICAL] 生产环境配置了阿里 Video，但缺失环境变量：DASHSCOPE_API_KEY。请检查您的 .env 配置文件！');
   }
-  const ALI_VIDEO_T2V_MODEL = process.env.ALI_VIDEO_T2V_MODEL || 'wanx-text-to-video-turbo';
-  const ALI_VIDEO_I2V_MODEL = process.env.ALI_VIDEO_I2V_MODEL || 'wanx-image-to-video-turbo';
+  const ALI_VIDEO_T2V_MODEL = process.env.ALI_VIDEO_T2V_MODEL || 'wan2.7-t2v-2026-04-25';
+  const ALI_VIDEO_I2V_MODEL = process.env.ALI_VIDEO_I2V_MODEL || 'wan2.7-i2v-2026-04-25';
   console.log(`🚀 [PROVIDER] 正在配置真实阿里灵积 Video 服务 (T2V: ${ALI_VIDEO_T2V_MODEL}, I2V: ${ALI_VIDEO_I2V_MODEL})...`);
   videoProvider = new AliVideoProvider({
     apiKey: DASHSCOPE_API_KEY,

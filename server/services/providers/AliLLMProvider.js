@@ -1,7 +1,7 @@
 const BaseLLMProvider = require('./BaseLLMProvider');
 
 class AliLLMProvider extends BaseLLMProvider {
-  constructor({ apiKey, llmModel = 'qwen-plus', imageModel = 'wanx-v1' }) {
+  constructor({ apiKey, llmModel = 'qwen-plus', imageModel = 'qwen-image-2.0-pro' }) {
     super();
     this.apiKey = apiKey;
     this.llmModel = llmModel;
@@ -63,69 +63,64 @@ class AliLLMProvider extends BaseLLMProvider {
       if (width === 1024 && height === 1024) size = '1024*1024';
       else if (width === 720 && height === 1280) size = '720*1280';
       else if (width === 1280 && height === 720) size = '1280*720';
+      // 支持更大分辨率
+      else if (width === 2048 && height === 2048) size = '2048*2048';
 
       console.log(`📡 [AliLLMProvider] 正在向 DashScope 发起生图任务: model=${this.imageModel}, size=${size}`);
 
-      const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis', {
+      const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-          'X-DashScope-Async': 'enable'
+          'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
           model: this.imageModel,
           input: {
-            prompt
+            messages: [
+              {
+                role: 'user',
+                content: [
+                  { text: prompt }
+                ]
+              }
+            ]
           },
           parameters: {
-            size,
-            n: 1
+            prompt_extend: true,
+            watermark: false,
+            size
           }
         })
       });
 
       const data = await response.json();
-      if (data.code || (data.status_code && data.status_code !== 200)) {
-        throw new Error(data.message || 'API Error');
+      console.log(`📡 [AliLLMProvider] 生图 API 响应:`, JSON.stringify(data).slice(0, 500));
+
+      if (data.code) {
+        throw new Error(data.message || `DashScope API Error: ${data.code}`);
       }
 
-      const taskId = data.output?.task_id || data.id;
-      if (!taskId) {
-        throw new Error('No task ID returned from Ali image generation API');
-      }
-
-      console.log(`📡 [AliLLMProvider] 生图任务已创建, ID: ${taskId}, 开始轮询状态...`);
-
-      // Poll task status
-      let attempts = 0;
-      const maxAttempts = 30; // 60 seconds
-      while (attempts < maxAttempts) {
-        await new Promise(r => setTimeout(r, 2000));
-        const pollResponse = await fetch(`https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`, {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`
+      // 从响应中提取图片 URL
+      // Qwen-Image 返回格式: output.choices[0].message.content[].image
+      const choices = data.output?.choices;
+      if (choices && choices.length > 0) {
+        const content = choices[0].message?.content;
+        if (Array.isArray(content)) {
+          for (const item of content) {
+            if (item.image) return item.image;
+            if (item.url) return item.url;
           }
-        });
-        const pollData = await pollResponse.json();
-        if (pollData.code || (pollData.status_code && pollData.status_code !== 200)) {
-          throw new Error(pollData.message || 'API Error while polling status');
         }
-
-        const taskStatus = pollData.output?.task_status;
-        console.log(`📡 [AliLLMProvider] 轮询任务 ${taskId} 状态: ${taskStatus}`);
-
-        if (taskStatus === 'SUCCEEDED') {
-          const url = pollData.output?.results?.[0]?.url;
-          if (url) return url;
-          throw new Error('No image URL returned in succeeded task response');
-        }
-        if (taskStatus === 'FAILED') {
-          throw new Error(pollData.output?.message || 'Image generation task failed');
-        }
-        attempts++;
       }
-      throw new Error('Ali Image generation task timed out');
+
+      // 备用提取路径
+      const results = data.output?.results;
+      if (results && results.length > 0 && results[0].url) {
+        return results[0].url;
+      }
+
+      throw new Error('No image URL found in DashScope response');
     } catch (error) {
       console.error('Ali LLM Provider generateImage 失败:', error);
       throw error;

@@ -42,7 +42,7 @@ async function uploadLocalImageToPublic(imageUrl) {
 }
 
 class AliVideoProvider extends BaseVideoProvider {
-  constructor({ apiKey, t2vModel = 'wanx-text-to-video-turbo', i2vModel = 'wanx-image-to-video-turbo' }) {
+  constructor({ apiKey, t2vModel = 'wan2.7-t2v-2026-04-25', i2vModel = 'wan2.7-i2v-2026-04-25' }) {
     super();
     this.apiKey = apiKey;
     this.t2vModel = t2vModel;
