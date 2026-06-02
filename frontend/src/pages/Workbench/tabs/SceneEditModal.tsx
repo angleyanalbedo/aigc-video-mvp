@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWorkbench } from '../useWorkbench';
+import { renderMediaPreview } from '../utils/mediaHelper';
 import { DeleteOutlined } from '@ant-design/icons';
 import { Modal, Form, Input, Select, Button, Divider, Row, Col, Typography } from 'antd';
 
@@ -189,11 +190,10 @@ const SceneEditModal: React.FC<WorkbenchProps> = (workbench) => {
                 }} onClick={() => uploadFrameImage(currentEditSceneIndex, 'first')}>
                   {!!script.scenes[currentEditSceneIndex].firstFrameUrl ? (
                     <>
-                      <img
-                        src={script.scenes[currentEditSceneIndex].firstFrameUrl}
-                        alt="首帧"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+                      {renderMediaPreview(script.scenes[currentEditSceneIndex].firstFrameUrl, {
+                        alt: '首帧',
+                        style: { width: '100%', height: '100%', objectFit: 'cover' }
+                      })}
                       <Button
                         size="small"
                         danger
@@ -230,11 +230,10 @@ const SceneEditModal: React.FC<WorkbenchProps> = (workbench) => {
                 }} onClick={() => uploadFrameImage(currentEditSceneIndex, 'last')}>
                   {!!script.scenes[currentEditSceneIndex].lastFrameUrl ? (
                     <>
-                      <img
-                        src={script.scenes[currentEditSceneIndex].lastFrameUrl}
-                        alt="尾帧"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
+                      {renderMediaPreview(script.scenes[currentEditSceneIndex].lastFrameUrl, {
+                        alt: '尾帧',
+                        style: { width: '100%', height: '100%', objectFit: 'cover' }
+                      })}
                       <Button
                         size="small"
                         danger

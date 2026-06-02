@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWorkbench, Scene, API_BASE } from '../useWorkbench';
+import { renderMediaPreview } from '../utils/mediaHelper';
 import {
   PlayCircleOutlined, LoadingOutlined, RocketOutlined, PictureOutlined,
   ApiOutlined, BulbOutlined, ThunderboltOutlined, SyncOutlined,
@@ -316,7 +317,7 @@ const VideoTab: React.FC<WorkbenchProps> = (workbench) => {
                         </div>
                       ) : scene.imageUrl ? (
                         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                          <img src={scene.imageUrl} alt="首帧" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 }} />
+                          {renderMediaPreview(scene.imageUrl, { alt: '首帧', style: { width: '100%', height: '100%', objectFit: 'cover', opacity: 0.6 } })}
                           <div style={{
                             position: 'absolute',
                             inset: 0,

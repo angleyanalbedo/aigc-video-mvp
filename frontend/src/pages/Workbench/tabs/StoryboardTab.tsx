@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWorkbench, Scene, API_BASE } from '../useWorkbench';
+import { renderMediaPreview } from '../utils/mediaHelper';
 import AssetPanel from '../AssetPanel';
 import {
   SendOutlined, LoadingOutlined, PictureOutlined, VideoCameraOutlined,
@@ -346,7 +347,7 @@ const StoryboardTab: React.FC<WorkbenchProps> = (workbench) => {
                               zIndex: 10,
                               boxShadow: '0 2px 6px rgba(0, 0, 0, 0.6)'
                             }} title="已关联商品参考图">
-                              <img src={scene.referenceImageUrl} alt="参考图" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {renderMediaPreview(scene.referenceImageUrl, { alt: '参考图', style: { width: '100%', height: '100%', objectFit: 'cover' } })}
                             </div>
                           )}
 
@@ -357,7 +358,7 @@ const StoryboardTab: React.FC<WorkbenchProps> = (workbench) => {
                             </div>
                           ) : !!scene.imageUrl ? (
                             <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-                              <img src={scene.imageUrl} alt="首帧图片" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {renderMediaPreview(scene.imageUrl, { alt: '首帧图片', style: { width: '100%', height: '100%', objectFit: 'cover' } })}
                               <Button
                                 size="small"
                                 danger
@@ -686,7 +687,7 @@ const StoryboardTab: React.FC<WorkbenchProps> = (workbench) => {
                               }}>
                                 {!!scene.firstFrameUrl ? (
                                   <>
-                                    <img src={scene.firstFrameUrl} alt="首帧" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    {renderMediaPreview(scene.firstFrameUrl, { alt: '首帧', style: { width: '100%', height: '100%', objectFit: 'cover' } })}
                                     <Button
                                       size="small"
                                       danger
@@ -732,7 +733,7 @@ const StoryboardTab: React.FC<WorkbenchProps> = (workbench) => {
                               }}>
                                 {!!scene.lastFrameUrl ? (
                                   <>
-                                    <img src={scene.lastFrameUrl} alt="尾帧" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    {renderMediaPreview(scene.lastFrameUrl, { alt: '尾帧', style: { width: '100%', height: '100%', objectFit: 'cover' } })}
                                     <Button
                                       size="small"
                                       danger
