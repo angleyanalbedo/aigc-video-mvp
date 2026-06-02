@@ -89,18 +89,34 @@ class ImageAgent {
     // 1. 尝试调用 imageProvider.generateImage 抽象接口进行真实生图
     try {
       console.log(`📡 ImageAgent: 正在调用 imageProvider.generateImage 抽象接口...`);
-      
+
       // 智能拼接融合电商产品 Prompts
       const enhancedPrompt = referenceImageUrl
         ? `High-end commercial product photography, extremely detailed, reference style: ${referenceImageUrl}, scene context: ${prompt}`
         : `High-end commercial product rendering, photorealistic, premium e-commerce style, scene context: ${prompt}`;
 
-      const url = await imageProvider.generateImage({
-        prompt: enhancedPrompt,
-        width: 1024,
-        height: 1024
-      });
-      
+      let url;
+      try {
+        url = await imageProvider.generateImage({
+          prompt: enhancedPrompt,
+          width: 1024,
+          height: 1024
+        });
+      } catch (genErr) {
+        // 内容安全审核失败时，用通用 prompt 重试
+        if (genErr.message.includes('inappropriate') || genErr.message.includes('DataInspection')) {
+          console.warn(`⚠️ ImageAgent: 内容审核拦截，使用通用 prompt 重试...`);
+          const safePrompt = `High-end commercial product photography, clean studio background, soft lighting, professional e-commerce style, centered composition, white background`;
+          url = await imageProvider.generateImage({
+            prompt: safePrompt,
+            width: 1024,
+            height: 1024
+          });
+        } else {
+          throw genErr;
+        }
+      }
+
       resultUrl = url;
       console.log(`✅ ImageAgent: 真实多模态大模型生图成功! -> ${resultUrl}`);
     } catch (err) {
