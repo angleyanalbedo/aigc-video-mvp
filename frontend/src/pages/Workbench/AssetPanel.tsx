@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
+import { renderMediaPreview } from './utils/mediaHelper';
 import { Tooltip, message as antdMessage, Spin, Input } from 'antd';
 import {
   PlusOutlined,
@@ -119,7 +120,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                 flexShrink: 0,
               }}
             >
-              <img src={m.url} alt={m.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {renderMediaPreview(m.url, { alt: m.filename, style: { width: '100%', height: '100%', objectFit: 'cover' } })}
             </div>
           </Tooltip>
         ))}
@@ -260,11 +261,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
                   onMouseEnter={() => setHoveredId(m.id)}
                   onMouseLeave={() => setHoveredId(null)}
                 >
-                  <img
-                    src={m.url}
-                    alt={m.filename}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  {renderMediaPreview(m.url, { alt: m.filename, style: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' } })}
 
                   {/* 悬停遮罩 + 注入按钮 */}
                   {(isHovered || isInjecting) && (
@@ -315,7 +312,7 @@ const AssetPanel: React.FC<AssetPanelProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0];
