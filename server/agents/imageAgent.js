@@ -5,7 +5,6 @@
  * 调用文生图/图生图大模型，为每个分镜生成高清、一致的关键帧视觉效果图。
  */
 
-const { getToolsForAgent } = require('./tools/agentTools');
 const skillLoader = require('./skills/skillLoader');
 
 const FALLBACK_PROMPT = `你是电商视频关键帧视觉生成专家，负责为每个分镜生成高质量的关键帧图片。
@@ -38,7 +37,6 @@ class ImageAgent {
     this.agentName = 'ImageAgent';
     this.layer = '执行层';
     this.skillId = 'ImageAgent_generation';
-    this.tools = getToolsForAgent('ImageAgent');
   }
 
   getSystemPrompt() {
@@ -83,26 +81,42 @@ class ImageAgent {
       console.log(`🔗 ImageAgent: 已挂载商品参考图: ${referenceImageUrl}`);
     }
 
-    const { llmProvider } = require('../services/providers');
+    const { imageProvider } = require('../services/providers');
     let resultUrl = null;
 
     const actualSceneIndex = sceneId ? sceneId - 1 : (sceneIndex !== null ? sceneIndex : null);
 
-    // 1. 尝试调用 llmProvider.generateImage 抽象接口进行真实生图
+    // 1. 尝试调用 imageProvider.generateImage 抽象接口进行真实生图
     try {
-      console.log(`📡 ImageAgent: 正在调用 llmProvider.generateImage 抽象接口...`);
-      
+      console.log(`📡 ImageAgent: 正在调用 imageProvider.generateImage 抽象接口...`);
+
       // 智能拼接融合电商产品 Prompts
       const enhancedPrompt = referenceImageUrl
         ? `High-end commercial product photography, extremely detailed, reference style: ${referenceImageUrl}, scene context: ${prompt}`
         : `High-end commercial product rendering, photorealistic, premium e-commerce style, scene context: ${prompt}`;
 
-      const url = await llmProvider.generateImage({
-        prompt: enhancedPrompt,
-        width: 1024,
-        height: 1024
-      });
-      
+      let url;
+      try {
+        url = await imageProvider.generateImage({
+          prompt: enhancedPrompt,
+          width: 1024,
+          height: 1024
+        });
+      } catch (genErr) {
+        // 内容安全审核失败时，用通用 prompt 重试
+        if (genErr.message.includes('inappropriate') || genErr.message.includes('DataInspection')) {
+          console.warn(`⚠️ ImageAgent: 内容审核拦截，使用通用 prompt 重试...`);
+          const safePrompt = `High-end commercial product photography, clean studio background, soft lighting, professional e-commerce style, centered composition, white background`;
+          url = await imageProvider.generateImage({
+            prompt: safePrompt,
+            width: 1024,
+            height: 1024
+          });
+        } else {
+          throw genErr;
+        }
+      }
+
       resultUrl = url;
       console.log(`✅ ImageAgent: 真实多模态大模型生图成功! -> ${resultUrl}`);
     } catch (err) {

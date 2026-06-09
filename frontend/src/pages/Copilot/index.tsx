@@ -27,8 +27,8 @@ const Copilot: React.FC = () => {
   const [error] = useState<string | null>(null);
 
   // Layout collapsed states
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(true);
+  const [rightCollapsed, setRightCollapsed] = useState(true);
 
   // Chat sessions state
   const [sessions, setSessions] = useState<any[]>([]);

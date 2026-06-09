@@ -182,43 +182,28 @@ const projectModel = {
     }
     
     if (scenes.length > 0) {
-      console.log(`\n🔍 [DEBUG_STATUS] 计算项目 ${project.id || project.name || 'Unknown'} 状态:`);
-      console.log(`   - project.videoUrl (最终合成视频):`, project.videoUrl);
-      console.log(`   - 关联分镜数量:`, scenes.length);
-      scenes.forEach((s, idx) => {
-        console.log(`     * 分镜 ${idx + 1}: videoUrl="${s.videoUrl || s.video_url || '无'}", status="${s.status || '无'}", rendering=${s.rendering}`);
-      });
-
       // 兼容 videoUrl 和 video_url 两种属性命名
       const allHaveVideo = scenes.every(scene => scene.videoUrl || scene.video_url);
       const allHaveImage = scenes.every(scene => scene.imageUrl || scene.image_url);
       const hasAnyVideo = scenes.some(scene => scene.videoUrl || scene.video_url);
       const hasAnyImage = scenes.some(scene => scene.imageUrl || scene.image_url);
       const hasGenerating = scenes.some(scene => scene.status === 'generating' || scene.rendering || scene.status === 'processing');
-      
-      console.log(`   - allHaveVideo (所有分镜均有视频):`, allHaveVideo);
-      console.log(`   - hasGenerating (有正在生成的任务):`, hasGenerating);
 
       // 如果每个分镜都有 video url，就是生成完毕 (completed)
       if (allHaveVideo) {
-        console.log(`   👉 最终决定状态: completed\n`);
         return 'completed';
       }
-      
+
       if (hasGenerating) {
-        console.log(`   👉 最终决定状态: processing (因为有生成中任务)\n`);
         return 'processing';
       }
       
       if (hasAnyVideo || hasAnyImage) {
-        console.log(`   👉 最终决定状态: processing (因为已开始部分画面/视频生成)\n`);
         return 'processing';
       }
-      console.log(`   👉 最终决定状态: draft\n`);
       return 'draft';
     }
-    
-    console.log(`   👉 最终决定状态:`, project.status || 'draft', `(无分镜，返回默认值)\n`);
+
     return project.status || 'draft';
   },
 

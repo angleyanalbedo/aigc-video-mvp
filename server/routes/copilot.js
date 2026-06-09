@@ -129,10 +129,9 @@ router.get('/chat/sessions/:projectId', async (req, res) => {
 
   try {
     const db = require('../db');
-    const sessions = await db.all(
-      'SELECT * FROM chat_sessions WHERE project_id = ? ORDER BY updated_at DESC',
-      [projectId]
-    );
+    const sessions = db.prepare(
+      'SELECT * FROM chat_sessions WHERE project_id = ? ORDER BY updated_at DESC'
+    ).all(projectId);
 
     res.json({ success: true, sessions });
   } catch (error) {

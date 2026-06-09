@@ -7,9 +7,8 @@ const { VideoOrchestrator, STATES } = require('./orchestrator');
 const { memoryManager, vectorStore, embeddingService } = require('./memory');
 const skillLoader = require('./skills/skillLoader');
 const masterAgent = require('./masterAgent');
-const IntentParser = require('./intent/intentParser');
-const TaskPlanner = require('./planner/taskPlanner');
-const ToolExecutor = require('./executor/toolExecutor');
+const { getToolDescriptions, executeTool, getToolNames } = require('./tools/toolRegistry');
+const { runToolLoop } = require('./toolLoop');
 
 module.exports = {
   scriptAgent,
@@ -25,7 +24,6 @@ module.exports = {
   embeddingService,
   skillLoader,
   masterAgent,
-  IntentParser,
-  TaskPlanner,
-  ToolExecutor
+  toolRegistry: { getToolDescriptions, executeTool, getToolNames },
+  runToolLoop
 };

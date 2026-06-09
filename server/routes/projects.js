@@ -23,15 +23,15 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    // 工作台资产面板只允许图片上传
-    const allowed = /\.(jpe?g|png|gif|webp|bmp)$/i;
+    // 工作台资产面板支持图片和视频上传
+    const allowed = /\.(jpe?g|png|gif|webp|bmp|mp4|mov|avi|webm|mkv)$/i;
     if (allowed.test(file.originalname)) {
       cb(null, true);
     } else {
-      cb(new Error('仅支持图片格式（jpg/png/gif/webp）'));
+      cb(new Error('仅支持图片格式（jpg/png/gif/webp）或视频格式（mp4/mov/avi/webm）'));
     }
   },
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB (支持视频文件)
 });
 
 router.get('/', (req, res) => {

@@ -6,7 +6,6 @@ const execAsync = promisify(exec);
 const { generateStructuredText } = require('./tools/llm');
 const { generateTTS } = require('./tools/ttsAPI');
 const skillLoader = require('./skills/skillLoader');
-const { getToolsForAgent } = require('./tools/agentTools');
 
 const TASKS_DIR = path.join(__dirname, '../tasks');
 const OUTPUTS_DIR = path.join(__dirname, '../outputs');
@@ -32,7 +31,6 @@ class ClipAgent {
     this.skillId = 'ClipAgent_planning';
     this.transitions = ['cut', 'fade', 'dissolve', 'wipe'];
     this.bgmStyles = ['欢快', '温馨', '动感', '舒缓', '激情'];
-    this.tools = getToolsForAgent('ClipAgent');
   }
 
   getSystemPrompt() {
