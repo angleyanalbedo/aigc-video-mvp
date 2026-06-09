@@ -7,7 +7,7 @@ const assert = require('assert');
 process.env.LLM_PROVIDER = 'ali';
 process.env.IMAGE_PROVIDER = 'ali';
 process.env.VIDEO_PROVIDER = 'ali';
-process.env.DASHSCOPE_API_KEY = 'mock-dashscope-key';
+process.env.DASHSCOPE_API_KEY = 'test-key-placeholder';
 
 try {
   console.log('🧪 Starting provider validation...');
