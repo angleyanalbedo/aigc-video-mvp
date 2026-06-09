@@ -8,8 +8,13 @@ class AliLLMProvider extends BaseLLMProvider {
     this.imageModel = imageModel;
   }
 
-  async generateText({ system, prompt, temperature = 0.7, maxTokens = 2000 }) {
+  async generateText({ system, prompt, messages, temperature = 0.7, maxTokens = 2000 }) {
     try {
+      // 支持多轮消息格式：如果传了 messages 数组则直接使用，否则用 prompt 构造单条消息
+      const msgArray = messages
+        ? [...(system ? [{ role: 'system', content: system }] : []), ...messages]
+        : [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: prompt }];
+
       const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -18,10 +23,7 @@ class AliLLMProvider extends BaseLLMProvider {
         },
         body: JSON.stringify({
           model: this.llmModel,
-          messages: [
-            ...(system ? [{ role: 'system', content: system }] : []),
-            { role: 'user', content: prompt }
-          ],
+          messages: msgArray,
           temperature,
           max_tokens: maxTokens
         })

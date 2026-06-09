@@ -131,6 +131,24 @@ export async function getConnections(projectId: string): Promise<{
   return response.json();
 }
 
+export async function createConnection(
+  projectId: string,
+  sourceNodeId: string,
+  targetNodeId: string,
+  connectionType: string = 'dependency'
+): Promise<{
+  success: boolean;
+  connection?: Connection;
+  error?: string;
+}> {
+  const response = await fetch(`${API_BASE}/copilot/canvas/connections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, sourceNodeId, targetNodeId, connectionType })
+  });
+  return response.json();
+}
+
 export async function updateNodePosition(
   nodeId: string,
   position: { x: number; y: number }

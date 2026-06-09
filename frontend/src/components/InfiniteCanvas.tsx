@@ -22,6 +22,7 @@ import {
   updateNodeData,
   deleteNodeDirectly,
   createNodeDirectly,
+  createConnection,
   generateSceneVideo,
   type Node,
   type Connection
@@ -449,6 +450,56 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     setIsPreviewVisible(true);
   };
 
+  // 通用：创建节点后自动建立与相关节点的连线
+  const autoConnectNode = async (newNodeId: string, nodeType: string) => {
+    const scriptNode = nodes.find(n => n.type === 'script');
+    const videoNode = nodes.find(n => n.type === 'video');
+
+    if (nodeType === 'scene') {
+      // 分镜 → 连接到剧本（timeline）和成片（dependency）
+      if (scriptNode) {
+        await createConnection(projectId, scriptNode.id, newNodeId, 'timeline');
+        setConnections(prev => [...prev, { id: `conn_${Date.now()}`, sourceNodeId: scriptNode.id, targetNodeId: newNodeId, connectionType: 'timeline' }]);
+      }
+      if (videoNode) {
+        await createConnection(projectId, newNodeId, videoNode.id, 'dependency');
+        setConnections(prev => [...prev, { id: `conn_${Date.now()}_v`, sourceNodeId: newNodeId, targetNodeId: videoNode.id, connectionType: 'dependency' }]);
+      }
+    } else if (nodeType === 'material') {
+      // 素材/BGM → 连接到最近的分镜（reference）
+      const lastScene = nodes.filter(n => n.type === 'scene').sort((a, b) => (b.data.sceneId || 0) - (a.data.sceneId || 0))[0];
+      if (lastScene) {
+        await createConnection(projectId, newNodeId, lastScene.id, 'reference');
+        setConnections(prev => [...prev, { id: `conn_${Date.now()}`, sourceNodeId: newNodeId, targetNodeId: lastScene.id, connectionType: 'reference' }]);
+      }
+    } else if (nodeType === 'video') {
+      // 成片 → 连接所有分镜（dependency）
+      const sceneNodes = nodes.filter(n => n.type === 'scene');
+      for (const sn of sceneNodes) {
+        await createConnection(projectId, sn.id, newNodeId, 'dependency');
+        setConnections(prev => [...prev, { id: `conn_${Date.now()}_${sn.id}`, sourceNodeId: sn.id, targetNodeId: newNodeId, connectionType: 'dependency' }]);
+      }
+    }
+  };
+
+  const handleAddScriptNode = async () => {
+    const defaultData = {
+      title: '产品推广脚本',
+      description: '展示商品精致的外观与设计，通过镜头语言传达品牌质感',
+      scenes: []
+    };
+
+    const x = -viewport.x / viewport.scale + 150 + Math.random() * 50;
+    const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
+
+    const res = await createNodeDirectly(projectId, 'script', defaultData, { x, y });
+    if (res.success) {
+      message.success('已成功在画布上创建了剧本节点！');
+    } else {
+      message.error(res.error || '添加剧本失败');
+    }
+  };
+
   const handleAddSceneNode = async () => {
     const existingSceneIds = nodes
       .filter(n => n.type === 'scene' && n.data.sceneId)
@@ -469,7 +520,8 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
 
     const res = await createNodeDirectly(projectId, 'scene', defaultData, { x, y });
-    if (res.success) {
+    if (res.success && res.node) {
+      await autoConnectNode(res.node.id, 'scene');
       message.success('已在画布和剧本配置中新增了一个分镜节点！');
     } else {
       message.error(res.error || '添加分镜失败');
@@ -488,7 +540,8 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
 
     const res = await createNodeDirectly(projectId, 'material', defaultData, { x, y });
-    if (res.success) {
+    if (res.success && res.node) {
+      await autoConnectNode(res.node.id, 'material');
       message.success('已成功在画布上创建了素材节点！');
     } else {
       message.error(res.error || '添加素材失败');
@@ -508,7 +561,8 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     const y = -viewport.y / viewport.scale + 100 + Math.random() * 50;
 
     const res = await createNodeDirectly(projectId, 'material', defaultData, { x, y });
-    if (res.success) {
+    if (res.success && res.node) {
+      await autoConnectNode(res.node.id, 'material');
       message.success('已成功在画布上添加了背景音乐节点！双击可编辑音频信息。');
     } else {
       message.error(res.error || '添加背景音乐失败');
@@ -527,7 +581,8 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
     const y = -viewport.y / viewport.scale + 150;
 
     const res = await createNodeDirectly(projectId, 'video', defaultData, { x, y });
-    if (res.success) {
+    if (res.success && res.node) {
+      await autoConnectNode(res.node.id, 'video');
       message.success('已成功在画布上添加了最终成片节点！您可以在节点中一键触发多分镜合成。');
     } else {
       message.error(res.error || '添加视频合成节点失败');
@@ -1198,6 +1253,14 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
           <BuildOutlined /> 画布工具箱 (Toonflow)
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={handleAddScriptNode}
+            size="small"
+            className="script-toolbox-btn"
+          >
+            添加剧本节点
+          </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}

@@ -46,7 +46,17 @@ const TOOL_USE_INSTRUCTIONS = `## 工具调用规范
 - 工具调用必须用 \`\`\`tool_call 代码块包裹
 - 最终回复必须用 \`\`\`final_answer 代码块包裹
 - 如果不需要调用工具，直接输出 final_answer
-- 先思考再行动，简要说明你的思路`;
+- 先思考再行动，简要说明你的思路
+
+**多步任务执行规范（关键）：**
+- 用户的请求通常需要多步操作才能完成，不要调用一个工具就停下来！
+- 每次工具调用成功后，检查用户的原始请求是否已完全满足
+- 如果还有未完成的步骤，继续调用下一个工具，不要输出 final_answer
+- 只有当所有步骤都执行完毕后，才输出 final_answer 汇总结果
+- 例如用户说"生成剧本然后渲染所有分镜"，你需要：1) generate_script 2) generate_video(分镜1) 3) generate_video(分镜2) ... 直到所有分镜都渲染完
+
+**执行计划示例：**
+用户请求 → 先在内心列出所有需要的步骤 → 逐步执行每个工具 → 全部完成后输出 final_answer`;
 
 /**
  * 从 LLM 响应中提取工具调用或最终回答
@@ -144,15 +154,15 @@ ${TOOL_USE_INSTRUCTIONS}`;
     iterations++;
     onProgress?.(`思考中... (第 ${iterations} 轮)`);
 
-    // 调用 LLM
+    // 调用 LLM — 使用多轮消息格式，让 LLM 正确感知对话轮次
     const response = await llmProvider.generateText({
       system: systemPrompt,
-      prompt: conversationHistory.map(m => {
-        if (m.role === 'user') return `用户: ${m.content}`;
-        if (m.role === 'assistant') return `助手: ${m.content}`;
-        if (m.role === 'tool') return `工具结果: ${m.content}`;
-        return m.content;
-      }).join('\n\n'),
+      messages: conversationHistory.map(m => ({
+        role: m.role === 'tool' ? 'user' : m.role,  // tool 结果作为 user 消息发回（OpenAI 兼容格式不支持 tool role）
+        content: m.role === 'tool'
+          ? `[工具执行结果]\n${m.content}\n\n请根据以上结果决定：如果用户的任务还有未完成的步骤，继续调用工具；如果所有步骤已完成，输出 final_answer 汇总。`
+          : m.content
+      })),
       temperature: 0.3,
       maxTokens: 2000
     });

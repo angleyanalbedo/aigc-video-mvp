@@ -101,6 +101,22 @@ router.get('/canvas/connections/:projectId', async (req, res) => {
   }
 });
 
+router.post('/canvas/connections', async (req, res) => {
+  const { projectId, sourceNodeId, targetNodeId, connectionType } = req.body;
+
+  if (!projectId || !sourceNodeId || !targetNodeId) {
+    return res.status(400).json({ success: false, error: 'projectId, sourceNodeId and targetNodeId are required' });
+  }
+
+  try {
+    const connection = await canvasSyncService.createConnection(projectId, sourceNodeId, targetNodeId, connectionType || 'dependency');
+    res.json({ success: true, connection });
+  } catch (error) {
+    console.error('Connection creation error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.put('/canvas/nodes/:nodeId/position', async (req, res) => {
   const { nodeId } = req.params;
   const { x, y } = req.body;

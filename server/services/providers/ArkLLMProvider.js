@@ -9,8 +9,13 @@ class ArkLLMProvider extends BaseLLMProvider {
     this.imageEp = imageEp;
   }
 
-  async generateText({ system, prompt, temperature = 0.7, maxTokens = 2000 }) {
+  async generateText({ system, prompt, messages, temperature = 0.7, maxTokens = 2000 }) {
     try {
+      // 支持多轮消息格式：如果传了 messages 数组则直接使用，否则用 prompt 构造单条消息
+      const msgArray = messages
+        ? [...(system ? [{ role: 'system', content: system }] : []), ...messages]
+        : [...(system ? [{ role: 'system', content: system }] : []), { role: 'user', content: prompt }];
+
       const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
         method: 'POST',
         headers: {
@@ -19,10 +24,7 @@ class ArkLLMProvider extends BaseLLMProvider {
         },
         body: JSON.stringify({
           model: this.llmEp,
-          messages: [
-            ...(system ? [{ role: 'system', content: system }] : []),
-            { role: 'user', content: prompt }
-          ],
+          messages: msgArray,
           temperature,
           max_tokens: maxTokens
         })
