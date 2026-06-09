@@ -29,7 +29,7 @@ if [ ! -f "server/.env" ]; then
         echo -e "${YELLOW}📝 未检测到 server/.env，正在创建默认配置...${NC}"
         cat > server/.env << 'EOF'
 PORT=3001
-***REMOVED***ark-your-key-here
+ARK_API_KEY=ark-your-key-here
 LLM_EP=ep-your-llm-endpoint
 VIDEO_EP=ep-your-video-endpoint
 EOF

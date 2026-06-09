@@ -10,7 +10,7 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - ***REMOVED***${ARK_API_KEY:-}
+      - ARK_API_KEY=${ARK_API_KEY:-}
       - LLM_EP=${LLM_EP:-}
       - VIDEO_EP=${VIDEO_EP:-}
     volumes:

@@ -27,7 +27,7 @@ if not exist "server\.env" (
         echo 📝 未检测到 server/.env，正在创建默认配置文件...
         (
         echo PORT=3001
-        echo ***REMOVED***ark-your-key-here
+        echo ARK_API_KEY=ark-your-key-here
         echo LLM_EP=ep-your-llm-endpoint
         echo VIDEO_EP=ep-your-video-endpoint
         ) > "server\.env"

@@ -70,7 +70,7 @@ npm run dev
 在 `server/.env` 中配置 API 密钥：
 ```env
 PORT=3001
-***REMOVED***ark-你的API密钥
+ARK_API_KEY=ark-你的API密钥
 LLM_EP=ep-Doubao-Seed-2.0-pro的Endpoint
 VIDEO_EP=ep-Doubao-Seedance-1.5-pro的Endpoint
 ```

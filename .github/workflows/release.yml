@@ -139,7 +139,7 @@ docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/aigc-video-frontend:${VE
           curl -O https://raw.githubusercontent.com/${{ github.repository }}/${VERSION}/docker-compose.yml
 
           # 设置环境变量
-          export ***REMOVED***your_api_key
+          export ARK_API_KEY=your_api_key
           export LLM_EP=your_llm_endpoint
           export VIDEO_EP=your_video_endpoint
 
