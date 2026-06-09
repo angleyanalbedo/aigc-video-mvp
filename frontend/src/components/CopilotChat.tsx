@@ -151,6 +151,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
   const [pendingPlan, setPendingPlan] = useState<Plan & { planNodeId: string, sessionId: string } | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(activeSessionId || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -196,6 +197,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
     }
     setSessionId(newSessionId);
     setMessages([]);
+    isLoadingRef.current = false;
     setIsLoading(false);
     setPendingPlan(null);
     setShowHistory(false);
@@ -285,6 +287,12 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
         };
 
         setMessages(prev => mergeMessage(prev, normalizedMsg));
+
+        // assistant 的 text 类型消息是最终回答 → 结束 loading
+        if (normalizedMsg.role === 'assistant' && normalizedMsg.type === 'text') {
+          isLoadingRef.current = false;
+          setIsLoading(false);
+        }
       },
       onError: (error) => console.error('❌ WebSocket error:', error)
     });
@@ -328,7 +336,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
   };
 
   const handleSend = async () => {
-    if ((!inputValue.trim() && !uploadedFile) || isLoading || !sessionId) return;
+    if ((!inputValue.trim() && !uploadedFile) || isLoadingRef.current || !sessionId) return;
 
     const userMetadata = uploadedFile
       ? {
@@ -352,19 +360,21 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
     setMessages(prev => mergeMessage(prev, userMessage));
     setInputValue('');
     setUploadedFile(null);
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
       const response = await sendMessage(projectId, tempContent, sessionId, userMetadata);
-      
+
       if (response.success) {
         if (response.type === 'plan_confirmation') {
+          // 计划确认需要用户交互，结束 loading
           setPendingPlan({
             ...response.plan!,
             planNodeId: response.planNodeId!,
             sessionId: response.sessionId!
           });
-          
+
           const assistantMessage: Message = {
             id: `assistant_${Date.now()}`,
             role: 'assistant',
@@ -377,16 +387,10 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
             }
           };
           setMessages(prev => mergeMessage(prev, assistantMessage));
-        } else {
-          const assistantMessage: Message = {
-            id: `assistant_${Date.now()}`,
-            role: 'assistant',
-            type: response.type as any,
-            content: response.message || '操作完成！',
-            timestamp: Date.now()
-          };
-          setMessages(prev => mergeMessage(prev, assistantMessage));
+          isLoadingRef.current = false;
+          setIsLoading(false);
         }
+        // 普通 chat 消息：不清 loading，等 WebSocket 推送最终回答时再清
       } else {
         const errorMessage: Message = {
           id: `error_${Date.now()}`,
@@ -396,6 +400,8 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
           timestamp: Date.now()
         };
         setMessages(prev => mergeMessage(prev, errorMessage));
+        isLoadingRef.current = false;
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('❌ Send message error:', error);
@@ -407,7 +413,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
         timestamp: Date.now()
       };
       setMessages(prev => mergeMessage(prev, errorMessage));
-    } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
   };
@@ -424,11 +430,12 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
     };
     setMessages(prev => mergeMessage(prev, executingMessage));
     setPendingPlan(null);
+    isLoadingRef.current = true;
     setIsLoading(true);
 
     try {
       const response = await executePlan(pendingPlan.planNodeId, projectId, pendingPlan.sessionId);
-      
+
       if (response.success) {
         const successMessage: Message = {
           id: `assistant_${Date.now()}`,
@@ -459,6 +466,7 @@ const CopilotChat: React.FC<CopilotChatProps> = ({
       };
       setMessages(prev => mergeMessage(prev, errorMessage));
     } finally {
+      isLoadingRef.current = false;
       setIsLoading(false);
     }
   };
