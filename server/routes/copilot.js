@@ -220,12 +220,7 @@ router.post('/canvas/nodes', async (req, res) => {
   }
 
   try {
-    let node;
-    if (type === 'scene') {
-      node = await canvasSyncService.createSceneNodeDirectly(projectId, data || {}, position);
-    } else {
-      node = await canvasSyncService.createNode(projectId, type, data || {}, position || { x: 100, y: 100 });
-    }
+    const node = await canvasSyncService.createNode(projectId, type, data || {}, position || { x: 100, y: 100 });
     res.json({ success: true, node });
   } catch (error) {
     console.error('Node creation error:', error);

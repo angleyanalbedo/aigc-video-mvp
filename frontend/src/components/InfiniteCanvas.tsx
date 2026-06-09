@@ -450,7 +450,13 @@ const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ projectId }) => {
   };
 
   const handleAddSceneNode = async () => {
+    const existingSceneIds = nodes
+      .filter(n => n.type === 'scene' && n.data.sceneId)
+      .map(n => n.data.sceneId);
+    const nextSceneId = existingSceneIds.length > 0 ? Math.max(...existingSceneIds) + 1 : 1;
+
     const defaultData = {
+      sceneId: nextSceneId,
       description: '镜头微距特写，展示商品精致的外观与设计，商业摄影光影，极简背景',
       voiceover: '看看这个精致的工艺与细节，你一定会爱上它！',
       duration: 3,
