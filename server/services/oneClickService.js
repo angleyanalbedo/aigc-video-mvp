@@ -95,7 +95,7 @@ class OneClickService {
         progress: 100,
         phase: 'completed',
         message: '一键成片完成！',
-        videoUrl: `http://localhost:${PORT}/outputs/${path.basename(composeResult.outputPath)}`,
+        videoUrl: `/outputs/${path.basename(composeResult.outputPath)}`,
         duration: composeResult.duration,
         script,
         productInfo,

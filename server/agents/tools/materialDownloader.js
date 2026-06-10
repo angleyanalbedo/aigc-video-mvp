@@ -36,8 +36,7 @@ async function downloadMaterial(url, projectId) {
   const mockImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   fs.writeFileSync(destPath, Buffer.from(mockImageBase64, 'base64'));
 
-  const port = process.env.PORT || 3001;
-  const fileUrl = `http://localhost:${port}/uploads/${filename}`;
+  const fileUrl = `/uploads/${filename}`;
 
   // 写入 SQLite materials 数据库
   try {

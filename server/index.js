@@ -43,6 +43,13 @@ console.log('[DEBUG] 10. observabilityRoutes loaded');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 根据请求动态生成基础 URL（避免硬编码 localhost）
+function getBaseUrl(req) {
+  const protocol = req.protocol || 'http';
+  const host = req.get('host') || `localhost:${PORT}`;
+  return `${protocol}://${host}`;
+}
+
 // 引入后端抽象服务层
 const { videoProvider, llmProvider, hasRealAPI } = require('./services/providers');
 console.log('✅ 已加载火山方舟 API 配置');
@@ -183,7 +190,7 @@ setInterval(() => {
 // 1. 素材上传
 app.post('/api/upload', upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: '没有上传文件' });
-  const fileUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+  const fileUrl = `${getBaseUrl(req)}/uploads/${req.file.filename}`;
   res.json({ success: true, url: fileUrl, filename: req.file.filename });
 });
 
@@ -330,13 +337,13 @@ app.get('/api/video/status/:taskId', async (req, res) => {
             const promptUsed = taskInfo?.prompt || '真实大模型生成视频片段';
             materialService.addMaterial({
               filename: `分镜渲染片段_${taskId.substring(0, 8)}.mp4`,
-              url: `http://localhost:${PORT}/outputs/${localFilename}`,
+              url: `${getBaseUrl(req)}/outputs/${localFilename}`,
               content: `由提示词生成: ${promptUsed}`
             });
             console.log(`✅ 已自动将持久化视频片段添加至素材库！`);
           }
           
-          finalVideoUrl = `http://localhost:${PORT}/outputs/${localFilename}`;
+          finalVideoUrl = `${getBaseUrl(req)}/outputs/${localFilename}`;
         } catch (downloadErr) {
           console.error(`⚠️ 下载持久化真实视频失败:`, downloadErr.message);
           // 降级使用原始远程 URL
@@ -579,8 +586,8 @@ app.post('/api/tts/generate', async (req, res) => {
 
     res.json({
       success: true,
-      audioUrl: `http://localhost:${PORT}/outputs/${audioFilename}`,
-      subtitleUrl: `http://localhost:${PORT}/outputs/${subtitleFilename}`,
+      audioUrl: `${getBaseUrl(req)}/outputs/${audioFilename}`,
+      subtitleUrl: `${getBaseUrl(req)}/outputs/${subtitleFilename}`,
       duration: result.duration
     });
   } catch (error) {
@@ -770,7 +777,7 @@ app.post('/api/video/compose', async (req, res) => {
 
     res.json({
       success: true,
-      videoUrl: `http://localhost:${PORT}/outputs/${path.basename(result.outputPath)}`,
+      videoUrl: `${getBaseUrl(req)}/outputs/${path.basename(result.outputPath)}`,
       duration: result.duration,
       tracks: result.tracks
     });
@@ -881,7 +888,7 @@ app.post('/api/video/batch-generate', async (req, res) => {
           console.log(`💾 批量分镜 ${i + 1} 持久化副本已保存至: ${persistPath}`);
 
           const promptUsed = scene.description || '批量生成分镜片段';
-          const localUrl = `http://localhost:${PORT}/outputs/${persistFilename}`;
+          const localUrl = `${getBaseUrl(req)}/outputs/${persistFilename}`;
           materialService.addMaterial({
             filename: `批量分镜_${i + 1}_${batchId.substring(6)}.mp4`,
             url: localUrl,
@@ -990,7 +997,7 @@ app.post('/api/video/batch-generate', async (req, res) => {
       const finalResult = {
         status: 'completed',
         progress: 100,
-        videoUrl: `http://localhost:${PORT}/outputs/${path.basename(composeResult.outputPath)}`,
+        videoUrl: `${getBaseUrl(req)}/outputs/${path.basename(composeResult.outputPath)}`,
         duration: composeResult.duration,
         completedAt: Date.now()
       };

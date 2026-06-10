@@ -90,7 +90,7 @@ router.post('/generate', async (req, res) => {
       success: true,
       taskId: result.id,
       script: result.script,
-      videoUrl: result.finalVideo ? `http://localhost:${process.env.PORT || 3001}/${result.finalVideo}` : null,
+      videoUrl: result.finalVideo ? `${req.protocol}://${req.get('host')}/${result.finalVideo}` : null,
       steps: result.steps,
       duration: result.totalDuration,
       state: result.state
