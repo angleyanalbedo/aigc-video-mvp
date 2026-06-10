@@ -65,14 +65,15 @@ class MasterAgent extends EventEmitter {
 
     // 立即返回，不阻塞前端
     resultPromise.then(async (result) => {
-      await canvasSyncService.addChatMessage(
-        sessionId, 'assistant', 'text', result.answer
+      // 必须用 broadcastChatMessage 广播最终回答，前端靠 WebSocket 收到后才结束 loading
+      await this.broadcastChatMessage(
+        projectId, sessionId, 'assistant', 'text', result.answer
       );
       console.log(`✅ 工具循环完成: ${result.iterations} 轮, ${result.toolCalls.length} 次工具调用`);
     }).catch(async (err) => {
       console.error('❌ 工具循环失败:', err);
-      await canvasSyncService.addChatMessage(
-        sessionId, 'assistant', 'error', `❌ 处理失败: ${err.message}`
+      await this.broadcastChatMessage(
+        projectId, sessionId, 'assistant', 'error', `❌ 处理失败: ${err.message}`
       );
     });
 
