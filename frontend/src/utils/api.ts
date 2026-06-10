@@ -1,4 +1,5 @@
 import { API_BASE } from '../services/config';
+import { getAuthHeaders, removeToken } from '../services/auth';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -6,10 +7,21 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+// 401 统一处理：清除 token 并跳转登录
+function handle401(): ApiResponse {
+  removeToken();
+  window.location.href = '/login';
+  return { success: false, error: '登录已过期' };
+}
+
 export async function apiGet<T = any>(endpoint: string): Promise<ApiResponse<T>> {
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`);
-    
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      headers: getAuthHeaders(),
+    });
+
+    if (response.status === 401) return handle401();
+
     if (!response.ok) {
       return {
         success: false,
@@ -46,11 +58,14 @@ export async function apiPost<T = any>(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
         ...options?.headers,
       },
       body: body ? JSON.stringify(body) : undefined,
       ...options,
     });
+
+    if (response.status === 401) return handle401();
 
     if (!response.ok) {
       return {
@@ -85,9 +100,11 @@ export async function apiPut<T = any>(
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (response.status === 401) return handle401();
 
     if (!response.ok) {
       return {
@@ -113,7 +130,10 @@ export async function apiDelete<T = any>(
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
+
+    if (response.status === 401) return handle401();
 
     if (!response.ok) {
       return {

@@ -3,6 +3,7 @@ import { Card, Row, Col, Statistic, Table, Progress, Tag, Spin, Empty } from 'an
 import { VideoCameraOutlined, EyeOutlined, ClockCircleOutlined, RiseOutlined, ArrowUpOutlined } from '@ant-design/icons'
 import axios from 'axios'
 import { API_BASE } from './services/config'
+import { getAuthHeaders, removeToken } from './services/auth'
 
 interface DashboardData {
   overview: {
@@ -50,9 +51,16 @@ export default function Dashboard() {
 
   const fetchDashboard = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/api/dashboard/stats`)
+      const response = await axios.get(`${API_BASE}/api/dashboard/stats`, {
+        headers: getAuthHeaders(),
+      })
       setData(response.data.data)
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        removeToken();
+        window.location.href = '/login';
+        return;
+      }
       console.error('获取看板数据失败:', error)
     } finally {
       setLoading(false)

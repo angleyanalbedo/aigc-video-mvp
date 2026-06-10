@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Spin } from 'antd';
 import WorkbenchLayout from './layouts/WorkbenchLayout';
 import VideoCreationPage from './pages/VideoCreation';
 import TaskCenterPage from './pages/TaskCenter';
@@ -16,8 +17,29 @@ import SettingsPage from './pages/Settings';
 import VideoLibraryPage from './pages/VideoLibrary';
 import TemplateLibraryPage from './pages/TemplateLibrary';
 import OneClickPage from './pages/OneClick';
+import LoginPage from './pages/Login';
 import ErrorBoundary from './components/ErrorBoundary';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
+
+// 认证守卫组件
+const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoggedIn, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 // Dashboard wrapper for global pages sharing the sidebar layout
 const DashboardWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -28,30 +50,31 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
-        <Routes>
-          {/* Dynamic, Focused Workbench Studio (Sidebar adapts to project context) */}
-          <Route path="/workbench/:projectId" element={<DashboardWrapper><WorkbenchPage /></DashboardWrapper>} />
-          
-          {/* Copilot AI Agent Studio - No side panel layout */}
-          <Route path="/copilot/:projectId" element={<CopilotPage />} />
+        <AuthProvider>
+          <Routes>
+            {/* 公开路由 */}
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Global Management Portal (With Left Sidebar Navigation) */}
-          <Route path="/" element={<DashboardWrapper><ProjectListPage /></DashboardWrapper>} />
-          <Route path="/projects" element={<DashboardWrapper><ProjectListPage /></DashboardWrapper>} />
-          <Route path="/video-creation" element={<DashboardWrapper><VideoCreationPage /></DashboardWrapper>} />
-          <Route path="/task-center" element={<DashboardWrapper><TaskCenterPage /></DashboardWrapper>} />
-          <Route path="/materials" element={<DashboardWrapper><MaterialManagementPage /></DashboardWrapper>} />
-          <Route path="/attribution" element={<DashboardWrapper><AttributionAnalysisPage /></DashboardWrapper>} />
-          <Route path="/abtest" element={<DashboardWrapper><ABTestPage /></DashboardWrapper>} />
-          <Route path="/observability" element={<DashboardWrapper><ObservabilityPage /></DashboardWrapper>} />
-          <Route path="/compliance" element={<DashboardWrapper><CompliancePage /></DashboardWrapper>} />
-          <Route path="/status" element={<DashboardWrapper><StatusPage /></DashboardWrapper>} />
-          <Route path="/settings" element={<DashboardWrapper><SettingsPage /></DashboardWrapper>} />
-          <Route path="/video-library" element={<DashboardWrapper><VideoLibraryPage /></DashboardWrapper>} />
-          <Route path="/template-library" element={<DashboardWrapper><TemplateLibraryPage /></DashboardWrapper>} />
-          <Route path="/one-click" element={<DashboardWrapper><OneClickPage /></DashboardWrapper>} />
-          <Route path="/dashboard" element={<Dashboard />} />
-        </Routes>
+            {/* 受保护路由 */}
+            <Route path="/workbench/:projectId" element={<RequireAuth><DashboardWrapper><WorkbenchPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/copilot/:projectId" element={<RequireAuth><CopilotPage /></RequireAuth>} />
+            <Route path="/" element={<RequireAuth><DashboardWrapper><ProjectListPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/projects" element={<RequireAuth><DashboardWrapper><ProjectListPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/video-creation" element={<RequireAuth><DashboardWrapper><VideoCreationPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/task-center" element={<RequireAuth><DashboardWrapper><TaskCenterPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/materials" element={<RequireAuth><DashboardWrapper><MaterialManagementPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/attribution" element={<RequireAuth><DashboardWrapper><AttributionAnalysisPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/abtest" element={<RequireAuth><DashboardWrapper><ABTestPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/observability" element={<RequireAuth><DashboardWrapper><ObservabilityPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/compliance" element={<RequireAuth><DashboardWrapper><CompliancePage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/status" element={<RequireAuth><DashboardWrapper><StatusPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/settings" element={<RequireAuth><DashboardWrapper><SettingsPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/video-library" element={<RequireAuth><DashboardWrapper><VideoLibraryPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/template-library" element={<RequireAuth><DashboardWrapper><TemplateLibraryPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/one-click" element={<RequireAuth><DashboardWrapper><OneClickPage /></DashboardWrapper></RequireAuth>} />
+            <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          </Routes>
+        </AuthProvider>
       </Router>
     </ErrorBoundary>
   );

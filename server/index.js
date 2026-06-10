@@ -109,6 +109,26 @@ app.use((req, res, next) => {
 });
 console.log('[DEBUG] 15. request tracing middleware done');
 
+// ====== 认证 ======
+// 登录路由（必须在 auth 中间件之前注册）
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+
+// 认证中间件：保护所有 /api 路由
+const requireAuth = require('./middleware/auth');
+app.use('/api', requireAuth);
+
+// 检查认证环境变量
+if (!process.env.ADMIN_USERNAME || !process.env.ADMIN_PASSWORD) {
+  console.warn('⚠️ ADMIN_USERNAME 或 ADMIN_PASSWORD 未设置，登录功能将不可用');
+}
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️ JWT_SECRET 未设置，将使用默认密钥（不安全）');
+  process.env.JWT_SECRET = 'aigc-video-mvp-default-secret-change-me';
+}
+
+console.log('[DEBUG] 16. auth middleware done');
+
 // 确保上传目录存在
 const uploadsDir = path.join(__dirname, 'uploads');
 const outputDir = path.join(__dirname, 'outputs');

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, authFetch } from './config';
 
 export interface VideoLibraryItem {
   id: string;
@@ -46,17 +46,17 @@ export class VideoLibraryService {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`${API_BASE_URL}/api/video-library?${query}`);
+    const res = await authFetch(`${API_BASE_URL}/api/video-library?${query}`);
     return await res.json();
   }
 
   static async getById(id: string): Promise<{ success: boolean; data?: VideoLibraryItem; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/${id}`);
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/${id}`);
     return await res.json();
   }
 
   static async create(data: Partial<VideoLibraryItem>): Promise<{ success: boolean; data?: VideoLibraryItem; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library`, {
+    const res = await authFetch(`${API_BASE_URL}/api/video-library`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -65,7 +65,7 @@ export class VideoLibraryService {
   }
 
   static async update(id: string, data: Partial<VideoLibraryItem>): Promise<{ success: boolean; data?: VideoLibraryItem; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/${id}`, {
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -74,12 +74,12 @@ export class VideoLibraryService {
   }
 
   static async delete(id: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/${id}`, { method: 'DELETE' });
     return await res.json();
   }
 
   static async analyze(id: string): Promise<{ success: boolean; data?: any; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/${id}/analyze`, {
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/${id}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -87,12 +87,12 @@ export class VideoLibraryService {
   }
 
   static async getStats(): Promise<{ success: boolean; data?: VideoLibraryStats }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/stats`);
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/stats`);
     return await res.json();
   }
 
   static async getCategories(): Promise<{ success: boolean; data: string[] }> {
-    const res = await fetch(`${API_BASE_URL}/api/video-library/categories`);
+    const res = await authFetch(`${API_BASE_URL}/api/video-library/categories`);
     return await res.json();
   }
 }

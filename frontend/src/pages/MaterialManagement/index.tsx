@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
 import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, SoundOutlined } from '@ant-design/icons';
-import { API_BASE } from '../../services/config';
+import { API_BASE, authFetch } from '../../services/config';
 
 const { Option } = Select;
 
@@ -45,7 +45,7 @@ const MaterialManagementPage = () => {
   const loadMaterials = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/materials`);
+      const response = await authFetch(`${API_BASE}/api/materials`);
       const data = await response.json();
       if (data.success && data.data) {
         setMaterials(data.data);
@@ -74,7 +74,7 @@ const MaterialManagementPage = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/api/materials/search`, {
+      const response = await authFetch(`${API_BASE}/api/materials/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: searchKeyword, tags: searchTags, topK: 50 }),
@@ -97,7 +97,7 @@ const MaterialManagementPage = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const uploadResponse = await fetch(`${API_BASE}/api/upload`, {
+      const uploadResponse = await authFetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -114,7 +114,7 @@ const MaterialManagementPage = () => {
       }
 
       // 2. 将服务器返回的持久化素材链接登记到 /api/materials 数据库
-      const response = await fetch(`${API_BASE}/api/materials`, {
+      const response = await authFetch(`${API_BASE}/api/materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +141,7 @@ const MaterialManagementPage = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/materials/${id}`, { method: 'DELETE' });
+      const response = await authFetch(`${API_BASE}/api/materials/${id}`, { method: 'DELETE' });
       const data = await response.json();
       if (data.success) {
         message.success('素材删除成功');
@@ -155,7 +155,7 @@ const MaterialManagementPage = () => {
 
   const handleSaveTags = async (id: string, updatedTags: string[]) => {
     try {
-      const response = await fetch(`${API_BASE}/api/materials/${id}`, {
+      const response = await authFetch(`${API_BASE}/api/materials/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tags: updatedTags }),

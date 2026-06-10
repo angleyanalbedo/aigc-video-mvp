@@ -19,9 +19,11 @@ import {
   FireOutlined,
   ThunderboltOutlined,
   PlayCircleOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import ConnectionStatus from '../components/ConnectionStatus';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MenuItem {
   key: string;
@@ -38,6 +40,7 @@ interface WorkbenchLayoutProps {
 const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { logout } = useAuth();
 
   // Detect project-level workspace mode
   const match = location.pathname.match(/\/workbench\/([^/]+)/);
@@ -171,9 +174,20 @@ const WorkbenchLayout: React.FC<WorkbenchLayoutProps> = ({ children }) => {
       icon: <GithubOutlined />,
       tooltip: '访问 GitHub',
     },
+    {
+      key: 'logout',
+      path: '/login',
+      icon: <LogoutOutlined />,
+      tooltip: '退出登录',
+    },
   ];
 
   const handleMenuClick = (item: MenuItem) => {
+    if (item.key === 'logout') {
+      logout();
+      navigate('/login', { replace: true });
+      return;
+    }
     if (item.key === 'github' || item.key === 'feedback') {
       window.open(item.path, '_blank');
     } else {

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, authFetch } from './config';
 
 export interface TemplateFactor {
   opening?: string;
@@ -40,17 +40,17 @@ export class TemplateService {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`${API_BASE_URL}/api/templates?${query}`);
+    const res = await authFetch(`${API_BASE_URL}/api/templates?${query}`);
     return await res.json();
   }
 
   static async getById(id: string): Promise<{ success: boolean; data?: InspirationTemplate; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/${id}`);
+    const res = await authFetch(`${API_BASE_URL}/api/templates/${id}`);
     return await res.json();
   }
 
   static async create(data: Partial<InspirationTemplate>): Promise<{ success: boolean; data?: InspirationTemplate; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates`, {
+    const res = await authFetch(`${API_BASE_URL}/api/templates`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -59,7 +59,7 @@ export class TemplateService {
   }
 
   static async update(id: string, data: Partial<InspirationTemplate>): Promise<{ success: boolean; data?: InspirationTemplate; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/${id}`, {
+    const res = await authFetch(`${API_BASE_URL}/api/templates/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -68,12 +68,12 @@ export class TemplateService {
   }
 
   static async delete(id: string): Promise<{ success: boolean }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`${API_BASE_URL}/api/templates/${id}`, { method: 'DELETE' });
     return await res.json();
   }
 
   static async extractFromVideos(videoIds: string[]): Promise<{ success: boolean; data?: InspirationTemplate; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/extract`, {
+    const res = await authFetch(`${API_BASE_URL}/api/templates/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoIds }),
@@ -82,7 +82,7 @@ export class TemplateService {
   }
 
   static async generateScript(templateId: string, productInfo: any): Promise<{ success: boolean; data?: any; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/${templateId}/generate-script`, {
+    const res = await authFetch(`${API_BASE_URL}/api/templates/${templateId}/generate-script`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productInfo }),
@@ -91,7 +91,7 @@ export class TemplateService {
   }
 
   static async getCategories(): Promise<{ success: boolean; data: string[] }> {
-    const res = await fetch(`${API_BASE_URL}/api/templates/categories`);
+    const res = await authFetch(`${API_BASE_URL}/api/templates/categories`);
     return await res.json();
   }
 }

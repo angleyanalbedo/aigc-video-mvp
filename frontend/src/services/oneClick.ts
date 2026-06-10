@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, authFetch } from './config';
 
 export interface OneClickOptions {
   resolution?: string;
@@ -29,7 +29,7 @@ export class OneClickService {
     referenceVideoId?: string;
     options?: OneClickOptions;
   }): Promise<{ success: boolean; taskId?: string; error?: string }> {
-    const res = await fetch(`${API_BASE_URL}/api/one-click/generate`, {
+    const res = await authFetch(`${API_BASE_URL}/api/one-click/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
@@ -38,7 +38,7 @@ export class OneClickService {
   }
 
   static async getStatus(taskId: string): Promise<any> {
-    const res = await fetch(`${API_BASE_URL}/api/one-click/status/${taskId}`);
+    const res = await authFetch(`${API_BASE_URL}/api/one-click/status/${taskId}`);
     return await res.json();
   }
 
