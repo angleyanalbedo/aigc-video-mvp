@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { getToken } from '../../services/auth'
 import {
   Upload, Input, Button, Tag, Progress, Alert, Radio, Switch, Modal,
   message, Tooltip, Select, Divider
@@ -481,7 +482,7 @@ const VideoCreationPage: React.FC = () => {
         setStatusText('批量生成任务已启动')
 
         try {
-          const es = new EventSource(`${API_BASE}/api/tasks/${batchId}/stream`)
+          const es = new EventSource(`${API_BASE}/api/tasks/${batchId}/stream?token=${getToken()}`)
           es.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data)

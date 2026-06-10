@@ -1,4 +1,5 @@
 import { API_BASE_URL, authFetch } from './config';
+import { getToken } from './auth';
 
 export interface OneClickOptions {
   resolution?: string;
@@ -75,7 +76,7 @@ export class OneClickService {
     };
 
     try {
-      eventSource = new EventSource(`${API_BASE_URL}/api/one-click/stream/${taskId}`);
+      eventSource = new EventSource(`${API_BASE_URL}/api/one-click/stream/${taskId}?token=${getToken()}`);
       eventSource.onmessage = (event) => {
         if (!active) return;
         try {

@@ -11,12 +11,15 @@ function requireAuth(req, res, next) {
     return next();
   }
 
+  // 支持从 Authorization header 或 query parameter 获取 token（EventSource 不支持自定义 header）
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const token = (authHeader && authHeader.startsWith('Bearer '))
+    ? authHeader.substring(7)
+    : req.query.token;
+
+  if (!token) {
     return res.status(401).json({ success: false, error: '未登录，请先登录' });
   }
-
-  const token = authHeader.substring(7);
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;

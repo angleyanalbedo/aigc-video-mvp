@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Form, message, Modal } from 'antd';
 import { API_BASE } from '../../services/config';
+import { getToken } from '../../services/auth';
 
 // Re-export for tabs
 export { API_BASE };
@@ -1128,7 +1129,7 @@ export const useWorkbench = () => {
       }
 
       const taskId = data.batchId;
-      const es = new EventSource(`${API_BASE}/api/tasks/${taskId}/stream`);
+      const es = new EventSource(`${API_BASE}/api/tasks/${taskId}/stream?token=${getToken()}`);
 
       es.onmessage = (event) => {
         const task = JSON.parse(event.data);

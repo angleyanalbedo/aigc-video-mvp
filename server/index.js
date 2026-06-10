@@ -43,11 +43,9 @@ console.log('[DEBUG] 10. observabilityRoutes loaded');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// 根据请求动态生成基础 URL（避免硬编码 localhost）
+// 返回相对路径，由浏览器基于当前 origin 解析（兼容远程访问和反向代理）
 function getBaseUrl(req) {
-  const protocol = req.protocol || 'http';
-  const host = req.get('host') || `localhost:${PORT}`;
-  return `${protocol}://${host}`;
+  return '';
 }
 
 // 引入后端抽象服务层
