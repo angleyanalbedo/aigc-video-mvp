@@ -119,11 +119,15 @@ console.log('[DEBUG] 15. request tracing middleware done');
 
 // ====== 认证 ======
 // 登录路由（必须在 auth 中间件之前注册）
+console.log('[DEBUG] 15a. loading auth routes...');
 const authRoutes = require('./routes/auth');
+console.log('[DEBUG] 15b. auth routes loaded');
 app.use('/api/auth', authRoutes);
 
 // 认证中间件：保护所有 /api 路由
+console.log('[DEBUG] 15c. loading auth middleware...');
 const requireAuth = require('./middleware/auth');
+console.log('[DEBUG] 15d. auth middleware loaded');
 app.use('/api', requireAuth);
 
 // 检查认证环境变量

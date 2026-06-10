@@ -170,7 +170,7 @@ router.post('/:id/materials', upload.single('file'), (req, res) => {
 
     // 方式1: 处理文件上传
     if (req.file) {
-      const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      const fileUrl = `/uploads/${req.file.filename}`;
       const now = new Date().toISOString();
       const matId = `mat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
