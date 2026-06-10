@@ -58,7 +58,10 @@ console.log(`[DEBUG] API 状态: hasRealAPI=${hasRealAPI}`);
 
 console.log('[DEBUG] 13. setting up middleware');
 // ====== 中间件 ======
-app.use(cors());
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',  // 生产环境建议设为具体域名
+  credentials: true
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

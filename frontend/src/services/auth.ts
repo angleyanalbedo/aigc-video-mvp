@@ -1,5 +1,4 @@
 const TOKEN_KEY = 'auth_token';
-const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 export function getToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY);
@@ -21,7 +20,7 @@ export async function login(
   username: string,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
-  const response = await fetch(`${API_BASE}/api/auth/login`, {
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -38,7 +37,7 @@ export async function verifyToken(): Promise<boolean> {
   const token = getToken();
   if (!token) return false;
   try {
-    const response = await fetch(`${API_BASE}/api/auth/verify`, {
+    const response = await fetch('/api/auth/verify', {
       headers: { Authorization: `Bearer ${token}` },
     });
     return response.ok;
