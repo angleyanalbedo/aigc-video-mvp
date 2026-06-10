@@ -6,8 +6,8 @@ function requireAuth(req, res, next) {
     return next();
   }
 
-  // 登录接口和健康检查不需要认证
-  if (req.path === '/api/auth/login' || req.path === '/api/auth/verify' || req.path === '/api/health') {
+  // 登录接口和健康检查不需要认证（注意：挂载在 /api 下，req.path 已剥离前缀）
+  if (req.path === '/auth/login' || req.path === '/auth/verify' || req.path === '/health') {
     return next();
   }
 
