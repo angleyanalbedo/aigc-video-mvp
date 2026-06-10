@@ -496,6 +496,43 @@ const tools = [
       await projectModel.update(context.projectId, { script: project.script });
       return `✅ 已将素材 "${material.filename}" 关联到分镜 ${params.sceneId}`;
     }
+  },
+
+  {
+    name: 'analyze_material',
+    description: '分析用户上传的图片、视频或文件，提取商品信息（名称、卖点、受众、风格、价格）。当用户上传了附件并要求分析时使用。',
+    parameters: {
+      type: 'object',
+      properties: {
+        fileUrl: { type: 'string', description: '文件URL（可选，不传则自动使用当前消息的附件）' },
+        fileName: { type: 'string', description: '文件名（可选）' },
+        fileType: { type: 'string', description: '文件类型: image, video, file（可选）' }
+      }
+    },
+    execute: async (params, context) => {
+      const assetAgent = require('../assetAgent');
+      // 优先使用参数传入的文件信息，否则从当前消息元数据中获取
+      const meta = context.sessionContext?.currentMessageMetadata || {};
+      const fileUrl = params.fileUrl || meta.fileUrl;
+      const fileName = params.fileName || meta.fileName;
+      const fileType = params.fileType || meta.fileType;
+
+      if (!fileUrl) return '❌ 没有可分析的文件，请先上传图片、视频或文件';
+
+      const materials = [{
+        filename: fileName || 'uploaded_file',
+        url: fileUrl,
+        type: fileType || 'file',
+        tags: []
+      }];
+
+      try {
+        const result = await assetAgent.analyze(materials);
+        return `✅ 文件分析完成:\n- 商品: ${result.title}\n- 卖点: ${result.sellingPoints}\n- 受众: ${result.targetAudience}\n- 风格: ${result.style}\n- 价格: ${result.price}`;
+      } catch (err) {
+        return `❌ 文件分析失败: ${err.message}`;
+      }
+    }
   }
 ];
 

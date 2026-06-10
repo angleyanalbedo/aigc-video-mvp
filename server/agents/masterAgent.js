@@ -40,6 +40,11 @@ class MasterAgent extends EventEmitter {
     const sessionId = context.sessionId || await this.createChatSession(projectId);
     const sessionContext = await this.loadSessionContext(projectId, sessionId);
 
+    // 将当前消息的附件元数据注入上下文，供工具使用
+    if (context.metadata) {
+      sessionContext.currentMessageMetadata = context.metadata;
+    }
+
     // 保存用户消息
     await canvasSyncService.addChatMessage(
       sessionId, 'user', 'text', message, context.metadata || {}
