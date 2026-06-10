@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Upload, Button, Card, List, Tag, Input, Select, Empty, Space, message, Descriptions, Modal } from 'antd';
 import { UploadOutlined, SearchOutlined, PictureOutlined, VideoCameraOutlined, SoundOutlined } from '@ant-design/icons';
+import { API_BASE } from '../../services/config';
 
 const { Option } = Select;
-
-const API_BASE = window.location.hostname.includes('trae.cn')
-  ? 'http://localhost:3001'
-  : '';
 
 // 辅助函数：处理素材 URL，确保相对路径能正确解析
 const getMaterialUrl = (url: string): string => {

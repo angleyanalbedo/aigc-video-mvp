@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Form, message, Modal } from 'antd';
+import { API_BASE } from '../../services/config';
 
-// API base address helper
-export const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
+// Re-export for tabs
+export { API_BASE };
 
 // Shared Types
 export interface Message {

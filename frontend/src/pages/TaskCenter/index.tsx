@@ -14,10 +14,7 @@ import {
   ClearOutlined
 } from '@ant-design/icons'
 import axios from 'axios'
-
-const API_BASE = window.location.hostname.includes('trae.cn') 
-  ? 'http://localhost:3001' 
-  : ''
+import { API_BASE } from '../../services/config'
 
 interface DashboardData {
   overview: {

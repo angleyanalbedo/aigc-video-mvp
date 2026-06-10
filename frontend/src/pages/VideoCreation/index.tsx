@@ -15,10 +15,7 @@ import {
 } from '@ant-design/icons'
 import axios from 'axios'
 import { useLocation, useNavigate } from 'react-router-dom'
-
-const API_BASE = window.location.hostname.includes('trae.cn')
-  ? 'http://localhost:3001'
-  : ''
+import { API_BASE } from '../../services/config'
 
 const { TextArea } = Input
 

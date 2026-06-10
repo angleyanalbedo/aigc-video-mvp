@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+import { API_BASE } from '../services/config';
 
 export interface ApiResponse<T = any> {
   success: boolean;
