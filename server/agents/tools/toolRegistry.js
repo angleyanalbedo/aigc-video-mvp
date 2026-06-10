@@ -331,6 +331,171 @@ const tools = [
       const reply = await agentChatService.generateGeneralChat(params.question, context.sessionContext);
       return reply;
     }
+  },
+
+  // ─── 补齐工具 ─────────────────────────────────────────
+
+  {
+    name: 'delete_scene',
+    description: '删除指定分镜，剩余分镜自动重新编号。删除后会同步更新画布。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sceneId: { type: 'number', description: '要删除的分镜序号（从1开始）' }
+      },
+      required: ['sceneId']
+    },
+    execute: async (params, context) => {
+      const project = projectModel.getById(context.projectId);
+      if (!project?.script?.scenes) return '❌ 没有剧本';
+      const idx = params.sceneId - 1;
+      if (idx < 0 || idx >= project.script.scenes.length) return `❌ 分镜 ${params.sceneId} 不存在`;
+      const deleted = project.script.scenes.splice(idx, 1)[0];
+      // 重新编号
+      project.script.scenes.forEach((s, i) => { s.id = i + 1; });
+      await projectModel.update(context.projectId, { script: project.script });
+      const canvasSyncService = require('../../services/canvasSyncService');
+      await canvasSyncService.syncScriptToCanvas(context.projectId, project.script);
+      return `✅ 已删除分镜 ${params.sceneId}（${deleted.description?.slice(0, 20)}...），剩余 ${project.script.scenes.length} 个分镜`;
+    }
+  },
+
+  {
+    name: 'reorder_scene',
+    description: '将分镜移动到新位置，其余分镜自动重新编号。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sceneId: { type: 'number', description: '要移动的分镜序号（从1开始）' },
+        newPosition: { type: 'number', description: '目标位置（从1开始）' }
+      },
+      required: ['sceneId', 'newPosition']
+    },
+    execute: async (params, context) => {
+      const project = projectModel.getById(context.projectId);
+      if (!project?.script?.scenes) return '❌ 没有剧本';
+      const scenes = project.script.scenes;
+      const fromIdx = params.sceneId - 1;
+      const toIdx = params.newPosition - 1;
+      if (fromIdx < 0 || fromIdx >= scenes.length) return `❌ 分镜 ${params.sceneId} 不存在`;
+      if (toIdx < 0 || toIdx >= scenes.length) return `❌ 目标位置 ${params.newPosition} 超出范围（共 ${scenes.length} 个分镜）`;
+      const [moved] = scenes.splice(fromIdx, 1);
+      scenes.splice(toIdx, 0, moved);
+      scenes.forEach((s, i) => { s.id = i + 1; });
+      await projectModel.update(context.projectId, { script: project.script });
+      const canvasSyncService = require('../../services/canvasSyncService');
+      await canvasSyncService.syncScriptToCanvas(context.projectId, project.script);
+      return `✅ 分镜已从位置 ${params.sceneId} 移动到 ${params.newPosition}，当前顺序: ${scenes.map(s => s.id).join('→')}`;
+    }
+  },
+
+  {
+    name: 'set_video_params',
+    description: '设置指定分镜的视频渲染参数（分辨率、宽高比）。下次渲染时生效。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sceneId: { type: 'number', description: '分镜序号（从1开始）' },
+        resolution: { type: 'string', description: '分辨率: 720p 或 480p', enum: ['720p', '480p'] },
+        ratio: { type: 'string', description: '宽高比: 9:16(竖屏), 16:9(横屏), 1:1(方形), 4:3', enum: ['9:16', '16:9', '1:1', '4:3'] }
+      },
+      required: ['sceneId']
+    },
+    execute: async (params, context) => {
+      const project = projectModel.getById(context.projectId);
+      if (!project?.script?.scenes) return '❌ 没有剧本';
+      const scene = project.script.scenes[params.sceneId - 1];
+      if (!scene) return `❌ 分镜 ${params.sceneId} 不存在`;
+      scene.videoParams = scene.videoParams || {};
+      if (params.resolution) scene.videoParams.resolution = params.resolution;
+      if (params.ratio) scene.videoParams.ratio = params.ratio;
+      await projectModel.update(context.projectId, { script: project.script });
+      return `✅ 分镜 ${params.sceneId} 渲染参数: 分辨率=${scene.videoParams.resolution || '720p'}, 宽高比=${scene.videoParams.ratio || '9:16'}`;
+    }
+  },
+
+  {
+    name: 'set_audio_mix',
+    description: '设置全局音频混音参数（TTS音量、BGM音量、BGM链接）。合成成片时生效。',
+    parameters: {
+      type: 'object',
+      properties: {
+        ttsVolume: { type: 'number', description: 'TTS配音音量 0-1，默认0.8' },
+        bgmVolume: { type: 'number', description: 'BGM背景音乐音量 0-1，默认0.2' },
+        bgmUrl: { type: 'string', description: 'BGM音频文件URL（可选）' }
+      }
+    },
+    execute: async (params, context) => {
+      const project = projectModel.getById(context.projectId);
+      if (!project) return '❌ 项目不存在';
+      const settings = project.settings || {};
+      settings.audioMix = settings.audioMix || { ttsVolume: 0.8, bgmVolume: 0.2 };
+      if (params.ttsVolume !== undefined) settings.audioMix.ttsVolume = Math.max(0, Math.min(1, params.ttsVolume));
+      if (params.bgmVolume !== undefined) settings.audioMix.bgmVolume = Math.max(0, Math.min(1, params.bgmVolume));
+      if (params.bgmUrl !== undefined) settings.audioMix.bgmUrl = params.bgmUrl;
+      await projectModel.update(context.projectId, { settings });
+      return `✅ 音频混音参数已更新: TTS音量=${settings.audioMix.ttsVolume}, BGM音量=${settings.audioMix.bgmVolume}${settings.audioMix.bgmUrl ? ', BGM=' + settings.audioMix.bgmUrl.slice(0, 40) : ''}`;
+    }
+  },
+
+  {
+    name: 'parallel_generate_video',
+    description: '同时渲染多个分镜的视频（并行执行，速度更快）。传入分镜序号数组。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sceneIds: { type: 'array', items: { type: 'number' }, description: '分镜序号数组，如 [1, 2, 3]' }
+      },
+      required: ['sceneIds']
+    },
+    execute: async (params, context) => {
+      const videoAgent = require('../videoAgent');
+      const project = projectModel.getById(context.projectId);
+      if (!project?.script?.scenes) return '❌ 没有剧本';
+      const scenes = params.sceneIds
+        .map(id => project.script.scenes[id - 1])
+        .filter(Boolean);
+      if (scenes.length === 0) return '❌ 没有有效的分镜';
+      const results = await Promise.allSettled(
+        scenes.map(scene => videoAgent.generateScene(scene, {
+          projectId: context.projectId,
+          sceneIndex: scene.id - 1,
+          resolution: scene.videoParams?.resolution || '720p',
+          ratio: scene.videoParams?.ratio || '9:16'
+        }))
+      );
+      const succeeded = results.filter(r => r.status === 'fulfilled' && r.value?.videoUrl).length;
+      const failed = results.length - succeeded;
+      return `✅ 并行渲染完成: ${succeeded} 成功，${failed} 失败（共 ${results.length} 个分镜）`;
+    }
+  },
+
+  {
+    name: 'link_material',
+    description: '将素材库中的素材关联到指定分镜（作为首帧图片或参考图）。',
+    parameters: {
+      type: 'object',
+      properties: {
+        sceneId: { type: 'number', description: '分镜序号（从1开始）' },
+        materialId: { type: 'string', description: '素材ID' }
+      },
+      required: ['sceneId', 'materialId']
+    },
+    execute: async (params, context) => {
+      const project = projectModel.getById(context.projectId);
+      if (!project?.script?.scenes) return '❌ 没有剧本';
+      const scene = project.script.scenes[params.sceneId - 1];
+      if (!scene) return `❌ 分镜 ${params.sceneId} 不存在`;
+      const material = project.materials?.find(m => m.id === params.materialId);
+      if (!material) return `❌ 素材 ${params.materialId} 不存在`;
+      if (material.type === 'image' || material.type === 'video') {
+        scene.imageUrl = material.url || material.file_path;
+        scene.referenceImageUrl = material.url || material.file_path;
+      }
+      scene.linkedMaterialId = params.materialId;
+      await projectModel.update(context.projectId, { script: project.script });
+      return `✅ 已将素材 "${material.filename}" 关联到分镜 ${params.sceneId}`;
+    }
   }
 ];
 

@@ -134,7 +134,7 @@ async function runToolLoop(userMessage, projectId, options = {}) {
   const toolsPrompt = formatToolsPrompt(toolDescriptions);
 
   const contextSnippet = sessionContext
-    ? `\n## 当前上下文\n项目ID: ${projectId}\n${sessionContext.script ? `剧本: ${sessionContext.script.title} (${sessionContext.script.scenes?.length || 0} 个分镜)` : '暂无剧本'}\n${sessionContext.productInfo ? `商品: ${sessionContext.productInfo.title}` : ''}`
+    ? `\n## 当前上下文\n项目ID: ${projectId}\n${sessionContext.script ? `剧本: ${sessionContext.script.title} (${sessionContext.script.scenes?.length || 0} 个分镜)\n分镜列表: ${sessionContext.script.scenes?.map((s, i) => `${i+1}.${s.description?.slice(0, 20)}`).join(' | ')}` : '暂无剧本'}\n${sessionContext.productInfo ? `商品: ${sessionContext.productInfo.title}` : ''}\n素材数: ${sessionContext.project?.materials?.length || 0}`
     : '';
 
   const systemPrompt = `你是 AI 视频创作助手，负责帮助用户完成短视频创作任务。${contextSnippet}
