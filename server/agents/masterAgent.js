@@ -37,8 +37,14 @@ class MasterAgent extends EventEmitter {
   async processMessage(message, projectId, context = {}) {
     console.log(`\n🤖 MasterAgent: 收到消息 "${message.slice(0, 50)}${message.length > 50 ? '...' : ''}"`);
 
-    const sessionId = context.sessionId || await this.createChatSession(projectId);
+    const sessionId = context.sessionId || await this.createChatSession(projectId, message.slice(0, 20) || '新会话');
     const sessionContext = await this.loadSessionContext(projectId, sessionId);
+
+    // 自动用用户第一条消息更新会话标题（替换默认的"新会话"/"新对话"）
+    if (sessionContext.recentMessages?.length <= 1) {
+      const autoTitle = message.slice(0, 25) + (message.length > 25 ? '...' : '');
+      await canvasSyncService.updateChatSessionTitle(sessionId, autoTitle);
+    }
 
     // 将当前消息的附件元数据注入上下文，供工具使用
     if (context.metadata) {

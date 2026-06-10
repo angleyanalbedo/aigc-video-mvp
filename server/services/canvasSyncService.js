@@ -512,6 +512,10 @@ class CanvasSyncService {
     return sessionId;
   }
 
+  async updateChatSessionTitle(sessionId, title) {
+    db.prepare('UPDATE chat_sessions SET title = ? WHERE id = ?').run(title, sessionId);
+  }
+
   async addChatMessage(sessionId, role, messageType, content, metadata = {}) {
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
