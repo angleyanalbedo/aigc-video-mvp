@@ -98,18 +98,16 @@ const groupMessages = (msgs: Message[], isLoading: boolean): GroupedMessageItem[
   const pushCurrentTrace = (isLastGroup: boolean) => {
     if (currentTrace.length > 0) {
       let status: 'executing' | 'completed' | 'failed' = 'completed';
-      
-      const hasError = currentTrace.some(m => m.type === 'error' || m.content.includes('失败') || m.content.includes('❌'));
-      const hasCompletion = currentTrace.some(m => m.content.includes('完成') || m.content.includes('成功') || m.content.includes('✅'));
 
+      const hasError = currentTrace.some(m => m.type === 'error' || m.content.includes('失败') || m.content.includes('❌'));
+
+      // 只有最后一组 trace 且仍在加载中才显示 executing，其余一律 completed
       if (hasError) {
         status = 'failed';
-      } else if (hasCompletion) {
-        status = 'completed';
       } else if (isLastGroup && isLoading) {
         status = 'executing';
       } else {
-        status = 'completed'; // Fallback if no longer loading
+        status = 'completed';
       }
 
       grouped.push({
@@ -801,7 +799,7 @@ const TracePanel: React.FC<{
         {isExpanded && (
           <div className="trace-steps-container">
             <Timeline className="trace-timeline">
-              {trace.steps.map((step) => {
+              {trace.steps.map((step, idx) => {
                 let dotIcon = <InfoCircleOutlined />;
                 let dotColor = 'blue';
 
@@ -811,12 +809,25 @@ const TracePanel: React.FC<{
                 } else if (step.content.includes('思考') || step.content.includes('🧠')) {
                   dotIcon = <RobotOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
                   dotColor = 'blue';
-                } else if (step.content.includes('成功') || step.content.includes('完成') || step.content.includes('✅')) {
-                  dotIcon = <CheckCircleOutlined style={{ fontSize: '14px', color: '#52c41a' }} />;
-                  dotColor = 'green';
-                } else if (step.content.includes('准备执行') || step.content.includes('正在执行') || step.content.includes('⚙️')) {
-                  dotIcon = <LoadingOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
-                  dotColor = 'blue';
+                } else if (step.content.includes('📋')) {
+                  // 工具结果 — 有 ✅ 则绿色，否则蓝色（已完成但无明确状态）
+                  if (step.content.includes('✅') || step.content.includes('成功') || step.content.includes('完成')) {
+                    dotIcon = <CheckCircleOutlined style={{ fontSize: '14px', color: '#52c41a' }} />;
+                    dotColor = 'green';
+                  } else {
+                    dotIcon = <CheckCircleOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
+                    dotColor = 'blue';
+                  }
+                } else if (step.content.includes('⚙️')) {
+                  // 工具调用 — 如果后面已经有 📋 结果了就显示对勾，否则转圈
+                  const hasResultAfter = trace.steps.slice(idx + 1).some(s => s.content.includes('📋'));
+                  if (hasResultAfter) {
+                    dotIcon = <CheckCircleOutlined style={{ fontSize: '14px', color: '#52c41a' }} />;
+                    dotColor = 'green';
+                  } else {
+                    dotIcon = <LoadingOutlined style={{ fontSize: '14px', color: '#1890ff' }} />;
+                    dotColor = 'blue';
+                  }
                 }
 
                 return (
